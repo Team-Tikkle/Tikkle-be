@@ -1,0 +1,20 @@
+name: "🎯 Fix"
+description: "버그 수정 및 파일 수정/삭제"
+labels: ["fix"]
+body:
+  - type: textarea
+    attributes:
+      label: 📄 설명
+      description: 설명을 작성해 주세요.
+      placeholder: 예시) 로그인 시 비밀번호 검증 오류 수정
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: ✅ 작업할 내용
+      description: 할 일을 작성해주세요.
+      value: |
+        - [ ] Task1
+        - [ ] Task2
+    validations:
+      required: true
