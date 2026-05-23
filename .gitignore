@@ -65,5 +65,5 @@ Thumbs.db
 # ==========================================
 # 4. 보안 및 환경 설정 파일
 # ==========================================
-src/main/resources/application-main.yml
-application-main.yml
+src/main/resources/application-prod.yml
+application-prod.yml
