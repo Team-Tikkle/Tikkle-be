@@ -2,10 +2,10 @@ package com.tikkle.global.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.tikkle.global.exception.ErrorCode;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import com.tikkle.global.exception.ErrorCode;
 
 /**
  * API 공통 응답 형식 클래스
