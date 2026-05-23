@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -58,9 +59,10 @@ public class GlobalExceptionHandler {
     }
 
     // 잘못된 주소(URL)로 요청을 보냈을 때 (404 Not Found)
-    @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseEntity<ApiResponse<?>> handleNoHandlerFoundException(NoHandlerFoundException e) {
-        log.warn("[NoHandlerFoundException]", e);
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("[NoResourceFoundException] 잘못된 URL 요청: {}", e.getResourcePath());
+
         return ResponseEntity
                 .status(ErrorCode.URL_NOT_FOUND.getHttpStatus())
                 .body(ApiResponse.error(ErrorCode.URL_NOT_FOUND.getCode(), ErrorCode.URL_NOT_FOUND.getMessage()));
