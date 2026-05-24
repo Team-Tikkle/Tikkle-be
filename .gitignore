@@ -67,6 +67,7 @@ Thumbs.db
 # ==========================================
 src/main/resources/application-prod.yml
 application-prod.yml
+.env
 
 # ==========================================
 # 5. 프로젝트 문서
