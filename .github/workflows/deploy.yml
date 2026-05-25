@@ -67,9 +67,11 @@ jobs:
             --zone=${{ env.REGION }}-a \
             --project=${{ env.PROJECT_ID }} \
             --command="
-              # 1) 프로젝트 폴더 이동 및 최신 코드 갱신
               cd /home/canach3/Tikkle-be &&
-              git pull origin main &&
+          
+              # 1) 원격 저장소 내용을 가져오고, 로컬 변경사항을 무시하고 강제 동기화
+              git fetch origin main &&
+              git reset --hard origin/main &&
           
               # 2) .env 파일 재생성 (보안 정보 업데이트)
               echo 'SPRING_PROFILES_ACTIVE=prod' > .env &&
