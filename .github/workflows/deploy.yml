@@ -63,25 +63,23 @@ jobs:
         run: |
           IMAGE_PATH="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:latest"
           
-          gcloud compute ssh tikkle-server \
+          gcloud compute ssh canach3@tikkle-server \
             --zone=${{ env.REGION }}-a \
             --project=${{ env.PROJECT_ID }} \
             --command="
-              # 1) 프로젝트 폴더로 이동하여 최신 docker-compose.yml 갱신
-              cd ~/Tikkle-be &&
+              # 1) 프로젝트 폴더 이동 및 최신 코드 갱신
+              cd /home/canach3/Tikkle-be &&
               git pull origin main &&
           
-              # 2) Secrets를 활용해 서버 내부에 .env 파일 생성 및 덮어쓰기
+              # 2) .env 파일 재생성 (보안 정보 업데이트)
               echo 'SPRING_PROFILES_ACTIVE=prod' > .env &&
               echo 'DB_URL=${{ secrets.DB_URL }}' >> .env &&
               echo 'DB_USERNAME=${{ secrets.DB_USERNAME }}' >> .env &&
               echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> .env &&
               echo 'REDIS_HOST=${{ secrets.REDIS_HOST }}' >> .env &&
           
-              # 3) 최신 도커 이미지 다운로드 후 컨테이너 재실행
+              # 3) 컨테이너 업데이트 및 최적화
               docker pull $IMAGE_PATH &&
               docker-compose up -d &&
-          
-              # 4) 사용하지 않는 이전 도커 이미지 삭제 (디스크 용량 확보 필수!)
               docker image prune -f
             "
