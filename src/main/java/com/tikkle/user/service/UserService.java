@@ -9,6 +9,7 @@ import com.tikkle.user.repository.UserRepository;
 import com.tikkle.user.exception.DuplicateEmailException;
 import com.tikkle.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +30,11 @@ public class UserService {
                 .phone(request.phone())
                 .status(UserStatus.ACTIVE)
                 .build();
-        return UserResponse.from(userRepository.save(user));
+        try {
+            return UserResponse.from(userRepository.save(user));
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEmailException();
+        }
     }
 
     public UserResponse getUser(Long id) {
