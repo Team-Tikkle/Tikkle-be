@@ -21,13 +21,13 @@ public class UserService {
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(request.email())) {
             throw new DuplicateEmailException();
         }
         User user = User.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
+                .name(request.name())
+                .email(request.email())
+                .phone(request.phone())
                 .status(UserStatus.ACTIVE)
                 .build();
         return UserResponse.from(userRepository.save(user));
@@ -40,7 +40,7 @@ public class UserService {
     @Transactional
     public UserResponse updateUser(Long id, UpdateUserRequest request) {
         User user = findActiveUser(id);
-        user.update(request.getName(), request.getPhone());
+        user.update(request.name(), request.phone());
         return UserResponse.from(user);
     }
 
