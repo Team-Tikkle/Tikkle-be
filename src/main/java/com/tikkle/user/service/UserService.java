@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
-
     private final UserRepository userRepository;
 
     @Transactional
@@ -24,7 +23,7 @@ public class UserService {
         if (userRepository.existsByEmail(request.email())) {
             throw new DuplicateEmailException();
         }
-        User user = User.builder()
+        final User user = User.builder()
                 .name(request.name())
                 .email(request.email())
                 .phone(request.phone())
@@ -39,7 +38,7 @@ public class UserService {
 
     @Transactional
     public UserResponse updateUser(Long id, UpdateUserRequest request) {
-        User user = findActiveUser(id);
+        final User user = findActiveUser(id);
         user.update(request.name(), request.phone());
         return UserResponse.from(user);
     }
