@@ -1,6 +1,6 @@
 package com.tikkle.auth.jwt;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.tikkle.auth.security.CustomUserDetailsService;
 import com.tikkle.global.exception.ErrorCode;
 import com.tikkle.global.response.ApiResponse;
@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
     private final CustomUserDetailsService userDetailsService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
