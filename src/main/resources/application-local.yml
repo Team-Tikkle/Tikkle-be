@@ -23,7 +23,6 @@ spring:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
     generate-ddl: true
-    show-sql: true
     hibernate:
       ddl-auto: update
     properties:
@@ -31,6 +30,6 @@ spring:
         format_sql: true
 
 jwt:
-  secret: TikkleSecretKeyForJwtTokenGenerationAndVerification2024VeryLongSecretKey
+  secret: ${JWT_SECRET}
   access-token-expiration: 3600000
   refresh-token-expiration: 1209600000

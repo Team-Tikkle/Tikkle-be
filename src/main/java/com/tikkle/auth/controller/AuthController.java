@@ -17,12 +17,6 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController implements AuthSwagger {
     private final AuthService authService;
 
-    // TODO: 소셜 로그인 구현 후 삭제
-    @PostMapping("/test-token")
-    public ApiResponse<TokenResponse> testToken(@RequestParam String email) {
-        return ApiResponse.success(authService.generateTestToken(email));
-    }
-
     @Override
     @PostMapping("/logout")
     public ApiResponse<?> logout(@AuthenticationPrincipal CustomUserDetails userDetails) {

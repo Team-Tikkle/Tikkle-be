@@ -42,13 +42,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         switch (result) {
             case VALID -> {
-                final String email = jwtProvider.getEmail(token);
-                final UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                final UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                filterChain.doFilter(request, response);
+                try {
+                    final String email = jwtProvider.getEmail(token);
+                    final UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    final UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    filterChain.doFilter(request, response);
+                } catch (Exception e) {
+                    SecurityContextHolder.clearContext();
+                    writeErrorResponse(response, ErrorCode.INVALID_TOKEN);
+                }
             }
             case EXPIRED -> writeErrorResponse(response, ErrorCode.EXPIRED_TOKEN);
             case INVALID -> writeErrorResponse(response, ErrorCode.INVALID_TOKEN);

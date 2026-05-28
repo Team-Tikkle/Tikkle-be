@@ -3,7 +3,13 @@
     "allow": [
       "Bash(./gradlew compileJava)",
       "Bash(./gradlew bootRun)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(python3 *)",
+      "PowerShell($bytes = New-Object byte[] 64; [System.Security.Cryptography.RandomNumberGenerator]::Fill\\($bytes\\); [Convert]::ToBase64String\\($bytes\\))",
+      "PowerShell($rng = [System.Security.Cryptography.RNGCryptoServiceProvider]::new\\(\\); $bytes = New-Object byte[] 64; $rng.GetBytes\\($bytes\\); [Convert]::ToBase64String\\($bytes\\))",
+      "Bash(git check-ignore *)",
+      "PowerShell(Remove-Item *)",
+      "Bash(./gradlew clean *)"
     ]
   }
 }

@@ -16,18 +16,6 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    // TODO: 소셜 로그인 구현 후 삭제
-    public TokenResponse generateTestToken(String email) {
-        final String accessToken = jwtProvider.createAccessToken(email);
-        final String refreshToken = jwtProvider.createRefreshToken(email);
-        refreshTokenRepository.save(new RefreshToken(
-                email,
-                refreshToken,
-                jwtProvider.getRefreshTokenExpiration() / 1000
-        ));
-        return new TokenResponse(accessToken, refreshToken);
-    }
-
     public void logout(String email) {
         refreshTokenRepository.deleteById(email);
     }
