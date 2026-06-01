@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "User", description = "유저 API")
@@ -50,6 +51,7 @@ public interface UserSwagger {
     })
     ApiResponse<UserResponse> createUser(CreateUserRequest request);
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "유저 조회", description = "ID로 유저 정보를 조회합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공",
@@ -80,6 +82,7 @@ public interface UserSwagger {
     ApiResponse<UserResponse> getUser(
             @Parameter(description = "유저 ID", example = "1") Long id);
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "유저 정보 수정", description = "유저의 이름 또는 전화번호를 수정합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공",
@@ -119,6 +122,7 @@ public interface UserSwagger {
             @Parameter(description = "유저 ID", example = "1") Long id,
             UpdateUserRequest request);
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "회원 탈퇴", description = "유저를 탈퇴 처리합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "탈퇴 성공",

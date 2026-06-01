@@ -14,13 +14,22 @@ spring:
       max-file-size: 10MB
       max-request-size: 100MB
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   jpa:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
     generate-ddl: true
-    show-sql: true
     hibernate:
       ddl-auto: update
     properties:
       hibernate:
         format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
