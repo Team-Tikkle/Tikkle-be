@@ -1,5 +1,6 @@
 package com.tikkle.auth.swagger;
 
+import com.tikkle.auth.dto.request.GoogleLoginRequest;
 import com.tikkle.auth.dto.request.ReissueRequest;
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.global.response.ApiResponse;
@@ -14,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name = "Auth", description = "인증 API")
 public interface AuthSwagger {
+    @Operation(summary = "구글 소셜 로그인", description = "프론트에서 발급받은 구글 액세스 토큰으로 로그인/회원가입 후 자체 JWT를 발급합니다.")
+    ApiResponse<TokenResponse> googleLogin(@RequestBody @Valid GoogleLoginRequest request);
+
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "로그아웃", description = "Refresh Token을 삭제하여 로그아웃합니다.")
     ApiResponse<?> logout(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);

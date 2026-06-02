@@ -1,4 +1,8 @@
 spring:
   profiles:
     active:
-      - prod
+      - local
+
+oauth:
+  google:
+    user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo

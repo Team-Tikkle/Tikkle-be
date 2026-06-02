@@ -3,6 +3,7 @@ package com.tikkle.user.service;
 import com.tikkle.user.dto.request.CreateUserRequest;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;
+import com.tikkle.user.entity.AuthProvider;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.UserStatus;
 import com.tikkle.user.repository.UserRepository;
@@ -28,6 +29,7 @@ public class UserService {
                 .name(request.name())
                 .email(request.email())
                 .phone(request.phone())
+                .provider(AuthProvider.LOCAL)
                 .status(UserStatus.ACTIVE)
                 .build();
         try {

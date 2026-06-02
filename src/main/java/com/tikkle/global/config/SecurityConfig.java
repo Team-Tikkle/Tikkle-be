@@ -27,6 +27,7 @@ public class SecurityConfig {
 
     private static final String[] PERMIT_ALL_URLS = {
             "/api/auth/reissue",
+            "/api/auth/oauth/**",
             "/api/users",
             "/swagger-ui/**",
             "/v3/api-docs/**"
