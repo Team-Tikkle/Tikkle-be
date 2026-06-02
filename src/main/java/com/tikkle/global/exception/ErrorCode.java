@@ -23,7 +23,8 @@ public enum ErrorCode {
 
     // 3. 유저
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
-    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "USER-002", "이미 가입된 이메일입니다.");
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "USER-002", "이미 가입된 이메일입니다."),
+    WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-003", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
