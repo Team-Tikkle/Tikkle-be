@@ -1,14 +1,14 @@
 package com.tikkle.user.controller;
 
+import com.tikkle.auth.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.user.swagger.UserSwagger;
-import com.tikkle.user.dto.request.CreateUserRequest;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;
 import com.tikkle.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,29 +18,23 @@ public class UserController implements UserSwagger {
     private final UserService userService;
 
     @Override
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserResponse> createUser(@RequestBody @Valid CreateUserRequest request) {
-        return ApiResponse.success(userService.createUser(request));
+    @GetMapping("/me")
+    public ApiResponse<UserResponse> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ApiResponse.success(userService.getMe(userDetails.getUsername()));
     }
 
     @Override
-    @GetMapping("/{id}")
-    public ApiResponse<UserResponse> getUser(@PathVariable Long id) {
-        return ApiResponse.success(userService.getUser(id));
+    @PatchMapping("/me")
+    public ApiResponse<UserResponse> updateMe(@AuthenticationPrincipal CustomUserDetails userDetails,
+                                              @RequestBody @Valid UpdateUserRequest request) {
+        return ApiResponse.success(userService.updateMe(userDetails.getUsername(), request));
     }
 
     @Override
-    @PatchMapping("/{id}")
-    public ApiResponse<UserResponse> updateUser(@PathVariable Long id,
-                                                @RequestBody @Valid UpdateUserRequest request) {
-        return ApiResponse.success(userService.updateUser(id, request));
-    }
-
-    @Override
-    @DeleteMapping("/{id}")
-    public ApiResponse<?> withdrawUser(@PathVariable Long id) {
-        userService.withdrawUser(id);
+    @DeleteMapping("/me")
+    public ApiResponse<?> withdrawMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        userService.withdrawMe(userDetails.getUsername());
         return ApiResponse.successWithNoData();
     }
+
 }

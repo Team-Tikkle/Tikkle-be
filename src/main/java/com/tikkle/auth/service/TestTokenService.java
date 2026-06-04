@@ -4,6 +4,8 @@ import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.entity.RefreshToken;
 import com.tikkle.auth.jwt.JwtProvider;
 import com.tikkle.auth.repository.RefreshTokenRepository;
+import com.tikkle.user.entity.AuthProvider;
+import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
@@ -22,6 +24,21 @@ public class TestTokenService {
     public TokenResponse generateTestToken(String email) {
         userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
+        return issueToken(email);
+    }
+
+    public TokenResponse generateTestSignupAndToken(String email, String name) {
+        final User user = userRepository.findByEmail(email)
+                .orElseGet(() -> userRepository.save(User.builder()
+                        .email(email)
+                        .name(name)
+                        .provider(AuthProvider.GOOGLE)
+                        .status(UserStatus.ACTIVE)
+                        .build()));
+        return issueToken(user.getEmail());
+    }
+
+    private TokenResponse issueToken(String email) {
         final String accessToken = jwtProvider.createAccessToken(email);
         final String refreshToken = jwtProvider.createRefreshToken(email);
         refreshTokenRepository.save(new RefreshToken(

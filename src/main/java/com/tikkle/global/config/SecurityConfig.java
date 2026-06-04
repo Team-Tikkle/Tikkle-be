@@ -27,7 +27,7 @@ public class SecurityConfig {
 
     private static final String[] PERMIT_ALL_URLS = {
             "/api/auth/reissue",
-            "/api/users",
+            "/api/auth/oauth/**",
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/api/payments"
@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(PERMIT_ALL_URLS).permitAll();
                     if (isLocal) {
-                        auth.requestMatchers("/api/auth/test-token").permitAll();
+                        auth.requestMatchers("/api/auth/test-token", "/api/auth/test-signup").permitAll();
                     }
                     auth.anyRequest().authenticated();
                 })

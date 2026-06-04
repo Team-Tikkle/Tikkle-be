@@ -1,7 +1,7 @@
 package com.tikkle.user.swagger;
 
+import com.tikkle.auth.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
-import com.tikkle.user.dto.request.CreateUserRequest;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,48 +11,12 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(name = "User", description = "유저 API")
 public interface UserSwagger {
-    @Operation(summary = "회원가입", description = "새로운 유저를 등록합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "회원가입 성공",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "SUCCESS",
-                                      "message": "요청에 성공했습니다.",
-                                      "data": {
-                                        "id": 1,
-                                        "name": "홍길동",
-                                        "email": "hong@example.com",
-                                        "phone": "010-1234-5678",
-                                        "status": "ACTIVE",
-                                        "createdAt": "2024-01-01T00:00:00"
-                                      }
-                                    }
-                                    """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력값",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "COMMON-002",
-                                      "message": "잘못된 입력값입니다."
-                                    }
-                                    """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 가입된 이메일",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "USER-002",
-                                      "message": "이미 가입된 이메일입니다."
-                                    }
-                                    """)))
-    })
-    ApiResponse<UserResponse> createUser(CreateUserRequest request);
-
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "유저 조회", description = "ID로 유저 정보를 조회합니다.")
+    @Operation(summary = "내 정보 조회", description = "로그인한 유저 본인의 정보를 조회합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
@@ -64,7 +28,6 @@ public interface UserSwagger {
                                         "id": 1,
                                         "name": "홍길동",
                                         "email": "hong@example.com",
-                                        "phone": "010-1234-5678",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00"
                                       }
@@ -79,11 +42,10 @@ public interface UserSwagger {
                                     }
                                     """)))
     })
-    ApiResponse<UserResponse> getUser(
-            @Parameter(description = "유저 ID", example = "1") Long id);
+    ApiResponse<UserResponse> getMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "유저 정보 수정", description = "유저의 이름 또는 전화번호를 수정합니다.")
+    @Operation(summary = "내 정보 수정", description = "로그인한 유저 본인의 이름 또는 전화번호를 수정합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
@@ -95,7 +57,6 @@ public interface UserSwagger {
                                         "id": 1,
                                         "name": "홍길동",
                                         "email": "hong@example.com",
-                                        "phone": "010-9876-5432",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00"
                                       }
@@ -118,12 +79,11 @@ public interface UserSwagger {
                                     }
                                     """)))
     })
-    ApiResponse<UserResponse> updateUser(
-            @Parameter(description = "유저 ID", example = "1") Long id,
-            UpdateUserRequest request);
+    ApiResponse<UserResponse> updateMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+                                       UpdateUserRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "회원 탈퇴", description = "유저를 탈퇴 처리합니다.")
+    @Operation(summary = "회원 탈퇴 (본인)", description = "로그인한 유저 본인을 탈퇴 처리합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "탈퇴 성공",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
@@ -142,6 +102,6 @@ public interface UserSwagger {
                                     }
                                     """)))
     })
-    ApiResponse<?> withdrawUser(
-            @Parameter(description = "유저 ID", example = "1") Long id);
+    ApiResponse<?> withdrawMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
+
 }
