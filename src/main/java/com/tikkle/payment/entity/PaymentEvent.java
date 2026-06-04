@@ -35,6 +35,9 @@ public class PaymentEvent {
     @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
 
+    @Column(unique = true)
+    private String idempotencyKey;
+
     @Column(name = "failure_reason")
     private String failureReason;
 
@@ -43,12 +46,13 @@ public class PaymentEvent {
     private LocalDateTime createdAt;
 
     @Builder
-    public PaymentEvent(Long userId, String merchantName, BigDecimal amount, BigDecimal spareChangeAmount) {
+    public PaymentEvent(Long userId, String merchantName, BigDecimal amount, BigDecimal spareChangeAmount, String idempotencyKey) {
         this.userId = userId;
         this.merchantName = merchantName;
         this.amount = amount;
         this.spareChangeAmount = spareChangeAmount;
         this.status = PaymentStatus.PENDING;
+        this.idempotencyKey = idempotencyKey;
     }
 
     public void fail(String reason) {

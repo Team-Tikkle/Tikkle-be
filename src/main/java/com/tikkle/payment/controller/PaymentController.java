@@ -25,6 +25,7 @@ public class PaymentController implements PaymentSwagger {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<?> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
+        // TODO: 추후 삭제 예정
         log.info("Received payment scraping request: {}", request);
         
         paymentService.processPaymentScraping(request);
