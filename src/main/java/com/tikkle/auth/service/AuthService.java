@@ -3,8 +3,8 @@ package com.tikkle.auth.service;
 import com.tikkle.auth.dto.request.ReissueRequest;
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.entity.RefreshToken;
-import com.tikkle.auth.exception.ExpiredTokenException;
 import com.tikkle.auth.exception.InvalidTokenException;
+import com.tikkle.auth.exception.RefreshTokenExpiredException;
 import com.tikkle.auth.jwt.JwtProvider;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class AuthService {
             throw new InvalidTokenException();
         }
         if (result == JwtProvider.TokenValidationResult.EXPIRED) {
-            throw new ExpiredTokenException();
+            throw new RefreshTokenExpiredException();
         }
 
         final String email = jwtProvider.getEmail(request.refreshToken());

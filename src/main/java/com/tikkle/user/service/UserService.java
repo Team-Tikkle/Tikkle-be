@@ -1,16 +1,12 @@
 package com.tikkle.user.service;
 
-import com.tikkle.user.dto.request.CreateUserRequest;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;
-import com.tikkle.user.entity.AuthProvider;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.UserStatus;
 import com.tikkle.user.repository.UserRepository;
-import com.tikkle.user.exception.DuplicateEmailException;
 import com.tikkle.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,43 +16,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
 
-    @Transactional
-    public UserResponse createUser(CreateUserRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateEmailException();
-        }
-        final User user = User.builder()
-                .name(request.name())
-                .email(request.email())
-                .phone(request.phone())
-                .provider(AuthProvider.LOCAL)
-                .status(UserStatus.ACTIVE)
-                .build();
-        try {
-            return UserResponse.from(userRepository.save(user));
-        } catch (DataIntegrityViolationException e) {
-            throw new DuplicateEmailException();
-        }
-    }
-
-    public UserResponse getUser(Long id) {
-        return UserResponse.from(findActiveUser(id));
+    public UserResponse getMe(String email) {
+        return UserResponse.from(findActiveUserByEmail(email));
     }
 
     @Transactional
-    public UserResponse updateUser(Long id, UpdateUserRequest request) {
-        final User user = findActiveUser(id);
+    public UserResponse updateMe(String email, UpdateUserRequest request) {
+        final User user = findActiveUserByEmail(email);
         user.update(request.name(), request.phone());
         return UserResponse.from(user);
     }
 
     @Transactional
-    public void withdrawUser(Long id) {
-        findActiveUser(id).withdraw();
+    public void withdrawMe(String email) {
+        findActiveUserByEmail(email).withdraw();
     }
 
-    private User findActiveUser(Long id) {
-        return userRepository.findByIdAndStatus(id, UserStatus.ACTIVE)
+    private User findActiveUserByEmail(String email) {
+        return userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
     }
 }
