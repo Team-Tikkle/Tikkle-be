@@ -32,7 +32,8 @@ CREATE TABLE `USERS` (
     `id`            BIGINT          NOT NULL,
     `name`          VARCHAR(50)     NOT NULL,
     `email`         VARCHAR(100)    NOT NULL,
-    `phone`         VARCHAR(20)     NOT NULL,
+    `provider`      VARCHAR(20)     NOT NULL,                       -- GOOGLE
+    `provider_id`   VARCHAR(100)    NULL,                           -- 소셜 로그인 고유 ID (구글 sub)
     `status`        VARCHAR(20)     NOT NULL    DEFAULT 'ACTIVE',   -- ACTIVE, WITHDRAWN
     `created_at`    DATETIME        NOT NULL,
     `deleted_at`    DATETIME        NULL
@@ -235,6 +236,7 @@ STOCKS
 | 테이블 | 컬럼 | 값 |
 |--------|------|----|
 | `USERS` | `status` | `ACTIVE`, `WITHDRAWN` |
+| `USERS` | `provider` | `GOOGLE` |
 | `PAYMENT_EVENTS` | `status` | `PENDING`, `CLASSIFIED`, `INVESTED`, `FAILED` |
 | `INVESTMENT_ORDERS` | `status` | `PENDING`, `EXECUTED`, `FAILED` |
 | `INVESTMENT_ORDERS` | `order_type` | `BUY`, `SELL` |
