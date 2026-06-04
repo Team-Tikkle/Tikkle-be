@@ -29,7 +29,8 @@ public class SecurityConfig {
             "/api/auth/reissue",
             "/api/auth/oauth/**",
             "/swagger-ui/**",
-            "/v3/api-docs/**"
+            "/v3/api-docs/**",
+            "/api/payments"
     };
 
     @Bean
@@ -55,5 +56,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 }

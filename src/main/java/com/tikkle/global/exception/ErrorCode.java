@@ -25,6 +25,11 @@ public enum ErrorCode {
     // 3. 유저
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
     WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-002", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다.");
+  
+    // 8. 결제 (Payment)
+    INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),
+    EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
+    INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "PAYMENT-003", "잔액이 부족하여 투자를 진행할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
