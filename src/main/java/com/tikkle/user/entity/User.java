@@ -25,7 +25,7 @@ public class User {
     @Column(nullable = false, length = 20)
     private AuthProvider provider;
 
-    @Column(length = 100)
+    @Column(length = 255)
     private String providerId;
 
     @Enumerated(EnumType.STRING)

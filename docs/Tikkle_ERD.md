@@ -33,7 +33,7 @@ CREATE TABLE `USERS` (
     `name`          VARCHAR(50)     NOT NULL,
     `email`         VARCHAR(100)    NOT NULL,
     `provider`      VARCHAR(20)     NOT NULL,                       -- GOOGLE
-    `provider_id`   VARCHAR(100)    NULL,                           -- 소셜 로그인 고유 ID (구글 sub)
+    `provider_id`   VARCHAR(255)    NULL,                           -- 소셜 로그인 고유 ID (구글 sub)
     `status`        VARCHAR(20)     NOT NULL    DEFAULT 'ACTIVE',   -- ACTIVE, WITHDRAWN
     `created_at`    DATETIME        NOT NULL,
     `deleted_at`    DATETIME        NULL
