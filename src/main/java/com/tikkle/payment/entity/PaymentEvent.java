@@ -33,7 +33,7 @@ public class PaymentEvent {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private PaymentStatus status = PaymentStatus.PENDING;
+    private PaymentStatus status;
 
     @Column(name = "failure_reason")
     private String failureReason;
