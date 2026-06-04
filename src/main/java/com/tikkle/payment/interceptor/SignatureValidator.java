@@ -7,6 +7,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
@@ -26,10 +27,9 @@ public class SignatureValidator {
             sha256_HMAC.init(secret_key);
 
             byte[] hash = sha256_HMAC.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            String expectedSignature = Base64.getEncoder().encodeToString(hash);
-            System.out.println("정답 : " + expectedSignature);
-            return expectedSignature.equals(signature);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            byte[] decodedSignature = Base64.getDecoder().decode(signature);
+            return MessageDigest.isEqual(hash, decodedSignature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | IllegalArgumentException e) {
             return false;
         }
     }

@@ -20,12 +20,17 @@ import java.nio.charset.StandardCharsets;
 
 @Component
 public class RequestBodyCachingFilter extends OncePerRequestFilter {
+    private static final String PAYMENT_PATH = "/api/payments";
 
     @Override
     protected void doFilterInternal(@Nonnull HttpServletRequest request, @Nonnull HttpServletResponse response, @Nonnull FilterChain filterChain)
             throws ServletException, IOException {
-        CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
-        filterChain.doFilter(cachedRequest, response);
+        if ("POST".equalsIgnoreCase(request.getMethod()) && PAYMENT_PATH.equals(request.getServletPath())) {
+            CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
+            filterChain.doFilter(cachedRequest, response);
+        } else {
+            filterChain.doFilter(request, response);
+        }
     }
 
     public static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
