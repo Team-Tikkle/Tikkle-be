@@ -21,4 +21,9 @@ public class TestTokenController {
     public ApiResponse<TokenResponse> testToken(@RequestParam String email) {
         return ApiResponse.success(testTokenService.generateTestToken(email));
     }
+
+    @PostMapping("/test-signup")
+    public ApiResponse<TokenResponse> testSignup(@RequestParam String email, @RequestParam String name) {
+        return ApiResponse.success(testTokenService.generateTestSignupAndToken(email, name));
+    }
 }
