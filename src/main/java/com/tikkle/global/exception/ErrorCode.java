@@ -22,7 +22,12 @@ public enum ErrorCode {
 
     // 3. 유저
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
-    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "USER-002", "이미 가입된 이메일입니다.");
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "USER-002", "이미 가입된 이메일입니다."),
+
+    // 8. 결제 (Payment)
+    INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),
+    EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
+    INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "PAYMENT-003", "잔액이 부족하여 투자를 진행할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
