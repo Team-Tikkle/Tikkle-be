@@ -21,9 +21,6 @@ public class User {
     @Column(nullable = false, length = 100, unique = true)
     private String email;
 
-    @Column(length = 20)
-    private String phone;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AuthProvider provider;
@@ -43,18 +40,16 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    private User(String name, String email, String phone, AuthProvider provider, String providerId, UserStatus status) {
+    private User(String name, String email, AuthProvider provider, String providerId, UserStatus status) {
         this.name = name;
         this.email = email;
-        this.phone = phone;
         this.provider = provider;
         this.providerId = providerId;
         this.status = status;
     }
 
-    public void update(String name, String phone) {
+    public void update(String name) {
         if (name != null) this.name = name;
-        if (phone != null) this.phone = phone;
     }
 
     public void withdraw() {

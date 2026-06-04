@@ -23,7 +23,7 @@ public class UserService {
     @Transactional
     public UserResponse updateMe(String email, UpdateUserRequest request) {
         final User user = findActiveUserByEmail(email);
-        user.update(request.name(), request.phone());
+        user.update(request.name());
         return UserResponse.from(user);
     }
 

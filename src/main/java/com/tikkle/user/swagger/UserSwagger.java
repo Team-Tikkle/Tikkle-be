@@ -28,7 +28,6 @@ public interface UserSwagger {
                                         "id": 1,
                                         "name": "홍길동",
                                         "email": "hong@example.com",
-                                        "phone": "010-1234-5678",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00"
                                       }
@@ -58,7 +57,6 @@ public interface UserSwagger {
                                         "id": 1,
                                         "name": "홍길동",
                                         "email": "hong@example.com",
-                                        "phone": "010-9876-5432",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00"
                                       }
