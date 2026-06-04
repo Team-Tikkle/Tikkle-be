@@ -5,6 +5,7 @@ import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +20,6 @@ public class PaymentService {
     private final PaymentEventRepository paymentEventRepository;
 
     public void processPaymentScraping(PaymentScrapingRequest request) {
-        // 멱등성 키 생성
         String idempotencyKey = generateIdempotencyKey(request);
 
         BigDecimal amount = BigDecimal.valueOf(request.amount());
@@ -42,7 +42,7 @@ public class PaymentService {
                 .build();
 
         try {
-            // 잔돈이 0원인 경우
+            // 잔돈이 0원인 경우에도 기록
             if (spareChange.compareTo(BigDecimal.ZERO) == 0) {
                 log.info("잔돈이 0원이므로 투자를 진행하지 않습니다. (결제금액: {})", amount);
                 paymentEventRepository.save(paymentEvent);
@@ -63,17 +63,26 @@ public class PaymentService {
             
             // TODO: 추후 모든 처리가 완료되었을 대, PENDING -> SUCCESS로 바꾸는 로직 추가
         } catch (DataIntegrityViolationException e) {
-            log.info("중복 결제 요청 무시 (concurrent insert). idempotencyKey={}", idempotencyKey);
+            // 예외의 원인이 제약 조건 위반(ConstraintViolationException)인지 확인
+            if (e.getCause() instanceof ConstraintViolationException) {
+                // 제약 조건 위반 예외의 SQL 상태 코드를 확인하거나, 제약 조건 이름을 확인하여 더 정확하게 판단할 수 있음
+                // 여기서는 고유 키 제약 조건 이름(예: "uk_idempotency_key")을 확인하는 것이 가장 정확함
+                // 편의상, 여기서는 제약 조건 위반이 발생하면 멱등성 키 충돌로 간주하고 로그를 남김
+                log.info("중복 결제 요청 무시 (concurrent insert). idempotencyKey={}", idempotencyKey);
+            } else {
+                // 멱등성 키 중복이 아닌 다른 데이터 무결성 문제(예: NOT NULL 제약 조건 위반)일 경우, 예외를 다시 던져서 문제를 인지시킴
+                throw e;
+            }
         }
     }
 
     private String generateIdempotencyKey(PaymentScrapingRequest request) {
-        // userId, merchant, amount와 함께 현재 시간(밀리초)을 추가하여 고유성 보장
-        return String.format("%d:%s:%d:%d",
+        // 재시도 시에도 동일한 키가 생성되도록 클라이언트가 제공하는 transactionId를 사용
+        return String.format("%d:%s:%d:%s",
                 request.userId(),
                 request.merchant(),
                 request.amount(),
-                System.currentTimeMillis()
+                request.transactionId()
         );
     }
 }

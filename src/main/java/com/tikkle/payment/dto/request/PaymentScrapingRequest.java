@@ -19,5 +19,8 @@ public record PaymentScrapingRequest(
 
         @NotNull(message = "잔액은 필수입니다.")
         @PositiveOrZero(message = "잔액은 0 이상이어야 합니다.")
-        Integer balance
+        Integer balance,
+
+        @NotBlank(message = "트랜잭션 ID는 필수입니다.")
+        String transactionId
 ) {}
