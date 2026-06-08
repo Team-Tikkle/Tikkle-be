@@ -1,6 +1,11 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: tikkle-redis
+    restart: unless-stopped
+
   app:
     # GitHub Actions가 빌드해서 올릴 도커 이미지 경로
     image: asia-northeast3-docker.pkg.dev/project-4c111968-8a40-4fc9-b55/tikkle-repo/tikkle-be:latest
@@ -10,4 +15,9 @@ services:
     # 서버에 생성될 .env 파일의 환경 변수를 읽어옴
     env_file:
       - .env
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+    depends_on:
+      - redis
     restart: unless-stopped
