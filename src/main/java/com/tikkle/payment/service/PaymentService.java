@@ -3,6 +3,9 @@ package com.tikkle.payment.service;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.user.entity.User;
+import com.tikkle.user.exception.UserNotFoundException;
+import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -10,79 +13,70 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class PaymentService {
     private final PaymentEventRepository paymentEventRepository;
+    private final UserRepository userRepository;
 
     public void processPaymentScraping(PaymentScrapingRequest request) {
-        String idempotencyKey = generateIdempotencyKey(request);
+        // [1단계 Fail-Fast: 중복 결제 검증]
+        if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
+            log.info("중복 결제 요청 조기 종료 (transactionId: {})", request.transactionId());
+            return;
+        }
 
-        BigDecimal amount = BigDecimal.valueOf(request.amount());
+        // [2단계 Fail-Fast: 타겟 카드 매칭 검증]
+        User user = userRepository.findById(request.userId()).orElseThrow(UserNotFoundException::new);
+
+        if (!request.cardCompany().equals(user.getTargetCardCompany()) ||
+            !request.cardNumberLast4().equals(user.getTargetCardNumberLast4())) {
+            log.info("타겟 카드가 아니므로 조기 종료 (userId: {}, requestCard: {} {})", 
+                     user.getId(), request.cardCompany(), request.cardNumberLast4());
+            return;
+        }
+
+        Integer amount = request.amount();
         // TODO: 추후 온보딩 시 설정한 기본 잔돈 규칙이나, 각 결제 카테고리별로 사용자가 개별 설정한 잔돈 규칙을 Redis 등에서 조회하도록 수정 필요.
-        BigDecimal rule = BigDecimal.valueOf(1000);
+        Integer rule = 1000;
 
-        // 1. 잔돈 계산 (나머지 연산 활용)
-        BigDecimal remainder = amount.remainder(rule);
-        BigDecimal spareChange = remainder.compareTo(BigDecimal.ZERO) == 0
-                ? BigDecimal.ZERO
-                : rule.subtract(remainder);
+        Integer remainder = amount % rule;
+        Integer spareChange = remainder == 0 ? 0 : rule - remainder;
 
-        // 2. PaymentEvent 엔티티 생성 (초기 상태: PENDING)
         PaymentEvent paymentEvent = PaymentEvent.builder()
                 .userId(request.userId())
-                .merchantName(request.merchant())
+                .cardCompany(request.cardCompany())
+                .cardNumberLast4(request.cardNumberLast4())
+                .merchant(request.merchant())
                 .amount(amount)
-                .spareChangeAmount(spareChange)
-                .idempotencyKey(idempotencyKey)
+                .spareChange(spareChange)
+                .transactionId(request.transactionId())
                 .build();
 
         try {
-            // 잔돈이 0원인 경우에도 기록
-            if (spareChange.compareTo(BigDecimal.ZERO) == 0) {
-                log.info("잔돈이 0원이므로 투자를 진행하지 않습니다. (결제금액: {})", amount);
+            // [3단계 Fail-Fast: 자잔돈 0원 결제 건 이력 관리]
+            if (spareChange == 0) {
                 paymentEventRepository.save(paymentEvent);
+                log.info("잔돈이 0원이므로 투자안함 상태로 저장하고 조기 종료합니다. (결제금액: {})", amount);
                 return;
             }
 
-            // 3. Fail-Fast: 잔액 부족 검사
-            if (BigDecimal.valueOf(request.balance()).compareTo(spareChange) < 0) {
-                log.warn("잔액 부족으로 투자를 취소합니다. (userId: {})", request.userId());
-                paymentEvent.fail("잔액 부족"); // 상태를 FAILED로 변경
-                paymentEventRepository.save(paymentEvent);
-                return;
-            }
-
-            // 4. 이벤트 원장 저장 (결제가 정상적으로 접수됨)
             paymentEventRepository.save(paymentEvent);
             log.info("결제 이벤트 접수 완료. 잔돈: {}", spareChange);
             
-            // TODO: 추후 모든 처리가 완료되었을 대, PENDING -> SUCCESS로 바꾸는 로직 추가
+            // TODO: [1차 방어선] Caffeine 로컬 캐시 조회 로직 추가
+            // TODO: [2차 방어선] 캐시 MISS 시 RabbitMQ로 분류 요청 이벤트 발행 로직 추가
+
         } catch (DataIntegrityViolationException e) {
-            // 예외의 원인이 제약 조건 위반(ConstraintViolationException)인지 확인
+            // 아주 짧은 순간에 두 개의 동일한 요청이 동시에 들어오는 경우, 첫 번째 검증을 둘 다 통과할 수 있음
+            // 이 때 DB의 UNIQUE 제약조건이 동작하여 DataIntegrityViolationException이 발생
             if (e.getCause() instanceof ConstraintViolationException) {
-                // 제약 조건 위반 예외의 SQL 상태 코드를 확인하거나, 제약 조건 이름을 확인하여 더 정확하게 판단할 수 있음
-                // 여기서는 고유 키 제약 조건 이름(예: "uk_idempotency_key")을 확인하는 것이 가장 정확함
-                // 편의상, 여기서는 제약 조건 위반이 발생하면 멱등성 키 충돌로 간주하고 로그를 남김
-                log.info("중복 결제 요청 무시 (concurrent insert). idempotencyKey={}", idempotencyKey);
+                log.info("동시성 중복 결제 요청 무시. transactionId={}", request.transactionId());
             } else {
-                // 멱등성 키 중복이 아닌 다른 데이터 무결성 문제(예: NOT NULL 제약 조건 위반)일 경우, 예외를 다시 던져서 문제를 인지시킴
                 throw e;
             }
         }
-    }
-
-    private String generateIdempotencyKey(PaymentScrapingRequest request) {
-        // 재시도 시에도 동일한 키가 생성되도록 클라이언트가 제공하는 transactionId를 사용
-        return String.format("%d:%s:%d:%s",
-                request.userId(),
-                request.merchant(),
-                request.amount(),
-                request.transactionId()
-        );
     }
 }
