@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -22,41 +21,60 @@ public class PaymentEvent {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "merchant_name", nullable = false, length = 100)
-    private String merchantName;
+    @Column(name = "card_company", nullable = false, length = 50)
+    private String cardCompany;
 
-    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
-    private BigDecimal amount;
+    @Column(name = "card_number_last_4", nullable = false, length = 4)
+    private String cardNumberLast4;
 
-    @Column(name = "spare_change_amount", nullable = false, precision = 15, scale = 2)
-    private BigDecimal spareChangeAmount;
+    @Column(name = "merchant", nullable = false, length = 100)
+    private String merchant;
+
+    @Column(name = "amount", nullable = false)
+    private Integer amount;
+
+    @Column(name = "spare_change", nullable = false)
+    private Integer spareChange;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
 
-    @Column(unique = true)
-    private String idempotencyKey;
+    @Column(name = "transaction_id", unique = true, nullable = false)
+    private String transactionId;
 
-    @Column(name = "failure_reason")
-    private String failureReason;
+    @Column(name = "reason")
+    private String reason;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public PaymentEvent(Long userId, String merchantName, BigDecimal amount, BigDecimal spareChangeAmount, String idempotencyKey) {
+    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, String transactionId) {
         this.userId = userId;
-        this.merchantName = merchantName;
+        this.cardCompany = cardCompany;
+        this.cardNumberLast4 = cardNumberLast4;
+        this.merchant = merchant;
         this.amount = amount;
-        this.spareChangeAmount = spareChangeAmount;
-        this.status = PaymentStatus.PENDING;
-        this.idempotencyKey = idempotencyKey;
+        this.spareChange = spareChange;
+        this.transactionId = transactionId;
+        this.status = spareChange > 0 ? PaymentStatus.PENDING : PaymentStatus.NOT_INVESTED;
+        if (this.spareChange == 0) {
+            this.reason = "잔돈 0원";
+        }
     }
 
-    public void fail(String reason) {
-        this.status = PaymentStatus.FAILED;
-        this.failureReason = reason;
+    public void startClassifying() {
+        this.status = PaymentStatus.CLASSIFYING;
+    }
+
+    public void completeInvestment() {
+        this.status = PaymentStatus.INVESTED;
+    }
+
+    public void skipInvestment(String reason) {
+        this.status = PaymentStatus.NOT_INVESTED;
+        this.reason = reason;
     }
 }
