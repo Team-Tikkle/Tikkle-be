@@ -17,9 +17,9 @@ public interface MarketTopicRepository extends JpaRepository<MarketTopic, Long> 
 
     long deleteByFetchedAtBefore(LocalDateTime threshold);
 
-    // 최신순으로 유지할 id만 조회 (Pageable로 개수 제한). 네이티브 LIMIT/테이블명 하드코딩 회피.
-    @Query("SELECT m.id FROM MarketTopic m ORDER BY m.publishedAt DESC")
-    List<Long> findIdsOrderByPublishedAtDesc(Pageable pageable);
+    // 최신순으로 유지할 id만 조회 (Pageable로 개수 제한). fetchedAt은 @CreationTimestamp라 NULL 없음.
+    @Query("SELECT m.id FROM MarketTopic m ORDER BY m.fetchedAt DESC")
+    List<Long> findIdsOrderByFetchedAtDesc(Pageable pageable);
 
     @Modifying
     @Query("DELETE FROM MarketTopic m WHERE m.id NOT IN :ids")

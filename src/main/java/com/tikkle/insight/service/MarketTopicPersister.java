@@ -6,10 +6,13 @@ import com.tikkle.insight.repository.MarketTopicRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,12 +34,16 @@ public class MarketTopicPersister {
 
     @Transactional
     public void persist(Map<String, FetchedNewsItem> deduped) {
-        // 1. 신규 link만 저장
+        // 1. 신규 link만 저장 (existsByLink는 fast-path, save의 UNIQUE 충돌은 try-catch로 방어)
         int saved = 0;
         for (FetchedNewsItem item : deduped.values()) {
             if (!marketTopicRepository.existsByLink(item.link())) {
-                marketTopicRepository.save(toEntity(item));
-                saved++;
+                try {
+                    marketTopicRepository.save(toEntity(item));
+                    saved++;
+                } catch (DataIntegrityViolationException e) {
+                    log.debug("마켓 토픽 중복 저장 건너뜀. link={}", item.link());
+                }
             }
         }
 
@@ -45,13 +52,18 @@ public class MarketTopicPersister {
                 LocalDateTime.now().minusDays(RETENTION_DAYS));
         int deletedByLimit = 0;
         if (marketTopicRepository.count() > MAX_RECORDS) {
-            List<Long> keepIds = marketTopicRepository.findIdsOrderByPublishedAtDesc(
+            List<Long> keepIds = marketTopicRepository.findIdsOrderByFetchedAtDesc(
                     PageRequest.of(0, MAX_RECORDS));
             deletedByLimit = marketTopicRepository.deleteByIdNotIn(keepIds);
         }
 
-        // 3. 캐시 evict (다음 조회 시 DB에서 갱신). Redis 장애가 DB 트랜잭션을 롤백시키지 않도록 격리.
-        evictCache();
+        // 3. 캐시 evict는 커밋 성공 후에만 실행 (롤백 시 불필요한 evict 방지)
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                evictCache();
+            }
+        });
 
         log.info("마켓 토픽 저장 완료. 수집={}, 신규저장={}, 기간초과삭제={}, 건수초과삭제={}",
                 deduped.size(), saved, deletedByAge, deletedByLimit);
