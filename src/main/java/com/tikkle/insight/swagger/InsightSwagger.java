@@ -15,7 +15,6 @@ import java.util.List;
 
 @Tag(name = "Insight", description = "인사이트 API")
 public interface InsightSwagger {
-
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "투데이 마켓 토픽 조회", description = "캐싱된 최신 주식/증시 뉴스 목록을 조회합니다. 카드 터치 시 원문 외부 링크로 이동합니다.")
     ApiResponse<List<MarketTopicResponse>> getMarketTopics();

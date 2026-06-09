@@ -16,6 +16,7 @@ import com.tikkle.insight.repository.MarketTopicRepository;
 import com.tikkle.insight.repository.RecommendedVideoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +29,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class InsightService {
-
     /** 마켓 토픽 목록 캐시 키. 스케줄러가 갱신 후 이 키를 evict 한다. */
     public static final String MARKET_TOPICS_CACHE_KEY = "insight:market-topics";
     private static final Duration MARKET_TOPICS_CACHE_TTL = Duration.ofHours(12);
@@ -84,8 +84,9 @@ public class InsightService {
                 return null;
             }
             return objectMapper.readValue(json, new TypeReference<List<MarketTopicResponse>>() {});
-        } catch (JacksonException e) {
-            log.warn("마켓 토픽 캐시 역직렬화 실패. DB에서 조회합니다. reason={}", e.getMessage());
+        } catch (JacksonException | DataAccessException e) {
+            // 역직렬화 실패(Jackson) 또는 Redis 장애(DataAccess) 모두 DB 조회로 폴백
+            log.warn("마켓 토픽 캐시 조회 실패. DB에서 조회합니다. reason={}", e.getMessage());
             return null;
         }
     }
@@ -94,8 +95,9 @@ public class InsightService {
         try {
             String json = objectMapper.writeValueAsString(topics);
             redisTemplate.opsForValue().set(MARKET_TOPICS_CACHE_KEY, json, MARKET_TOPICS_CACHE_TTL);
-        } catch (JacksonException e) {
-            log.warn("마켓 토픽 캐시 직렬화 실패. 캐싱을 건너뜁니다. reason={}", e.getMessage());
+        } catch (JacksonException | DataAccessException e) {
+            // 직렬화 실패(Jackson) 또는 Redis 장애(DataAccess) 시 캐싱만 건너뛰고 정상 응답
+            log.warn("마켓 토픽 캐시 저장 실패. 캐싱을 건너뜁니다. reason={}", e.getMessage());
         }
     }
 }

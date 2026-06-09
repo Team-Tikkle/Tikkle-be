@@ -6,7 +6,6 @@ import com.tikkle.insight.entity.RecommendedVideo;
 import com.tikkle.insight.repository.BeginnerArticleRepository;
 import com.tikkle.insight.repository.InvestmentTermRepository;
 import com.tikkle.insight.repository.RecommendedVideoRepository;
-import com.tikkle.insight.service.MarketTopicCollectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -27,18 +26,15 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class InsightDataSeeder implements ApplicationRunner {
-
     private final InvestmentTermRepository investmentTermRepository;
     private final BeginnerArticleRepository beginnerArticleRepository;
     private final RecommendedVideoRepository recommendedVideoRepository;
-    private final MarketTopicCollectService marketTopicCollectService;
 
     @Override
     public void run(ApplicationArguments args) {
         seedTerms();
         seedArticles();
         seedVideos();
-        marketTopicCollectService.collect();
     }
 
     private void seedTerms() {

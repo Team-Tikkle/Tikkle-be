@@ -20,7 +20,10 @@
 | `INVESTMENT_ORDERS` | 매수/매도 주문 원장 |
 | `PORTFOLIOS` | 보유 종목 현황 |
 | `PORTFOLIO_SNAPSHOTS` | 일별 포트폴리오 스냅샷 |
-| `STOCK_CONTENTS` | 토픽/인사이트/초보자 정보 콘텐츠 |
+| `MARKET_TOPICS` | 투데이 마켓 토픽 (뉴스, Google News RSS 수집) |
+| `INVESTMENT_TERMS` | 투자 용어집 (시딩) |
+| `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
+| `RECOMMENDED_VIDEOS` | 추천 영상 (시딩, 외부 링크) |
 | `NOTIFICATIONS` | 푸시 알림 이력 |
 
 ---
@@ -162,14 +165,41 @@ CREATE TABLE `PORTFOLIO_SNAPSHOTS` (
     `snapshot_date`             DATE            NOT NULL
 );
 
-CREATE TABLE `STOCK_CONTENTS` (
+CREATE TABLE `MARKET_TOPICS` (
     `id`                BIGINT          NOT NULL,
-    `content_type`      VARCHAR(20)     NOT NULL,                   -- TOPIC, INSIGHT, BEGINNER
+    `title`             VARCHAR(300)    NOT NULL,
+    `press`             VARCHAR(100)    NULL,                       -- 매체명
+    `link`              VARCHAR(500)    NOT NULL,                   -- 원문 외부 링크 (UNIQUE)
+    `summary`           VARCHAR(500)    NULL,
+    `thumbnail_url`     VARCHAR(500)    NULL,                       -- 대부분 null (RSS 미제공)
+    `published_at`      DATETIME        NULL,
+    `keyword`           VARCHAR(50)     NULL,                       -- 수집 키워드 (코스피/코스닥/증시/주식)
+    `fetched_at`        DATETIME        NOT NULL                    -- 수집 시각
+);
+
+CREATE TABLE `INVESTMENT_TERMS` (
+    `id`                BIGINT          NOT NULL,
+    `term`              VARCHAR(100)    NOT NULL,
+    `description`       TEXT            NOT NULL,
+    `display_order`     INT             NOT NULL
+);
+
+CREATE TABLE `BEGINNER_ARTICLES` (
+    `id`                BIGINT          NOT NULL,
     `title`             VARCHAR(200)    NOT NULL,
-    `body`              TEXT            NOT NULL,
-    `target_audience`   VARCHAR(20)     NOT NULL    DEFAULT 'ALL',  -- ALL, BEGINNER, ADVANCED
-    `stock_id`          BIGINT          NULL,
-    `published_at`      DATETIME        NOT NULL
+    `body`              TEXT            NOT NULL,                    -- 본문 전체 (앱 내부 렌더링)
+    `thumbnail_url`     VARCHAR(500)    NULL,
+    `display_order`     INT             NOT NULL,
+    `published_at`      DATETIME        NULL
+);
+
+CREATE TABLE `RECOMMENDED_VIDEOS` (
+    `id`                BIGINT          NOT NULL,
+    `title`             VARCHAR(200)    NOT NULL,
+    `video_url`         VARCHAR(500)    NOT NULL,                   -- 유튜브 외부 링크
+    `thumbnail_url`     VARCHAR(500)    NULL,
+    `channel_name`      VARCHAR(100)    NULL,
+    `display_order`     INT             NOT NULL
 );
 
 CREATE TABLE `NOTIFICATIONS` (
@@ -197,11 +227,15 @@ ALTER TABLE `ALLOCATION_RULES`          ADD CONSTRAINT `PK_ALLOCATION_RULES`    
 ALTER TABLE `INVESTMENT_ORDERS`         ADD CONSTRAINT `PK_INVESTMENT_ORDERS`           PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIOS`                ADD CONSTRAINT `PK_PORTFOLIOS`                  PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIO_SNAPSHOTS`       ADD CONSTRAINT `PK_PORTFOLIO_SNAPSHOTS`         PRIMARY KEY (`id`);
-ALTER TABLE `STOCK_CONTENTS`            ADD CONSTRAINT `PK_STOCK_CONTENTS`              PRIMARY KEY (`id`);
+ALTER TABLE `MARKET_TOPICS`             ADD CONSTRAINT `PK_MARKET_TOPICS`               PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_TERMS`          ADD CONSTRAINT `PK_INVESTMENT_TERMS`            PRIMARY KEY (`id`);
+ALTER TABLE `BEGINNER_ARTICLES`         ADD CONSTRAINT `PK_BEGINNER_ARTICLES`           PRIMARY KEY (`id`);
+ALTER TABLE `RECOMMENDED_VIDEOS`        ADD CONSTRAINT `PK_RECOMMENDED_VIDEOS`          PRIMARY KEY (`id`);
 ALTER TABLE `NOTIFICATIONS`             ADD CONSTRAINT `PK_NOTIFICATIONS`               PRIMARY KEY (`id`);
 
 -- UNIQUE
 ALTER TABLE `USERS`                     ADD CONSTRAINT `UQ_USERS_EMAIL`                 UNIQUE (`email`);
+ALTER TABLE `MARKET_TOPICS`             ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`          UNIQUE (`link`);
 ```
 
 ---
@@ -225,8 +259,13 @@ USERS
 STOCKS
  ├── ALLOCATION_RULES       (1:N)
  ├── INVESTMENT_ORDERS      (1:N)
- ├── PORTFOLIOS             (1:N)
- └── STOCK_CONTENTS         (1:N) 종목 관련 콘텐츠
+ └── PORTFOLIOS             (1:N)
+
+인사이트 (독립 테이블, FK 없음)
+ ├── MARKET_TOPICS          외부 RSS 주기 수집
+ ├── INVESTMENT_TERMS       시딩
+ ├── BEGINNER_ARTICLES      시딩
+ └── RECOMMENDED_VIDEOS     시딩
 ```
 
 ---
@@ -247,6 +286,4 @@ STOCKS
 | `LINKED_ACCOUNTS` | `account_type` | `PAYMENT`, `INVESTMENT` |
 | `PAYMENT_CATEGORY_MAPPINGS` | `classified_by` | `TRIE_HIT`, `AI`, `DEFAULT` |
 | `ALLOCATION_RULES` | `source` | `PROFILE`, `PAYMENT_CATEGORY` |
-| `STOCK_CONTENTS` | `content_type` | `TOPIC`, `INSIGHT`, `BEGINNER` |
-| `STOCK_CONTENTS` | `target_audience` | `ALL`, `BEGINNER`, `ADVANCED` |
 | `NOTIFICATIONS` | `type` | `PAYMENT_DETECTED`, `INVEST_SUCCESS`, `INVEST_FAILED`, `REPORT` |

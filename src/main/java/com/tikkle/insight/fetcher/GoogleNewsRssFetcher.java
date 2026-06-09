@@ -28,7 +28,6 @@ import java.util.List;
 @Slf4j
 @Component
 public class GoogleNewsRssFetcher implements NewsFetcher {
-
     private static final String SEARCH_URL = "https://news.google.com/rss/search?q=%s&hl=ko&gl=KR&ceid=KR:ko";
     private static final String USER_AGENT = "Mozilla/5.0 (compatible; TikkleBot/1.0)";
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");

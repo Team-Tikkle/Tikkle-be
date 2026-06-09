@@ -20,7 +20,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/insights")
 public class InsightController implements InsightSwagger {
-
     private final InsightService insightService;
 
     @Override

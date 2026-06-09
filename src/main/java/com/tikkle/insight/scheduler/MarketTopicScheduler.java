@@ -3,6 +3,9 @@ package com.tikkle.insight.scheduler;
 import com.tikkle.insight.service.MarketTopicCollectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +18,29 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class MarketTopicScheduler {
-
     private final MarketTopicCollectService marketTopicCollectService;
+
+    /** 기동 직후 1회 수집. @Async라 외부 RSS 호출이 애플리케이션 기동을 막지 않는다. */
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void collectOnStartup() {
+        log.info("기동 시 마켓 토픽 초기 수집 시작");
+        runCollect();
+    }
 
     @Scheduled(cron = "0 0 7,18 * * *", zone = "Asia/Seoul")
     public void collectMarketTopics() {
         log.info("마켓 토픽 수집 스케줄러 시작");
-        marketTopicCollectService.collect();
+        runCollect();
+    }
+
+    private void runCollect() {
+        long start = System.currentTimeMillis();
+        try {
+            marketTopicCollectService.collect();
+            log.info("마켓 토픽 수집 완료. ({}ms)", System.currentTimeMillis() - start);
+        } catch (Exception e) {
+            log.error("마켓 토픽 수집 실패", e);
+        }
     }
 }
