@@ -33,7 +33,7 @@ public class PaymentService {
 
         if (!request.cardCompany().equals(user.getTargetCardCompany()) ||
             !request.cardNumberLast4().equals(user.getTargetCardNumberLast4())) {
-            log.info("타겟 카드가 아니므로 조기 종료 (userId: {}, requestCard: {} {})", 
+            log.info("타겟 카드가 아니므로 조기 종료 (userId: {}, requestCard: {} {})",
                      user.getId(), request.cardCompany(), request.cardNumberLast4());
             return;
         }
