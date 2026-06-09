@@ -53,7 +53,7 @@
 ### 5.2. 투트랙 인증 및 웹 보안 아키텍처 (Two-Track Auth)
 사용자 인터페이스(UI) 요청과 백그라운드 푸시 스크래핑 요청의 인증 통로를 완벽히 분리한다.
 
-```
+```text
 [일반 유저 요청] -------> JWT Authentication Filter -------> 컨트롤러 (인가 완료)
 [푸시 스크래핑]   -------> JwtFilter 예외(permitAll) -------> HMAC Interceptor (서명 검증)
 ```
@@ -72,9 +72,9 @@
 ⬇︎
 [1단계 Fail-Fast: 중복 결제 검증] ➔ YES ➔ 즉시 종료 (Idempotent 리턴)
 ⬇︎ NO
-[3단계 Fail-Fast: 타겟 카드 매칭] ➔ NO ➔ 즉시 종료 (투자 스킵)
+[2단계 Fail-Fast: 타겟 카드 매칭] ➔ NO ➔ 즉시 종료 (투자 스킵)
 ⬇︎ NO
-잔돈(spare_change) 계산 ➔ [2단계 Fail-Fast: 0원 필터링] ➔ YES ➔ DB에 'NOT_INVESTED(투자안함)' 저장 후 조기 종료
+잔돈(spare_change) 계산 ➔ [3단계 Fail-Fast: 0원 필터링] ➔ YES ➔ DB에 'NOT_INVESTED(투자안함)' 저장 후 조기 종료
 ⬇︎ YES
 1차 방어선: Caffeine 로컬 캐시 조회 (HIT 시 즉시 PENDING 저장)
 ⬇︎ MISS
