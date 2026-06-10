@@ -51,7 +51,7 @@ public class PaymentEvent {
     private LocalDateTime createdAt;
 
     @Builder
-    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, String transactionId) {
+    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, String transactionId, PaymentStatus status, String reason) {
         this.userId = userId;
         this.cardCompany = cardCompany;
         this.cardNumberLast4 = cardNumberLast4;
@@ -59,10 +59,8 @@ public class PaymentEvent {
         this.amount = amount;
         this.spareChange = spareChange;
         this.transactionId = transactionId;
-        this.status = spareChange > 0 ? PaymentStatus.PENDING : PaymentStatus.NOT_INVESTED;
-        if (this.spareChange == 0) {
-            this.reason = "잔돈 0원";
-        }
+        this.status = status;
+        this.reason = reason;
     }
 
     public void startClassifying() {
