@@ -46,6 +46,9 @@ public class MarketTopicCollectService {
         if (item.title() == null || item.link() == null) {
             return false;
         }
+        if (item.title().isBlank() || item.link().isBlank()) {
+            return false;
+        }
         return item.title().length() <= MAX_TITLE_LENGTH
                 && item.link().length() <= MAX_LINK_LENGTH;
     }
