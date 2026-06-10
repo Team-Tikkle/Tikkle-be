@@ -13,15 +13,20 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Payment", description = "결제 정보 처리 API")
 public interface PaymentSwagger {
 
-    @Operation(summary = "결제 푸시 알림 수신", description = "스크래핑한 결제 푸시 알림 데이터를 수신합니다.")
-    @Parameter(name = "X-Tikkle-Signature", description = "HMAC SHA256 서명값", required = true, in = ParameterIn.HEADER)
-    @Parameter(name = "X-Tikkle-Timestamp", description = "요청 생성 타임스탬프 (Unix Time)", required = true, in = ParameterIn.HEADER)
+    @Operation(summary = "결제 푸시 알림 수신", description = "안드로이드 클라이언트가 스크래핑한 결제 푸시 알림 데이터를 백엔드로 전송합니다.")
+    @Parameter(name = "X-Tikkle-Signature", description = "HMAC SHA256 서명값 (Body + Timestamp)", required = true, in = ParameterIn.HEADER)
+    @Parameter(name = "X-Tikkle-Timestamp", description = "요청 생성 타임스탬프 (Unix Time - 초 단위)", required = true, in = ParameterIn.HEADER)
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "수신 성공",
+            // 수정: 201 -> 200으로 변경 및 중복 건에 대한 설명 추가
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수신 성공 (중복 요청이나 잔돈 0원 건도 200으로 응답하여 클라이언트 재시도 방지)",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
                             value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": null }"
                     ))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "보안 검증 실패",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청 (필수 파라미터 누락 등)",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
+                            value = "{ \"code\": \"COMMON-001\", \"message\": \"잘못된 요청 파라미터입니다.\" }"
+                    ))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "보안 검증 실패 (서명 불일치 또는 타임스탬프 5분 만료)",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
                             value = "{ \"code\": \"PAYMENT-001\", \"message\": \"유효하지 않은 서명입니다.\" }"
                     )))
