@@ -29,7 +29,6 @@ public enum ErrorCode {
     // 8. 결제 (Payment)
     INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),
     EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
-    INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "PAYMENT-003", "잔액이 부족하여 투자를 진행할 수 없습니다."),
 
     // 9. 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다.");
