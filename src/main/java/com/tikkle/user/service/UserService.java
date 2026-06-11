@@ -3,7 +3,7 @@ package com.tikkle.user.service;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.UserStatus;
+import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.repository.UserRepository;
 import com.tikkle.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package com.tikkle.user.dto.response;
 
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.UserStatus;
+import com.tikkle.user.entity.enums.UserStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
