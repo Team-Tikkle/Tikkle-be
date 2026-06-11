@@ -20,6 +20,10 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
             @Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
+        if (allowedOrigins.isEmpty()) {
+            throw new IllegalStateException("app.cors.allowed-origins에 허용할 Origin을 최소 1개 이상 설정해야 합니다.");
+        }
+
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(ALLOWED_METHODS);
