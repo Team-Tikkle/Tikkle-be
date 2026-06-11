@@ -9,10 +9,13 @@ import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +38,17 @@ public class PaymentService {
             log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
             return;
         }
+
+        // 트랜잭션 롤백 시 Redis 키를 삭제하도록 동기화 설정
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    redisTemplate.delete(redisKey);
+                    log.warn("결제 처리 트랜잭션 롤백. Redis 키를 삭제합니다. key: {}", redisKey);
+                }
+            }
+        });
 
         // 혹시 모를 캐시 만료/유실에 대비한 DB 2차 검증
         if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
@@ -77,8 +91,15 @@ public class PaymentService {
                     .build();
             paymentEventRepository.saveAndFlush(event);
         } catch (DataIntegrityViolationException e) {
-            // Redis 1차 방어, existsByTransactionId 2차 방어에도 불구하고 동시성 이슈 발생 시 처리
-            log.warn("DataIntegrityViolationException 발생. 동시성 중복 결제 요청일 가능성이 높습니다. transactionId={}", request.transactionId());
+            // 동시성 이슈로 인한 중복 키 예외인지 확인
+            if (e.getCause() instanceof ConstraintViolationException) {
+                // Redis 1차, existsByTransactionId 2차 방어에도 불구하고 동시성 이슈 발생 시 처리
+                log.warn("DataIntegrityViolationException 발생 (ConstraintViolationException). 동시성 중복 결제 요청일 가능성이 높습니다. transactionId={}, cause={}",
+                        request.transactionId(), e.getMessage());
+            } else {
+                // 예상치 못한 DB 제약조건 위반이므로 예외를 다시 던져서 트랜잭션 롤백
+                throw e;
+            }
         }
     }
 
