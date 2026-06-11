@@ -37,3 +37,7 @@ jwt:
 tikkle:
   payment:
     secret-key: ${PAYMENT_SECRET_KEY}
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173,https://localhost
