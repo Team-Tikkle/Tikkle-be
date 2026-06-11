@@ -1,6 +1,7 @@
 # Tikkle DB 스키마 (DDL)
 
 > 이 파일을 참고하여 API 설계, 쿼리 작성, 기능 개발 시 테이블 구조를 파악하세요.
+> **마지막 업데이트: `PaymentEvent.java`, `User.java` 엔티티 기준**
 
 ---
 
@@ -40,9 +41,7 @@ CREATE TABLE `USERS` (
     `target_card_company`           VARCHAR(50)     NULL,
     `target_card_number_last_4`     VARCHAR(4)      NULL,
     `created_at`                    DATETIME        NOT NULL,
-    `deleted_at`                    DATETIME        NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_USERS_EMAIL` (`email`)
+    `deleted_at`                    DATETIME        NULL
 );
 
 CREATE TABLE `PAYMENT_EVENTS` (
@@ -56,64 +55,53 @@ CREATE TABLE `PAYMENT_EVENTS` (
     `status`                VARCHAR(20)     NOT NULL,   -- PENDING, CLASSIFYING, INVESTED, NOT_INVESTED
     `transaction_id`        VARCHAR(255)    NOT NULL,
     `reason`                VARCHAR(255)    NULL,       -- 미투자 사유 등
-    `created_at`            DATETIME        NOT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_PAYMENT_EVENTS_TRANSACTION_ID` (`transaction_id`)
+    `created_at`            DATETIME        NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_PROFILES` (
     `id`                        BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`                   BIGINT          NOT NULL,
-    `risk_tolerance`            VARCHAR(20)     NOT NULL,   -- SAFE, MODERATE, AGGRESSIVE
-    `investment_term`           VARCHAR(20)     NOT NULL,   -- SHORT_TERM, LONG_TERM
-    `investment_style`          VARCHAR(20)     NOT NULL,   -- VALUE, MOMENTUM
-    `preferred_theme`           VARCHAR(30)     NOT NULL,   -- TECH, BIO, SEMICONDUCTOR, GREEN, ENTERTAINMENT, NONE
-    `stock_cap_preference`      VARCHAR(20)     NOT NULL,   -- BLUE_CHIP, NEW_LISTING
-    `market_preference`         VARCHAR(20)     NOT NULL,   -- DOMESTIC, FOREIGN, BOTH
-    `esg_focus`                 VARCHAR(20)     NOT NULL,   -- NONE, ESG_DRIVEN
-    `sin_industry_filter`       VARCHAR(30)     NOT NULL,   -- NONE, WEAPON, TOBACCO, FOSSIL_FUEL
-    `return_preference`         VARCHAR(20)     NOT NULL,   -- DIVIDEND, GROWTH
-    `diversification_type`      VARCHAR(20)     NOT NULL,   -- CONCENTRATED, DIVERSIFIED
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_INVESTMENT_PROFILES_USER_ID` (`user_id`)
+    `risk_tolerance`            VARCHAR(20)     NOT NULL,
+    `investment_term`           VARCHAR(20)     NOT NULL,
+    `investment_style`          VARCHAR(20)     NOT NULL,
+    `preferred_theme`           VARCHAR(30)     NOT NULL,
+    `stock_cap_preference`      VARCHAR(20)     NOT NULL,
+    `market_preference`         VARCHAR(20)     NOT NULL,
+    `esg_focus`                 VARCHAR(20)     NOT NULL,
+    `sin_industry_filter`       VARCHAR(30)     NOT NULL,
+    `return_preference`         VARCHAR(20)     NOT NULL,
+    `diversification_type`      VARCHAR(20)     NOT NULL
 );
 
 CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
-    `category`      VARCHAR(30)     NOT NULL,   -- CAFE, MART, FOOD, SHOPPING, TRAFFIC, CULTURE, ETC
-    `rule_type`     VARCHAR(30)     NOT NULL,   -- ROUND_UP_1000, ROUND_UP_5000, ROUND_UP_10000, PERCENT_10
-    `is_active`     BOOLEAN         NOT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_CATEGORY_RULES_USER_CATEGORY` (`user_id`, `category`)
+    `category`      VARCHAR(30)     NOT NULL,
+    `rule_type`     VARCHAR(30)     NOT NULL,
+    `is_active`     BOOLEAN         NOT NULL
 );
 
 CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `kis_app_key`           VARCHAR(255)    NOT NULL,   -- AES-256 암호화
-    `kis_app_secret`        VARCHAR(255)    NOT NULL,   -- AES-256 암호화
-    `kis_account_num`       VARCHAR(255)    NOT NULL,   -- AES-256 암호화
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_LINKED_ACCOUNTS_USER_ID` (`user_id`)
+    `kis_app_key`           VARCHAR(255)    NOT NULL,
+    `kis_app_secret`        VARCHAR(255)    NOT NULL,
+    `kis_account_num`       VARCHAR(255)    NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_SETTINGS` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`           BIGINT          NOT NULL,
-    `execution_mode`    VARCHAR(20)     NOT NULL,   -- AUTO, MANUAL
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_INVESTMENT_SETTINGS_USER_ID` (`user_id`)
+    `execution_mode`    VARCHAR(20)     NOT NULL
 );
 
 CREATE TABLE `PAYMENT_CATEGORY_MAPPINGS` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `payment_event_id`  BIGINT          NOT NULL,
     `category`          VARCHAR(30)     NOT NULL,
-    `classified_by`     VARCHAR(20)     NOT NULL,   -- TRIE_HIT, AI, DEFAULT
+    `classified_by`     VARCHAR(20)     NOT NULL,
     `confidence`        DECIMAL(5,4)    NULL,
-    `classified_at`     DATETIME        NOT NULL,
-    PRIMARY KEY (`id`)
+    `classified_at`     DATETIME        NOT NULL
 );
 
 CREATE TABLE `STOCKS` (
@@ -121,19 +109,16 @@ CREATE TABLE `STOCKS` (
     `ticker`        VARCHAR(20)     NOT NULL,
     `name`          VARCHAR(100)    NOT NULL,
     `industry_code` VARCHAR(20)     NOT NULL,
-    `exchange`      VARCHAR(20)     NOT NULL,   -- KRX, NASDAQ, NYSE
-    `is_active`     BOOLEAN         NOT NULL,
-    PRIMARY KEY (`id`)
+    `exchange`      VARCHAR(20)     NOT NULL,
+    `is_active`     BOOLEAN         NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_TARGETS` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
-    `category`      VARCHAR(30)     NULL,       -- 카테고리 (NULL이면 기본 투자 종목)
-    `stock_id`      BIGINT          NOT NULL,   -- 투자 대상이 될 단일 종목 ID
-    `updated_at`    DATETIME        NOT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UQ_USER_CATEGORY_TARGET` (`user_id`, `category`)
+    `category`      VARCHAR(30)     NULL,
+    `stock_id`      BIGINT          NOT NULL,
+    `updated_at`    DATETIME        NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_ORDERS` (
@@ -144,14 +129,13 @@ CREATE TABLE `INVESTMENT_ORDERS` (
     `amount`            DECIMAL(15,2)   NOT NULL,
     `quantity`          DECIMAL(15,6)   NULL,
     `price`             DECIMAL(15,2)   NULL,
-    `order_type`        VARCHAR(10)     NOT NULL    DEFAULT 'BUY',  -- BUY, SELL
-    `status`            VARCHAR(20)     NOT NULL    DEFAULT 'PENDING',  -- PENDING, EXECUTED, FAILED
-    `kis_order_no`      VARCHAR(20)     NULL,       -- 한투 API 주문번호
-    `ord_dvsn`          VARCHAR(5)      NULL,       -- 00:지정가, 01:시장가
+    `order_type`        VARCHAR(10)     NOT NULL    DEFAULT 'BUY',
+    `status`            VARCHAR(20)     NOT NULL    DEFAULT 'PENDING',
+    `kis_order_no`      VARCHAR(20)     NULL,
+    `ord_dvsn`          VARCHAR(5)      NULL,
     `reject_reason`     VARCHAR(200)    NULL,
     `ordered_at`        DATETIME        NOT NULL,
-    `executed_at`       DATETIME        NULL,
-    PRIMARY KEY (`id`)
+    `executed_at`       DATETIME        NULL
 );
 
 CREATE TABLE `PORTFOLIOS` (
@@ -163,50 +147,78 @@ CREATE TABLE `PORTFOLIOS` (
     `total_buy_amount`  DECIMAL(15,2)   NOT NULL,
     `current_price`     DECIMAL(15,2)   NOT NULL,
     `evaluated_amount`  DECIMAL(15,2)   NOT NULL,
-    `evlu_pfls_amt`     DECIMAL(15,2)   NULL,       -- 한투 API 평가손익금액
-    `evlu_pfls_rt`      DECIMAL(10,4)   NULL,       -- 한투 API 평가손익율
-    `updated_at`        DATETIME        NOT NULL,
-    PRIMARY KEY (`id`)
+    `evlu_pfls_amt`     DECIMAL(15,2)   NULL,
+    `evlu_pfls_rt`      DECIMAL(10,4)   NULL,
+    `updated_at`        DATETIME        NOT NULL
 );
 
+-- 인사이트 관련 테이블 (생략)
 CREATE TABLE `MARKET_TOPICS` (
-     `id`                BIGINT          NOT NULL,
-     `title`             VARCHAR(300)    NOT NULL,
-     `press`             VARCHAR(100)    NULL,                       -- 매체명
-     `link`              VARCHAR(500)    NOT NULL,                   -- 원문 외부 링크 (UNIQUE)
-     `summary`           VARCHAR(500)    NULL,
-     `thumbnail_url`     VARCHAR(500)    NULL,                       -- 대부분 null (RSS 미제공)
-     `published_at`      DATETIME        NULL,
-     `keyword`           VARCHAR(50)     NULL,                       -- 수집 키워드 (코스피/코스닥/증시/주식)
-     `fetched_at`        DATETIME        NOT NULL                    -- 수집 시각
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `title`             VARCHAR(300)    NOT NULL,
+    `press`             VARCHAR(100)    NULL,
+    `link`              VARCHAR(500)    NOT NULL,
+    `summary`           VARCHAR(500)    NULL,
+    `thumbnail_url`     VARCHAR(500)    NULL,
+    `published_at`      DATETIME        NULL,
+    `keyword`           VARCHAR(50)     NULL,
+    `fetched_at`        DATETIME        NOT NULL
 );
-
 CREATE TABLE `INVESTMENT_TERMS` (
-    `id`                BIGINT          NOT NULL,
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `term`              VARCHAR(100)    NOT NULL,
     `description`       TEXT            NOT NULL,
     `display_order`     INT             NOT NULL
 );
-
 CREATE TABLE `BEGINNER_ARTICLES` (
-     `id`                BIGINT          NOT NULL,
-     `title`             VARCHAR(200)    NOT NULL,
-     `body`              TEXT            NOT NULL,                    -- 본문 전체 (앱 내부 렌더링)
-     `thumbnail_url`     VARCHAR(500)    NULL,
-     `display_order`     INT             NOT NULL,
-     `published_at`      DATETIME        NULL
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `title`             VARCHAR(200)    NOT NULL,
+    `body`              TEXT            NOT NULL,
+    `thumbnail_url`     VARCHAR(500)    NULL,
+    `display_order`     INT             NOT NULL,
+    `published_at`      DATETIME        NULL
 );
-
 CREATE TABLE `RECOMMENDED_VIDEOS` (
-      `id`                BIGINT          NOT NULL,
-      `title`             VARCHAR(200)    NOT NULL,
-      `video_url`         VARCHAR(500)    NOT NULL,                   -- 유튜브 외부 링크
-      `thumbnail_url`     VARCHAR(500)    NULL,
-      `channel_name`      VARCHAR(100)    NULL,
-      `display_order`     INT             NOT NULL
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `title`             VARCHAR(200)    NOT NULL,
+    `video_url`         VARCHAR(500)    NOT NULL,
+    `thumbnail_url`     VARCHAR(500)    NULL,
+    `channel_name`      VARCHAR(100)    NULL,
+    `display_order`     INT             NOT NULL
 );
 
+```
 
+---
+## CONSTRAINTS
+
+```sql
+-- PRIMARY KEY
+ALTER TABLE `USERS`                         ADD CONSTRAINT `PK_USERS`                           PRIMARY KEY (`id`);
+ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `PK_PAYMENT_EVENTS`                  PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_PROFILES`           ADD CONSTRAINT `PK_INVESTMENT_PROFILES`             PRIMARY KEY (`id`);
+ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `PK_CATEGORY_SPARE_CHANGE_RULES`     PRIMARY KEY (`id`);
+ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS`                 PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_SETTINGS`           ADD CONSTRAINT `PK_INVESTMENT_SETTINGS`             PRIMARY KEY (`id`);
+ALTER TABLE `PAYMENT_CATEGORY_MAPPINGS`     ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPINGS`       PRIMARY KEY (`id`);
+ALTER TABLE `STOCKS`                        ADD CONSTRAINT `PK_STOCKS`                          PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `PK_INVESTMENT_TARGETS`              PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_ORDERS`             ADD CONSTRAINT `PK_INVESTMENT_ORDERS`               PRIMARY KEY (`id`);
+ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `PK_PORTFOLIOS`                      PRIMARY KEY (`id`);
+ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `PK_MARKET_TOPICS`                   PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_TERMS`              ADD CONSTRAINT `PK_INVESTMENT_TERMS`                PRIMARY KEY (`id`);
+ALTER TABLE `BEGINNER_ARTICLES`             ADD CONSTRAINT `PK_BEGINNER_ARTICLES`               PRIMARY KEY (`id`);
+ALTER TABLE `RECOMMENDED_VIDEOS`            ADD CONSTRAINT `PK_RECOMMENDED_VIDEOS`              PRIMARY KEY (`id`);
+
+-- UNIQUE
+ALTER TABLE `USERS`                         ADD CONSTRAINT `UQ_USERS_EMAIL`                         UNIQUE (`email`);
+ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `UQ_PAYMENT_EVENTS_TRANSACTION_ID`       UNIQUE (`transaction_id`);
+ALTER TABLE `INVESTMENT_PROFILES`           ADD CONSTRAINT `UQ_INVESTMENT_PROFILES_USER_ID`         UNIQUE (`user_id`);
+ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `UQ_CATEGORY_RULES_USER_CATEGORY`        UNIQUE (`user_id`, `category`);
+ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_USER_ID`             UNIQUE (`user_id`);
+ALTER TABLE `INVESTMENT_SETTINGS`           ADD CONSTRAINT `UQ_INVESTMENT_SETTINGS_USER_ID`         UNIQUE (`user_id`);
+ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `UQ_USER_CATEGORY_TARGET`                UNIQUE (`user_id`, `category`);
+ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`                  UNIQUE (`link`);
 
 ```
 
@@ -251,5 +263,13 @@ STOCKS
 | `INVESTMENT_SETTINGS` | `executionMode` | `AUTO`, `MANUAL` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `ruleType` | `ROUND_UP_1000`, `ROUND_UP_5000`, `ROUND_UP_10000`, `PERCENT_10` |
-| `INVESTMENT_PROFILES` | ... | ... |
-```
+| `INVESTMENT_PROFILES` | `riskTolerance` | `SAFE`, `MODERATE`, `AGGRESSIVE` |
+| `INVESTMENT_PROFILES` | `investmentTerm` | `SHORT_TERM`, `LONG_TERM` |
+| `INVESTMENT_PROFILES` | `investmentStyle` | `VALUE`, `MOMENTUM` |
+| `INVESTMENT_PROFILES` | `preferredTheme` | `TECH`, `BIO`, `SEMICONDUCTOR`, `GREEN`, `ENTERTAINMENT`, `NONE` |
+| `INVESTMENT_PROFILES` | `stockCapPreference` | `BLUE_CHIP`, `NEW_LISTING` |
+| `INVESTMENT_PROFILES` | `marketPreference` | `DOMESTIC`, `FOREIGN`, `BOTH` |
+| `INVESTMENT_PROFILES` | `esgFocus` | `NONE`, `ESG_DRIVEN` |
+| `INVESTMENT_PROFILES` | `sinIndustryFilter` | `NONE`, `WEAPON`, `TOBACCO`, `FOSSIL_FUEL` |
+| `INVESTMENT_PROFILES` | `returnPreference` | `DIVIDEND`, `GROWTH` |
+| `INVESTMENT_PROFILES` | `diversificationType` | `CONCENTRATED`, `DIVERSIFIED` |
