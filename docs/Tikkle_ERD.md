@@ -49,7 +49,7 @@ CREATE TABLE `PAYMENT_EVENTS` (
     `merchant`              VARCHAR(100)    NOT NULL,
     `amount`                INT             NOT NULL,
     `spare_change`          INT             NOT NULL,
-    `status`                VARCHAR(20)     NOT NULL,   -- PENDING, CLASSIFYING, INVESTED, NOT_INVESTED
+    `status`                VARCHAR(20)     NOT NULL,   -- NOT_INVESTED, CLASSIFYING, PENDING, WAITING_APPROVAL, ORDERING, INVESTED, FAILED, EXPIRED
     `transaction_id`        VARCHAR(255)    NOT NULL,
     `reason`                VARCHAR(255)    NULL,       -- 미투자 사유 등
     `created_at`            DATETIME        NOT NULL
