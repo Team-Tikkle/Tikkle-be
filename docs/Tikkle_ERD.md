@@ -1,7 +1,6 @@
 # Tikkle DB 스키마 (DDL)
 
 > 이 파일을 참고하여 API 설계, 쿼리 작성, 기능 개발 시 테이블 구조를 파악하세요.
-> **마지막 업데이트: `PaymentEvent.java`, `User.java` 엔티티 기준**
 
 ---
 
@@ -9,10 +8,10 @@
 
 | 테이블명 | 설명 |
 |---------|------|
-| `USERS` | 회원 기본 정보, 타겟 카드 정보 포함 |
+| `USERS` | 회원 기본 정보 |
 | `INVESTMENT_PROFILES` | 유저별 9축 투자 성향 설문 결과 |
 | `CATEGORY_SPARE_CHANGE_RULES` | 카테고리별 다이나믹 잔돈 규칙 |
-| `LINKED_ACCOUNTS` | 금융 연동 정보 (한투 API 키) |
+| `LINKED_ACCOUNTS` | 금융 연동 정보 (한투 API 키, 타겟 카드 정보) |
 | `INVESTMENT_SETTINGS` | 매매 방식 등 공통 투자 설정 |
 | `PAYMENT_EVENTS` | 결제 이벤트 원장 |
 | `PAYMENT_CATEGORY_MAPPINGS` | AI 분류 결과 |
@@ -38,8 +37,6 @@ CREATE TABLE `USERS` (
     `provider`                      VARCHAR(20)     NOT NULL,   -- GOOGLE, KAKAO 등
     `provider_id`                   VARCHAR(255)    NULL,       -- 소셜 로그인 고유 ID
     `status`                        VARCHAR(20)     NOT NULL,   -- ACTIVE, WITHDRAWN
-    `target_card_company`           VARCHAR(50)     NULL,
-    `target_card_number_last_4`     VARCHAR(4)      NULL,
     `created_at`                    DATETIME        NOT NULL,
     `deleted_at`                    DATETIME        NULL
 );
@@ -86,7 +83,9 @@ CREATE TABLE `LINKED_ACCOUNTS` (
     `user_id`               BIGINT          NOT NULL,
     `kis_app_key`           VARCHAR(255)    NOT NULL,
     `kis_app_secret`        VARCHAR(255)    NOT NULL,
-    `kis_account_num`       VARCHAR(255)    NOT NULL
+    `kis_account_num`       VARCHAR(255)    NOT NULL,
+    `target_card_company`   VARCHAR(50)     NOT NULL,
+    `target_card_last_4`    VARCHAR(4)      NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_SETTINGS` (
@@ -230,7 +229,7 @@ ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LIN
 USERS (1)
  ├── INVESTMENT_PROFILES (1)          - 유저별 9축 투자 성향
  ├── CATEGORY_SPARE_CHANGE_RULES (N)  - 카테고리별 잔돈 규칙
- ├── LINKED_ACCOUNTS (1)              - 금융 연동 정보 (API 키)
+ ├── LINKED_ACCOUNTS (1)              - 금융 연동 정보 (API 키, 타겟 카드 정보)
  ├── INVESTMENT_SETTINGS (1)          - 공통 투자 설정
  ├── PAYMENT_EVENTS (N)               - 결제 이벤트
  │    └── PAYMENT_CATEGORY_MAPPINGS (1) - AI 분류 결과
