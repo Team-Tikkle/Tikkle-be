@@ -1,5 +1,6 @@
 package com.tikkle.payment.entity;
 
+import com.tikkle.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;

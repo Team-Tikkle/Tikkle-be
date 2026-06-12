@@ -1,7 +1,7 @@
 package com.tikkle.user.repository;
 
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.UserStatus;
+import com.tikkle.user.entity.enums.UserStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

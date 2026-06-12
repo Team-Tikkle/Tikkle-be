@@ -1,5 +1,7 @@
 package com.tikkle.user.entity;
 
+import com.tikkle.user.entity.enums.AuthProvider;
+import com.tikkle.user.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -32,12 +34,6 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
-    @Column(name = "target_card_company", length = 50)
-    private String targetCardCompany;
-
-    @Column(name = "target_card_number_last_4", length = 4)
-    private String targetCardNumberLast4;
-
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -46,14 +42,12 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    private User(String name, String email, AuthProvider provider, String providerId, UserStatus status, String targetCardCompany, String targetCardNumberLast4) {
+    private User(String name, String email, AuthProvider provider, String providerId, UserStatus status) {
         this.name = name;
         this.email = email;
         this.provider = provider;
         this.providerId = providerId;
         this.status = status;
-        this.targetCardCompany = targetCardCompany;
-        this.targetCardNumberLast4 = targetCardNumberLast4;
     }
 
     public void update(String name) {

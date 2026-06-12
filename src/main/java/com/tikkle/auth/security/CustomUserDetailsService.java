@@ -1,7 +1,7 @@
 package com.tikkle.auth.security;
 
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.UserStatus;
+import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
