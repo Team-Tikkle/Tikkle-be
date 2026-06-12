@@ -2,10 +2,12 @@ package com.tikkle.payment.service;
 
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
 import com.tikkle.payment.entity.PaymentEvent;
-import com.tikkle.payment.entity.PaymentStatus;
+import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.exception.UserNotFoundException;
+import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 public class PaymentService {
     private final PaymentEventRepository paymentEventRepository;
     private final UserRepository userRepository;
+    private final LinkedAccountRepository linkedAccountRepository;
     private final RedisTemplate<String, String> redisTemplate;
 
     @Transactional
@@ -58,8 +61,10 @@ public class PaymentService {
 
         // [2단계 Fail-Fast: 타겟 카드 매칭 검증]
         User user = userRepository.findById(request.userId()).orElseThrow(UserNotFoundException::new);
-        if (!isTargetCard(user, request)) {
-            log.info("타겟 카드가 아니므로 조기 종료 (userId: {}, requestCard: {} {})",
+        LinkedAccount linkedAccount = linkedAccountRepository.findByUserId(user.getId()).orElse(null);
+
+        if (linkedAccount == null || !isTargetCard(linkedAccount, request)) {
+            log.info("타겟 카드가 아니거나 연결된 계좌가 없어 조기 종료 (userId: {}, requestCard: {} {})",
                     user.getId(), request.cardCompany(), request.cardNumberLast4());
             return;
         }
@@ -103,9 +108,9 @@ public class PaymentService {
         }
     }
 
-    private boolean isTargetCard(User user, PaymentScrapingRequest request) {
-        return request.cardCompany().equals(user.getTargetCardCompany()) &&
-                request.cardNumberLast4().equals(user.getTargetCardNumberLast4());
+    private boolean isTargetCard(LinkedAccount linkedAccount, PaymentScrapingRequest request) {
+        return request.cardCompany().equals(linkedAccount.getTargetCardCompany()) &&
+                request.cardNumberLast4().equals(linkedAccount.getTargetCardLast4());
     }
 
     private Integer calculateSpareChange(Integer amount) {
