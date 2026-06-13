@@ -25,6 +25,7 @@ public record OnboardingRequest(
         String kisAccountNum,
 
         @NotBlank(message = "대상 카드사는 필수입니다.")
+        @Size(max = 20, message = "대상 카드사는 최대 50자까지 입력 가능합니다.")
         String targetCardCompany,
 
         @NotBlank(message = "대상 카드 번호 마지막 4자리는 필수입니다.")

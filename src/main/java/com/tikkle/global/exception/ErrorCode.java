@@ -28,6 +28,7 @@ public enum ErrorCode {
 
     // 온보딩 (Onboarding)
     ONBOARDING_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "ONBOARDING-001", "이미 온보딩을 완료한 사용자입니다."),
+    DUPLICATE_CATEGORY_RULE(HttpStatus.BAD_REQUEST, "ONBOARDING-002", "카테고리별 잔돈 규칙에 중복된 카테고리가 존재합니다."),
 
     // 결제 (Payment)
     INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),

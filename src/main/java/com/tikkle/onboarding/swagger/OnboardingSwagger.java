@@ -21,10 +21,11 @@ public interface OnboardingSwagger {
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
                             value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": null }"
                     ))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 유효성 검증 실패 또는 이미 온보딩을 완료한 경우",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 유효성 검증 실패, 온보딩 중복 또는 카테고리 규칙 중복",
                     content = @Content(mediaType = "application/json", examples = {
                             @ExampleObject(name = "입력값 오류", value = "{ \"code\": \"COMMON-002\", \"message\": \"잘못된 입력값입니다.\" }"),
-                            @ExampleObject(name = "온보딩 중복", value = "{ \"code\": \"ONBOARDING-001\", \"message\": \"이미 온보딩을 완료한 사용자입니다.\" }")
+                            @ExampleObject(name = "온보딩 중복", value = "{ \"code\": \"ONBOARDING-001\", \"message\": \"이미 온보딩을 완료한 사용자입니다.\" }"),
+                            @ExampleObject(name = "카테고리 규칙 중복", value = "{ \"code\": \"ONBOARDING-002\", \"message\": \"카테고리별 잔돈 규칙에 중복된 카테고리가 존재합니다.\" }")
                     })),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(

@@ -5,8 +5,10 @@ import com.tikkle.investment.entity.InvestmentSettings;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.onboarding.dto.request.OnboardingRequest;
+import com.tikkle.onboarding.exception.DuplicateCategoryRuleException;
 import com.tikkle.onboarding.exception.OnboardingAlreadyCompletedException;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
@@ -14,13 +16,17 @@ import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,17 +43,27 @@ public class OnboardingService {
 
     @Transactional
     public void processOnboarding(Long userId, OnboardingRequest request) {
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        try {
+            User user = userRepository.findByIdWithLock(userId).orElseThrow(UserNotFoundException::new);
 
-        if (linkedAccountRepository.findByUserId(userId).isPresent() || !categorySpareChangeRuleRepository.findByUserId(userId).isEmpty()) {
+            if (linkedAccountRepository.findByUserId(userId).isPresent() || !categorySpareChangeRuleRepository.findByUserId(userId).isEmpty()) {
+                throw new OnboardingAlreadyCompletedException();
+            }
+
+            saveLinkedAccount(user, request);
+            saveInvestmentProfile(user, request);
+            saveInvestmentSettings(user, request);
+            List<CategorySpareChangeRule> rules = saveCategorySpareChangeRules(user, request.categoryRules());
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    warmUpUserSettingsCache(userId, request.targetCardLast4(), rules);
+                }
+            });
+        } catch (DataIntegrityViolationException e) {
             throw new OnboardingAlreadyCompletedException();
         }
-
-        saveLinkedAccount(user, request);
-        saveInvestmentProfile(user, request);
-        saveInvestmentSettings(user, request);
-        saveCategorySpareChangeRules(user, request.categoryRules());
-        warmUpUserSettingsCache(userId, request);
     }
 
     private void saveLinkedAccount(User user, OnboardingRequest dto) {
@@ -87,7 +103,15 @@ public class OnboardingService {
         investmentSettingsRepository.save(settings);
     }
 
-    private void saveCategorySpareChangeRules(User user, List<OnboardingRequest.CategoryRuleDto> ruleDtos) {
+    private List<CategorySpareChangeRule> saveCategorySpareChangeRules(User user, List<OnboardingRequest.CategoryRuleDto> ruleDtos) {
+        Set<PaymentCategory> distinctCategories = ruleDtos.stream()
+                .map(OnboardingRequest.CategoryRuleDto::category)
+                .collect(Collectors.toSet());
+
+        if (distinctCategories.size() != ruleDtos.size()) {
+            throw new DuplicateCategoryRuleException();
+        }
+
         List<CategorySpareChangeRule> rules = ruleDtos.stream()
                 .map(dto -> CategorySpareChangeRule.builder()
                         .user(user)
@@ -95,17 +119,17 @@ public class OnboardingService {
                         .ruleType(dto.ruleType())
                         .build())
                 .collect(Collectors.toList());
-        categorySpareChangeRuleRepository.saveAll(rules);
+        return categorySpareChangeRuleRepository.saveAll(rules);
     }
 
-    private void warmUpUserSettingsCache(Long userId, OnboardingRequest dto) {
+    public void warmUpUserSettingsCache(Long userId, String targetCardLast4, List<CategorySpareChangeRule> rules) {
         String redisKey = USER_SETTINGS_CACHE_PREFIX + userId;
         Map<String, String> cacheData = new HashMap<>();
 
-        cacheData.put("targetCardLast4", dto.targetCardLast4());
+        cacheData.put("targetCardLast4", targetCardLast4);
 
-        dto.categoryRules().forEach(rule ->
-                cacheData.put(rule.category().name(), rule.ruleType().name())
+        rules.forEach(rule ->
+                cacheData.put(rule.getCategory().name(), rule.getRuleType().name())
         );
 
         redisTemplate.opsForHash().putAll(redisKey, cacheData);
