@@ -4,15 +4,16 @@ import com.tikkle.user.entity.User;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "category_spare_change_rules", 
+@Table(name = "category_spare_change_rules",
        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "category"})})
 @Getter
-@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
 public class CategorySpareChangeRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,6 +31,10 @@ public class CategorySpareChangeRule {
     @Column(nullable = false, length = 30)
     private RuleType ruleType;
 
-    @Column(nullable = false)
-    private boolean isActive;
+    @Builder
+    private CategorySpareChangeRule(User user, PaymentCategory category, RuleType ruleType) {
+        this.user = user;
+        this.category = category;
+        this.ruleType = ruleType;
+    }
 }
