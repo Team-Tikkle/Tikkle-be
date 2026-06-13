@@ -94,7 +94,8 @@ public class PaymentService {
                     .status(status)
                     .reason(reason)
                     .build();
-            paymentEventRepository.saveAndFlush(event);
+
+            paymentEventRepository.save(event);
         } catch (DataIntegrityViolationException e) {
             // 동시성 이슈로 인한 중복 키 예외인지 확인
             if (e.getCause() instanceof ConstraintViolationException) {
