@@ -1,6 +1,5 @@
-package com.tikkle.investment.entity;
+package com.tikkle.settings.entity;
 
-import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -9,10 +8,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "investment_settings")
+@Table(name = "notification_settings")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class InvestmentSettings {
+public class NotificationSettings {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,17 +20,16 @@ public class InvestmentSettings {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ExecutionMode executionMode;
+    @Column(nullable = false)
+    private boolean pushEnabled;
 
     @Builder
-    private InvestmentSettings(User user, ExecutionMode executionMode) {
+    private NotificationSettings(User user, boolean pushEnabled) {
         this.user = user;
-        this.executionMode = executionMode;
+        this.pushEnabled = pushEnabled;
     }
 
-    public void changeMode(ExecutionMode executionMode) {
-        this.executionMode = executionMode;
+    public void changePushEnabled(boolean pushEnabled) {
+        this.pushEnabled = pushEnabled;
     }
 }
