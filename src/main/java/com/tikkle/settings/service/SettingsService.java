@@ -8,16 +8,14 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
-import com.tikkle.settings.dto.request.UpdateNotificationRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
-import com.tikkle.settings.entity.NotificationSettings;
-import com.tikkle.settings.repository.NotificationSettingsRepository;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -30,6 +28,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -37,7 +36,6 @@ public class SettingsService {
     private final UserRepository userRepository;
     private final InvestmentSettingsRepository investmentSettingsRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
-    private final NotificationSettingsRepository notificationSettingsRepository;
     private final SettingsCacheManager settingsCacheManager;
 
     public SettingsResponse getSettings(String email) {
@@ -48,10 +46,6 @@ public class SettingsService {
                 .map(InvestmentSettings::getExecutionMode)
                 .orElse(ExecutionMode.MANUAL);
 
-        boolean pushEnabled = notificationSettingsRepository.findByUserId(userId)
-                .map(NotificationSettings::isPushEnabled)
-                .orElse(true);
-
         Map<PaymentCategory, RuleType> ruleMap = categorySpareChangeRuleRepository.findByUserId(userId).stream()
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, CategorySpareChangeRule::getRuleType));
 
@@ -60,7 +54,7 @@ public class SettingsService {
                         category, ruleMap.getOrDefault(category, RuleType.NONE)))
                 .toList();
 
-        return new SettingsResponse(executionMode, pushEnabled, spareChangeRules);
+        return new SettingsResponse(executionMode, spareChangeRules);
     }
 
     @Transactional
@@ -106,20 +100,6 @@ public class SettingsService {
         syncAfterCommit(() -> settingsCacheManager.updateSpareChangeRules(userId, changed));
     }
 
-    @Transactional
-    public void updateNotification(String email, UpdateNotificationRequest request) {
-        User user = findActiveUserByEmail(email);
-        boolean pushEnabled = request.pushEnabled();
-
-        notificationSettingsRepository.findByUserId(user.getId())
-                .ifPresentOrElse(
-                        settings -> settings.changePushEnabled(pushEnabled),
-                        () -> notificationSettingsRepository.save(NotificationSettings.builder()
-                                .user(user)
-                                .pushEnabled(pushEnabled)
-                                .build()));
-    }
-
     private User findActiveUserByEmail(String email) {
         return userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
@@ -129,7 +109,11 @@ public class SettingsService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                action.run();
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    log.error("커밋 후 설정 캐시 동기화에 실패했습니다. DB 변경은 이미 반영되었습니다.", e);
+                }
             }
         });
     }

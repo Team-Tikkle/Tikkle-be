@@ -8,11 +8,8 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
-import com.tikkle.settings.dto.request.UpdateNotificationRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
-import com.tikkle.settings.entity.NotificationSettings;
-import com.tikkle.settings.repository.NotificationSettingsRepository;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
@@ -53,8 +50,6 @@ class SettingsServiceTest {
     @Mock
     private CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     @Mock
-    private NotificationSettingsRepository notificationSettingsRepository;
-    @Mock
     private SettingsCacheManager settingsCacheManager;
 
     @InjectMocks
@@ -75,18 +70,16 @@ class SettingsServiceTest {
     }
 
     @Test
-    @DisplayName("getSettings - 미설정 카테고리는 NONE, 미설정 매매방식은 MANUAL, 미설정 알림은 true로 채운다")
+    @DisplayName("getSettings - 미설정 카테고리는 NONE, 미설정 매매방식은 MANUAL로 채운다")
     void getSettings_fillsDefaults() {
         givenActiveUser();
         given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
-        given(notificationSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(
                 List.of(rule(PaymentCategory.CAFE, RuleType.PERCENT_5)));
 
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
         assertThat(response.executionMode()).isEqualTo(ExecutionMode.MANUAL);
-        assertThat(response.pushEnabled()).isTrue();
         assertThat(response.spareChangeRules()).hasSize(PaymentCategory.values().length);
 
         Map<PaymentCategory, RuleType> result = response.spareChangeRules().stream()
@@ -96,19 +89,16 @@ class SettingsServiceTest {
     }
 
     @Test
-    @DisplayName("getSettings - 저장된 매매방식/알림 값을 그대로 반환한다")
+    @DisplayName("getSettings - 저장된 매매방식 값을 그대로 반환한다")
     void getSettings_returnsStoredValues() {
         givenActiveUser();
         given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(
                 Optional.of(InvestmentSettings.builder().user(user).executionMode(ExecutionMode.AUTO).build()));
-        given(notificationSettingsRepository.findByUserId(USER_ID)).willReturn(
-                Optional.of(NotificationSettings.builder().user(user).pushEnabled(false).build()));
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(List.of());
 
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
         assertThat(response.executionMode()).isEqualTo(ExecutionMode.AUTO);
-        assertThat(response.pushEnabled()).isFalse();
     }
 
     @Test
@@ -173,32 +163,6 @@ class SettingsServiceTest {
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, CategorySpareChangeRule::getRuleType));
         assertThat(synced).containsEntry(PaymentCategory.CAFE, RuleType.ROUND_UP_5000)
                 .containsEntry(PaymentCategory.SHOPPING, RuleType.NONE);
-    }
-
-    @Test
-    @DisplayName("updateNotification - 기존 설정 변경, 캐시는 건드리지 않는다")
-    void updateNotification_updatesExisting_noCache() {
-        givenActiveUser();
-        NotificationSettings settings = NotificationSettings.builder().user(user).pushEnabled(true).build();
-        given(notificationSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.of(settings));
-
-        settingsService.updateNotification(EMAIL, new UpdateNotificationRequest(false));
-
-        assertThat(settings.isPushEnabled()).isFalse();
-        verify(notificationSettingsRepository, never()).save(any());
-        verify(settingsCacheManager, never()).updateExecutionMode(any(), any());
-        verify(settingsCacheManager, never()).updateSpareChangeRules(any(), any());
-    }
-
-    @Test
-    @DisplayName("updateNotification - 설정이 없으면 새로 저장한다")
-    void updateNotification_createsWhenAbsent() {
-        givenActiveUser();
-        given(notificationSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
-
-        settingsService.updateNotification(EMAIL, new UpdateNotificationRequest(true));
-
-        verify(notificationSettingsRepository).save(any(NotificationSettings.class));
     }
 
     private CategorySpareChangeRule rule(PaymentCategory category, RuleType ruleType) {

@@ -8,7 +8,6 @@ import java.util.List;
 
 public record SettingsResponse(
         ExecutionMode executionMode,
-        boolean pushEnabled,
         List<CategoryRule> spareChangeRules
 ) {
     public record CategoryRule(PaymentCategory category, RuleType ruleType) {

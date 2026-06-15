@@ -3,7 +3,6 @@ package com.tikkle.settings.controller;
 import com.tikkle.auth.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
-import com.tikkle.settings.dto.request.UpdateNotificationRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
 import com.tikkle.settings.service.SettingsService;
@@ -38,14 +37,6 @@ public class SettingsController implements SettingsSwagger {
     public ApiResponse<?> updateSpareChangeRules(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                  @RequestBody @Valid UpdateSpareChangeRulesRequest request) {
         settingsService.updateSpareChangeRules(userDetails.getUsername(), request);
-        return ApiResponse.successWithNoData();
-    }
-
-    @Override
-    @PatchMapping("/notification")
-    public ApiResponse<?> updateNotification(@AuthenticationPrincipal CustomUserDetails userDetails,
-                                             @RequestBody @Valid UpdateNotificationRequest request) {
-        settingsService.updateNotification(userDetails.getUsername(), request);
         return ApiResponse.successWithNoData();
     }
 }
