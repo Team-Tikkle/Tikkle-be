@@ -22,7 +22,6 @@ import java.util.List;
  * <p>
  * 구현 함정 대응:
  * - 제목의 " - 매체명" 접미사 제거, 매체명은 source 엘리먼트 우선.
- * - description은 HTML 조각이라 태그를 제거하고 500자로 절단.
  * - 썸네일은 거의 제공되지 않아 대부분 null.
  */
 @Slf4j
@@ -33,7 +32,6 @@ public class GoogleNewsRssFetcher implements NewsFetcher {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 5_000;
-    private static final int MAX_SUMMARY_LENGTH = 500;
 
     @Override
     public List<FetchedNewsItem> fetch(String keyword) {
@@ -82,22 +80,10 @@ public class GoogleNewsRssFetcher implements NewsFetcher {
                 title,
                 press,
                 entry.getLink(),
-                cleanSummary(entry.getDescription() != null ? entry.getDescription().getValue() : null),
                 null,
                 toLocalDateTime(entry.getPublishedDate()),
                 keyword
         );
-    }
-
-    private String cleanSummary(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
-        if (text.isEmpty()) {
-            return null;
-        }
-        return text.length() > MAX_SUMMARY_LENGTH ? text.substring(0, MAX_SUMMARY_LENGTH) : text;
     }
 
     private LocalDateTime toLocalDateTime(Date date) {
