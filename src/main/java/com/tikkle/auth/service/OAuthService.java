@@ -13,6 +13,7 @@ import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.WithdrawnUserException;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -29,22 +30,8 @@ public class OAuthService {
         // 외부 HTTP 호출은 트랜잭션 밖에서 수행
         final GoogleUserInfo userInfo = googleOAuthClient.getUserInfo(request.accessToken());
 
-        final Optional<User> existingUser = userRepository.findByEmail(userInfo.email());
-        // 탈퇴한 계정은 보관 기간 동안 재로그인 차단 (보관 기간 경과 후 데이터 삭제되면 신규 가입)
-        existingUser.ifPresent(user -> {
-            if (user.getStatus() == UserStatus.WITHDRAWN) {
-                throw new WithdrawnUserException();
-            }
-        });
-
-        final boolean isNewUser = existingUser.isEmpty();
-        final User user = existingUser.orElseGet(() -> userRepository.save(User.builder()
-                .name(userInfo.name())
-                .email(userInfo.email())
-                .provider(AuthProvider.GOOGLE)
-                .providerId(userInfo.sub())
-                .status(UserStatus.ACTIVE)
-                .build()));
+        final LoginUser loginUser = resolveUser(userInfo);
+        final User user = loginUser.user();
 
         final String accessToken = jwtProvider.createAccessToken(user.getEmail());
         final String refreshToken = jwtProvider.createRefreshToken(user.getEmail());
@@ -55,6 +42,36 @@ public class OAuthService {
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
 
-        return new TokenResponse(accessToken, refreshToken, isNewUser);
+        return new TokenResponse(accessToken, refreshToken, loginUser.isNewUser());
     }
+
+    private LoginUser resolveUser(GoogleUserInfo userInfo) {
+        final Optional<User> existingUser = userRepository.findByEmail(userInfo.email());
+        // 탈퇴한 계정은 보관 기간 동안 재로그인 차단 (보관 기간 경과 후 데이터 삭제되면 신규 가입)
+        existingUser.ifPresent(user -> {
+            if (user.getStatus() == UserStatus.WITHDRAWN) {
+                throw new WithdrawnUserException();
+            }
+        });
+        if (existingUser.isPresent()) {
+            return new LoginUser(existingUser.get(), false);
+        }
+
+        // 신규 가입. 동시 요청이 같은 이메일을 먼저 저장하면 UNIQUE 충돌이 나므로 재조회로 기존 유저를 회수한다.
+        try {
+            return new LoginUser(userRepository.save(User.builder()
+                    .name(userInfo.name())
+                    .email(userInfo.email())
+                    .provider(AuthProvider.GOOGLE)
+                    .providerId(userInfo.sub())
+                    .status(UserStatus.ACTIVE)
+                    .build()), true);
+        } catch (DataIntegrityViolationException e) {
+            final User user = userRepository.findByEmail(userInfo.email())
+                    .orElseThrow(() -> e);
+            return new LoginUser(user, false);
+        }
+    }
+
+    private record LoginUser(User user, boolean isNewUser) {}
 }

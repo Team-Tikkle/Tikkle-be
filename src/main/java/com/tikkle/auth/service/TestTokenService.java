@@ -30,7 +30,7 @@ public class TestTokenService {
     }
 
     public TokenResponse generateTestSignupAndToken(String email, String name) {
-        final Optional<User> existingUser = userRepository.findByEmail(email);
+        final Optional<User> existingUser = userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE);
         final boolean isNewUser = existingUser.isEmpty();
         final User user = existingUser
                 .orElseGet(() -> userRepository.save(User.builder()
