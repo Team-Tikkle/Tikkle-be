@@ -58,7 +58,7 @@ public class OnboardingService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    warmUpUserSettingsCache(userId, request.targetCardLast4(), rules);
+                    warmUpUserSettingsCache(userId, request.targetCardLast4(), request.executionMode().name(), rules);
                 }
             });
         } catch (DataIntegrityViolationException e) {
@@ -122,11 +122,12 @@ public class OnboardingService {
         return categorySpareChangeRuleRepository.saveAll(rules);
     }
 
-    public void warmUpUserSettingsCache(Long userId, String targetCardLast4, List<CategorySpareChangeRule> rules) {
+    public void warmUpUserSettingsCache(Long userId, String targetCardLast4, String executionMode, List<CategorySpareChangeRule> rules) {
         String redisKey = USER_SETTINGS_CACHE_PREFIX + userId;
         Map<String, String> cacheData = new HashMap<>();
 
         cacheData.put("targetCardLast4", targetCardLast4);
+        cacheData.put("executionMode", executionMode);
 
         rules.forEach(rule ->
                 cacheData.put(rule.getCategory().name(), rule.getRuleType().name())
