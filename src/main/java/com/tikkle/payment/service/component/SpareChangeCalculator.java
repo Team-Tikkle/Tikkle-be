@@ -11,7 +11,6 @@ public class SpareChangeCalculator {
         }
 
         return switch (ruleType) {
-            case NONE -> 0;
             case ROUND_UP_1000 -> (1000 - (amount % 1000)) % 1000;
             case ROUND_UP_5000 -> (5000 - (amount % 5000)) % 5000;
             case ROUND_UP_10000 -> (10000 - (amount % 10000)) % 10000;
