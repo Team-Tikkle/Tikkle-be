@@ -1,6 +1,8 @@
 package com.tikkle.payment.service;
 
 import com.tikkle.investment.entity.enums.ExecutionMode;
+import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
 import com.tikkle.payment.entity.PaymentCategoryMapping;
 import com.tikkle.payment.entity.PaymentEvent;
@@ -12,13 +14,6 @@ import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.MarketTimeGate;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
-import com.tikkle.user.entity.LinkedAccount;
-import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.UserRule;
-import com.tikkle.user.exception.UserNotFoundException;
-import com.tikkle.user.repository.LinkedAccountRepository;
-import com.tikkle.user.repository.UserRepository;
-import com.tikkle.user.repository.UserRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -30,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -40,7 +36,7 @@ public class PaymentService {
     private final PaymentEventRepository paymentEventRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final PaymentCategoryMappingRepository paymentCategoryMappingRepository;
-    private final UserRuleRepository userRuleRepository;
+    private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final SpareChangeCalculator spareChangeCalculator;
     private final MarketTimeGate marketTimeGate;
     private final ApplicationEventPublisher eventPublisher;
@@ -76,12 +72,18 @@ public class PaymentService {
         String redisSettingsKey = "user:settings:" + request.userId();
 
         // [2단계 Fail-Fast: 타겟 카드 매칭 검증 - Zero DB!]
-        String targetCardLast4 = (String) redisTemplate.opsForHash().get(redisSettingsKey, "targetCardLast4");
+        // Task 2: 카드사, 카드번호 동시 검증 및 최적화
+        List<Object> targetCardInfo = redisTemplate.opsForHash().multiGet(redisSettingsKey, Arrays.asList("targetCardCompany", "targetCardLast4"));
+        String targetCardCompany = (String) targetCardInfo.get(0);
+        String targetCardLast4 = (String) targetCardInfo.get(1);
 
-        // 카드사가 일치하는지(PG사 필터링 로직 등)는 클라이언트가 넘겨준 값과 내부 정책으로 비교 (여기선 번호 4자리만 검증 예시)
-        if (targetCardLast4 == null || !request.cardNumberLast4().equals(targetCardLast4)) {
-            log.info("타겟 카드가 아니거나 캐시가 없어 조기 종료 (userId: {}, requestCardLast4: {})",
-                    request.userId(), request.cardNumberLast4());
+        // Task 3: Lock 해제 누락 버그 수정
+        if (targetCardCompany == null || targetCardLast4 == null ||
+            !request.cardCompany().equals(targetCardCompany) ||
+            !request.cardNumberLast4().equals(targetCardLast4)) {
+            log.info("타겟 카드가 아니거나 캐시가 없어 조기 종료 (userId: {}, requestCard: {} {})",
+                    request.userId(), request.cardCompany(), request.cardNumberLast4());
+            redisTemplate.delete(redisTxKey);
             return;
         }
 
@@ -110,7 +112,8 @@ public class PaymentService {
         }
 
         // [Phase 2: DB MISS - AI 분류기로 이관]
-        PaymentEvent tempEvent = saveEvent(request, null, PaymentStatus.CLASSIFYING, "가맹점 분류 대기");
+        // Task 4: Null Constraint 예외 방어
+        PaymentEvent tempEvent = saveEvent(request, 0, PaymentStatus.CLASSIFYING, "가맹점 분류 대기");
         if (tempEvent != null) {
             eventPublisher.publishEvent(new ClassificationRequestEvent(this, tempEvent.getId(), request.merchant()));
         }
@@ -124,9 +127,10 @@ public class PaymentService {
         }
 
         log.warn("유저(ID:{})의 Redis 캐시에 {} 카테고리 룰이 존재하지 않습니다. DB에서 조회합니다.", userId, category.name());
-        return userRuleRepository.findByUserIdAndCategory(userId, category)
-                .or(() -> userRuleRepository.findDefaultByUserId(userId))
-                .map(UserRule::getRuleType)
+        // Task 1: 데이터 소스(Entity) 타입 단일화 및 리포지토리 메서드 수정
+        return categorySpareChangeRuleRepository.findByUserIdAndCategory(userId, category)
+                .or(() -> categorySpareChangeRuleRepository.findDefaultByUserId(userId))
+                .map(CategorySpareChangeRule::getRuleType)
                 .orElse(RuleType.ROUND_UP_1000);
     }
 
@@ -158,10 +162,5 @@ public class PaymentService {
                 throw e;
             }
         }
-    }
-
-    private boolean isTargetCard(LinkedAccount linkedAccount, PaymentScrapingRequest request) {
-        return request.cardCompany().equals(linkedAccount.getTargetCardCompany()) &&
-                request.cardNumberLast4().equals(linkedAccount.getTargetCardLast4());
     }
 }
