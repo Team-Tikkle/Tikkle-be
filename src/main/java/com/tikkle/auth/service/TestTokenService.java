@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @Profile("local")
 @RequiredArgsConstructor
@@ -24,21 +26,23 @@ public class TestTokenService {
     public TokenResponse generateTestToken(String email) {
         userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
-        return issueToken(email);
+        return issueToken(email, false);
     }
 
     public TokenResponse generateTestSignupAndToken(String email, String name) {
-        final User user = userRepository.findByEmail(email)
+        final Optional<User> existingUser = userRepository.findByEmail(email);
+        final boolean isNewUser = existingUser.isEmpty();
+        final User user = existingUser
                 .orElseGet(() -> userRepository.save(User.builder()
                         .email(email)
                         .name(name)
                         .provider(AuthProvider.GOOGLE)
                         .status(UserStatus.ACTIVE)
                         .build()));
-        return issueToken(user.getEmail());
+        return issueToken(user.getEmail(), isNewUser);
     }
 
-    private TokenResponse issueToken(String email) {
+    private TokenResponse issueToken(String email, boolean isNewUser) {
         final String accessToken = jwtProvider.createAccessToken(email);
         final String refreshToken = jwtProvider.createRefreshToken(email);
         refreshTokenRepository.save(new RefreshToken(
@@ -46,6 +50,6 @@ public class TestTokenService {
                 refreshToken,
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
-        return new TokenResponse(accessToken, refreshToken);
+        return new TokenResponse(accessToken, refreshToken, isNewUser);
     }
 }

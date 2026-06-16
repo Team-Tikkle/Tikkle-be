@@ -82,7 +82,6 @@ public class MarketTopicPersister {
                 .title(item.title())
                 .press(item.press())
                 .link(item.link())
-                .summary(item.summary())
                 .thumbnailUrl(item.thumbnailUrl())
                 .publishedAt(item.publishedAt())
                 .keyword(item.keyword())

@@ -27,9 +27,6 @@ public class MarketTopic {
     @Column(name = "link", nullable = false, unique = true, length = 500)
     private String link;
 
-    @Column(name = "summary", length = 500)
-    private String summary;
-
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
@@ -44,12 +41,11 @@ public class MarketTopic {
     private LocalDateTime fetchedAt;
 
     @Builder
-    public MarketTopic(String title, String press, String link, String summary,
+    public MarketTopic(String title, String press, String link,
                        String thumbnailUrl, LocalDateTime publishedAt, String keyword) {
         this.title = title;
         this.press = press;
         this.link = link;
-        this.summary = summary;
         this.thumbnailUrl = thumbnailUrl;
         this.publishedAt = publishedAt;
         this.keyword = keyword;

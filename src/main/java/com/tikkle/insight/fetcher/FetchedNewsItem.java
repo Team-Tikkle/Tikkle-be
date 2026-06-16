@@ -9,7 +9,6 @@ public record FetchedNewsItem(
         String title,
         String press,
         String link,
-        String summary,
         String thumbnailUrl,
         LocalDateTime publishedAt,
         String keyword

@@ -47,6 +47,6 @@ public class AuthService {
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
 
-        return new TokenResponse(newAccessToken, newRefreshToken);
+        return new TokenResponse(newAccessToken, newRefreshToken, false);
     }
 }

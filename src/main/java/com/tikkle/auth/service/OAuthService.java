@@ -15,6 +15,8 @@ import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class OAuthService {
@@ -27,7 +29,22 @@ public class OAuthService {
         // 외부 HTTP 호출은 트랜잭션 밖에서 수행
         final GoogleUserInfo userInfo = googleOAuthClient.getUserInfo(request.accessToken());
 
-        final User user = findOrCreateUser(userInfo);
+        final Optional<User> existingUser = userRepository.findByEmail(userInfo.email());
+        // 탈퇴한 계정은 보관 기간 동안 재로그인 차단 (보관 기간 경과 후 데이터 삭제되면 신규 가입)
+        existingUser.ifPresent(user -> {
+            if (user.getStatus() == UserStatus.WITHDRAWN) {
+                throw new WithdrawnUserException();
+            }
+        });
+
+        final boolean isNewUser = existingUser.isEmpty();
+        final User user = existingUser.orElseGet(() -> userRepository.save(User.builder()
+                .name(userInfo.name())
+                .email(userInfo.email())
+                .provider(AuthProvider.GOOGLE)
+                .providerId(userInfo.sub())
+                .status(UserStatus.ACTIVE)
+                .build()));
 
         final String accessToken = jwtProvider.createAccessToken(user.getEmail());
         final String refreshToken = jwtProvider.createRefreshToken(user.getEmail());
@@ -38,24 +55,6 @@ public class OAuthService {
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
 
-        return new TokenResponse(accessToken, refreshToken);
-    }
-
-    private User findOrCreateUser(GoogleUserInfo userInfo) {
-        return userRepository.findByEmail(userInfo.email())
-                .map(existing -> {
-                    // 탈퇴한 계정은 보관 기간 동안 재로그인 차단 (보관 기간 경과 후 데이터 삭제되면 신규 가입)
-                    if (existing.getStatus() == UserStatus.WITHDRAWN) {
-                        throw new WithdrawnUserException();
-                    }
-                    return existing;
-                })
-                .orElseGet(() -> userRepository.save(User.builder()
-                        .name(userInfo.name())
-                        .email(userInfo.email())
-                        .provider(AuthProvider.GOOGLE)
-                        .providerId(userInfo.sub())
-                        .status(UserStatus.ACTIVE)
-                        .build()));
+        return new TokenResponse(accessToken, refreshToken, isNewUser);
     }
 }
