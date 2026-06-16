@@ -14,7 +14,8 @@ import lombok.NoArgsConstructor;
        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "category"})})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CategorySpareChangeRule {
+public class
+CategorySpareChangeRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,6 +36,10 @@ public class CategorySpareChangeRule {
     private CategorySpareChangeRule(User user, PaymentCategory category, RuleType ruleType) {
         this.user = user;
         this.category = category;
+        this.ruleType = ruleType;
+    }
+
+    public void change(RuleType ruleType) {
         this.ruleType = ruleType;
     }
 }
