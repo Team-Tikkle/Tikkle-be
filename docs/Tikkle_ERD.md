@@ -74,8 +74,7 @@ CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
     `category`      VARCHAR(30)     NOT NULL,
-    `rule_type`     VARCHAR(30)     NOT NULL,
-    `is_active`     BOOLEAN         NOT NULL
+    `rule_type`     VARCHAR(30)     NOT NULL
 );
 
 CREATE TABLE `LINKED_ACCOUNTS` (
@@ -261,7 +260,7 @@ STOCKS
 | `INVESTMENT_ORDERS` | `status` | `PENDING`, `EXECUTED`, `FAILED` |
 | `INVESTMENT_SETTINGS` | `executionMode` | `AUTO`, `MANUAL` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
-| `CATEGORY_SPARE_CHANGE_RULES` | `ruleType` | `ROUND_UP_1000`, `ROUND_UP_5000`, `ROUND_UP_10000`, `PERCENT_10` |
+| `CATEGORY_SPARE_CHANGE_RULES` | `ruleType` | `ROUND_UP_1000`, `ROUND_UP_5000`, `ROUND_UP_10000`, `ROUND_UP_50000`, `PERCENT_5`, `PERCENT_10`, `PERCENT_20`, `PERCENT_30` |
 | `INVESTMENT_PROFILES` | `riskTolerance` | `SAFE`, `MODERATE`, `AGGRESSIVE` |
 | `INVESTMENT_PROFILES` | `investmentTerm` | `SHORT_TERM`, `LONG_TERM` |
 | `INVESTMENT_PROFILES` | `investmentStyle` | `VALUE`, `MOMENTUM` |
