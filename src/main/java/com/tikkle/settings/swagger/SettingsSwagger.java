@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(name = "Settings", description = "설정 API (투자 룰)")
 public interface SettingsSwagger {
-
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "설정 전체 조회", description = "매매 방식과 7개 카테고리 잔돈 룰을 한 번에 조회합니다. 미설정 카테고리는 NONE으로 반환됩니다.")
     ApiResponse<SettingsResponse> getSettings(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
