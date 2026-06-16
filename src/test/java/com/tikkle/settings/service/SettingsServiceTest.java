@@ -70,8 +70,8 @@ class SettingsServiceTest {
     }
 
     @Test
-    @DisplayName("getSettings - 미설정 카테고리는 NONE, 미설정 매매방식은 MANUAL로 채운다")
-    void getSettings_fillsDefaults() {
+    @DisplayName("getSettings - DB에 저장된 카테고리 룰만 반환하고, 미설정 매매방식은 MANUAL로 채운다")
+    void getSettings_returnsStoredRules() {
         givenActiveUser();
         given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(
@@ -80,12 +80,12 @@ class SettingsServiceTest {
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
         assertThat(response.executionMode()).isEqualTo(ExecutionMode.MANUAL);
-        assertThat(response.spareChangeRules()).hasSize(PaymentCategory.values().length);
+        assertThat(response.spareChangeRules()).hasSize(1);
 
         Map<PaymentCategory, RuleType> result = response.spareChangeRules().stream()
                 .collect(Collectors.toMap(SettingsResponse.CategoryRule::category, SettingsResponse.CategoryRule::ruleType));
         assertThat(result.get(PaymentCategory.CAFE)).isEqualTo(RuleType.PERCENT_5);
-        assertThat(result.get(PaymentCategory.SHOPPING)).isEqualTo(RuleType.NONE);
+        assertThat(result).doesNotContainKey(PaymentCategory.SHOPPING);
     }
 
     @Test
@@ -149,7 +149,7 @@ class SettingsServiceTest {
 
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
                 new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_5000),
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.NONE)));
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_1000)));
 
         runWithTransactionSync(() -> settingsService.updateSpareChangeRules(EMAIL, request));
 
@@ -162,7 +162,7 @@ class SettingsServiceTest {
         Map<PaymentCategory, RuleType> synced = captor.getValue().stream()
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, CategorySpareChangeRule::getRuleType));
         assertThat(synced).containsEntry(PaymentCategory.CAFE, RuleType.ROUND_UP_5000)
-                .containsEntry(PaymentCategory.SHOPPING, RuleType.NONE);
+                .containsEntry(PaymentCategory.SHOPPING, RuleType.ROUND_UP_1000);
     }
 
     private CategorySpareChangeRule rule(PaymentCategory category, RuleType ruleType) {
