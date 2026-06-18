@@ -1,5 +1,6 @@
 package com.tikkle.payment.entity;
 
+import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -38,6 +39,10 @@ public class PaymentEvent {
     private Integer spareChange;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 20)
+    private PaymentCategory category;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
 
@@ -52,13 +57,14 @@ public class PaymentEvent {
     private LocalDateTime createdAt;
 
     @Builder
-    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, String transactionId, PaymentStatus status, String reason) {
+    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason) {
         this.userId = userId;
         this.cardCompany = cardCompany;
         this.cardNumberLast4 = cardNumberLast4;
         this.merchant = merchant;
         this.amount = amount;
         this.spareChange = spareChange;
+        this.category = category;
         this.transactionId = transactionId;
         this.status = status;
         this.reason = reason;
@@ -66,6 +72,12 @@ public class PaymentEvent {
 
     public void startClassifying() {
         this.status = PaymentStatus.CLASSIFYING;
+    }
+
+    public void updateAfterClassification(PaymentStatus status, int spareChange, PaymentCategory category) {
+        this.status = status;
+        this.spareChange = spareChange;
+        this.category = category;
     }
 
     public void completeInvestment() {
