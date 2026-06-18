@@ -29,6 +29,14 @@ spring:
       hibernate:
         format_sql: true
 
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          model: "gemini-2.5-flash"
+          temperature: 0.0
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600000

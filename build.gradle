@@ -1,20 +1,27 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.0.6'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+    id 'org.springframework.boot' version '4.0.6'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.tikkle'
 version = '0.0.1-SNAPSHOT'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        // Spring AI
+        mavenBom "org.springframework.ai:spring-ai-bom:2.0.0"
+    }
 }
 
 dependencies {
@@ -32,6 +39,9 @@ dependencies {
 
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // Spring AI for Google Gemini
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
     // RSS 파싱 (Google News RSS 수집)
     implementation 'com.rometools:rome:2.1.0'
@@ -55,9 +65,9 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }
 
 jar {
-	enabled = false
+    enabled = false
 }

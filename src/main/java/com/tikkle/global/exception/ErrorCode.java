@@ -33,6 +33,7 @@ public enum ErrorCode {
     // 결제 (Payment)
     INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),
     EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
+    INVALID_AI_RESPONSE(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-003", "AI 응답 데이터가 유효하지 않습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다.");

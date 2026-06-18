@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name = "Onboarding", description = "온보딩 API")
 public interface OnboardingSwagger {
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "온보딩 정보 등록", description = "사용자의 투자 성향, 금융 정보, 잔돈 규칙 등 온보딩 정보를 한번에 등록합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "온보딩 정보 등록 성공",
