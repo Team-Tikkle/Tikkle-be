@@ -5,7 +5,6 @@ import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
-import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
@@ -22,7 +21,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -46,12 +44,8 @@ public class SettingsService {
                 .map(InvestmentSettings::getExecutionMode)
                 .orElse(ExecutionMode.MANUAL);
 
-        Map<PaymentCategory, RuleType> ruleMap = categorySpareChangeRuleRepository.findByUserId(userId).stream()
-                .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, CategorySpareChangeRule::getRuleType));
-
-        List<SettingsResponse.CategoryRule> spareChangeRules = Arrays.stream(PaymentCategory.values())
-                .map(category -> new SettingsResponse.CategoryRule(
-                        category, ruleMap.getOrDefault(category, RuleType.NONE)))
+        List<SettingsResponse.CategoryRule> spareChangeRules = categorySpareChangeRuleRepository.findByUserId(userId).stream()
+                .map(rule -> new SettingsResponse.CategoryRule(rule.getCategory(), rule.getRuleType()))
                 .toList();
 
         return new SettingsResponse(executionMode, spareChangeRules);
