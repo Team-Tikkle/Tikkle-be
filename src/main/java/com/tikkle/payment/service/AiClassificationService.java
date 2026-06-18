@@ -1,6 +1,7 @@
 package com.tikkle.payment.service;
 
 import com.tikkle.payment.dto.response.AiClassificationResponse;
+import com.tikkle.payment.exception.InvalidAiResponseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -11,7 +12,6 @@ public class AiClassificationService {
     private final ChatClient chatClient;
 
     public AiClassificationService(ChatClient.Builder chatClientBuilder) {
-        // 사용자가 작성하신 정확도 높은 프롬프트를 System Prompt로 고정합니다.
         this.chatClient = chatClientBuilder
                 .defaultSystem("""
                         당신은 결제 가맹점 카테고리 분류 AI입니다.
@@ -39,6 +39,10 @@ public class AiClassificationService {
                 .entity(AiClassificationResponse.class);
 
         log.info("AI 분류 응답: {}", response);
+
+        if (response == null || response.keyword() == null || response.category() == null) {
+            throw new InvalidAiResponseException();
+        }
 
         return response;
     }
