@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "investment_profiles")
 @Getter
@@ -23,56 +26,58 @@ public class InvestmentProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private RiskTolerance riskTolerance;
+    private ReturnPreference firstReturnPreference;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private InvestmentTerm investmentTerm;
+    private ReturnPreference secondReturnPreference;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private InvestmentStyle investmentStyle;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private PreferredTheme preferredTheme;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private StockCapPreference stockCapPreference;
+    private ReturnPreference thirdReturnPreference;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private MarketPreference marketPreference;
 
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "investment_profile_themes",
+            joinColumns = @JoinColumn(name = "investment_profile_id")
+    )
+    @Column(name = "preferred_theme", nullable = false)
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private EsgFocus esgFocus;
+    private List<PreferredTheme> preferredThemes = new ArrayList<>();
 
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "investment_profile_value_filters",
+            joinColumns = @JoinColumn(name = "investment_profile_id")
+    )
+    @Column(name = "value_filter", nullable = false)
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private SinIndustryFilter sinIndustryFilter;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private ReturnPreference returnPreference;
+    private List<ValueFilter> valueFilters = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private DiversificationType diversificationType;
 
     @Builder
-    private InvestmentProfile(User user, RiskTolerance riskTolerance, InvestmentTerm investmentTerm, InvestmentStyle investmentStyle, PreferredTheme preferredTheme, StockCapPreference stockCapPreference, MarketPreference marketPreference, EsgFocus esgFocus, SinIndustryFilter sinIndustryFilter, ReturnPreference returnPreference, DiversificationType diversificationType) {
+    private InvestmentProfile(User user,
+                              ReturnPreference firstReturnPreference,
+                              ReturnPreference secondReturnPreference,
+                              ReturnPreference thirdReturnPreference,
+                              MarketPreference marketPreference,
+                              List<PreferredTheme> preferredThemes,
+                              List<ValueFilter> valueFilters,
+                              DiversificationType diversificationType) {
         this.user = user;
-        this.riskTolerance = riskTolerance;
-        this.investmentTerm = investmentTerm;
-        this.investmentStyle = investmentStyle;
-        this.preferredTheme = preferredTheme;
-        this.stockCapPreference = stockCapPreference;
+        this.firstReturnPreference = firstReturnPreference;
+        this.secondReturnPreference = secondReturnPreference;
+        this.thirdReturnPreference = thirdReturnPreference;
         this.marketPreference = marketPreference;
-        this.esgFocus = esgFocus;
-        this.sinIndustryFilter = sinIndustryFilter;
-        this.returnPreference = returnPreference;
+        this.preferredThemes = preferredThemes != null ? preferredThemes : new ArrayList<>();
+        this.valueFilters = valueFilters != null ? valueFilters : new ArrayList<>();
         this.diversificationType = diversificationType;
     }
 }
