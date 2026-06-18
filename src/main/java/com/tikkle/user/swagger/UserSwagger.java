@@ -29,7 +29,8 @@ public interface UserSwagger {
                                         "name": "홍길동",
                                         "email": "hong@example.com",
                                         "status": "ACTIVE",
-                                        "createdAt": "2024-01-01T00:00:00"
+                                        "createdAt": "2024-01-01T00:00:00",
+                                        "isNewUser": false
                                       }
                                     }
                                     """))),
@@ -58,7 +59,8 @@ public interface UserSwagger {
                                         "name": "홍길동",
                                         "email": "hong@example.com",
                                         "status": "ACTIVE",
-                                        "createdAt": "2024-01-01T00:00:00"
+                                        "createdAt": "2024-01-01T00:00:00",
+                                        "isNewUser": false
                                       }
                                     }
                                     """))),
