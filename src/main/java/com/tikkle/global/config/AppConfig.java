@@ -1,4 +1,4 @@
-package com.tikkle.config;
+package com.tikkle.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
