@@ -80,9 +80,9 @@ CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
 CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `kis_app_key`           VARCHAR(255)    NOT NULL,
-    `kis_app_secret`        VARCHAR(255)    NOT NULL,
-    `kis_account_num`       VARCHAR(255)    NOT NULL,
+    `kis_app_key`           VARCHAR(512)    NOT NULL,
+    `kis_app_secret`        VARCHAR(512)    NOT NULL,
+    `kis_account_num`       VARCHAR(512)    NOT NULL,
     `target_card_company`   VARCHAR(50)     NOT NULL,
     `target_card_last_4`    VARCHAR(4)      NOT NULL
 );

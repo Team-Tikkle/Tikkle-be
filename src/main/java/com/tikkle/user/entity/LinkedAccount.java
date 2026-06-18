@@ -48,4 +48,10 @@ public class LinkedAccount {
         this.targetCardCompany = targetCardCompany;
         this.targetCardLast4 = targetCardLast4;
     }
+
+    public void updateKisCredentials(String kisAppKey, String kisAppSecret, String kisAccountNum) {
+        this.kisAppKey = kisAppKey;
+        this.kisAppSecret = kisAppSecret;
+        this.kisAccountNum = kisAccountNum;
+    }
 }

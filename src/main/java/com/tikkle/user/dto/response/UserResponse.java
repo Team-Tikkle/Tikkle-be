@@ -12,15 +12,17 @@ public record UserResponse(
         @Schema(description = "이름", example = "홍길동") String name,
         @Schema(description = "이메일", example = "hong@example.com") String email,
         @Schema(description = "계정 상태", example = "ACTIVE") UserStatus status,
-        @Schema(description = "가입일시", example = "2024-01-01T00:00:00") LocalDateTime createdAt
+        @Schema(description = "가입일시", example = "2024-01-01T00:00:00") LocalDateTime createdAt,
+        @Schema(description = "신규 유저 여부 (true: 온보딩 미완료)", example = "false") boolean isNewUser
 ) {
-    public static UserResponse from(User user) {
+    public static UserResponse from(User user, boolean isNewUser) {
         return new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getStatus(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                isNewUser
         );
     }
 }

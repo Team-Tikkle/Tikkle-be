@@ -25,6 +25,7 @@ public enum ErrorCode {
     // 유저 (User)
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
     WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-002", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다."),
+    LINKED_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-003", "연동된 증권사 계좌 정보를 찾을 수 없습니다."),
 
     // 온보딩 (Onboarding)
     ONBOARDING_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "ONBOARDING-001", "이미 온보딩을 완료한 사용자입니다."),
