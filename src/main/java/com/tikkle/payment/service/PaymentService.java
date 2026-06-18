@@ -90,16 +90,14 @@ public class PaymentService {
             return;
         }
 
-        String redisSettingsKey = "user:settings:" + request.userId();
-
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
         if (!mappings.isEmpty()) {
             PaymentCategoryMapping mapping = mappings.get(0); // 가장 긴 키워드 매칭
             PaymentCategory category = mapping.getCategory();
 
-            // 💡 잔돈 룰 조회
-            RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, redisSettingsKey);
+            // 💡 잔돈 룰 조회 (최적화: 이미 가져온 userSettings 맵 사용)
+            RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, userSettings);
             int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
 
             if (spareChange == 0) {
@@ -161,8 +159,8 @@ public class PaymentService {
         return new HashMap<>(cacheData);
     }
 
-    private RuleType getRuleTypeFromCacheOrDb(Long userId, PaymentCategory category, String redisSettingsKey) {
-        String ruleTypeStr = (String) redisTemplate.opsForHash().get(redisSettingsKey, category.name());
+    private RuleType getRuleTypeFromCacheOrDb(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
+        String ruleTypeStr = (String) userSettings.get(category.name());
 
         if (ruleTypeStr != null) {
             return RuleType.valueOf(ruleTypeStr);
