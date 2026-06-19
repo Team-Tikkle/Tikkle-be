@@ -35,8 +35,15 @@ public enum ErrorCode {
     EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
     INVALID_AI_RESPONSE(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-003", "AI 응답 데이터가 유효하지 않습니다."),
 
+    // 투자 (Investment)
+    AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
+
     // 인사이트 (Insight)
-    ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다.");
+    ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
+    
+    // 시스템/보안 (Security)
+    ENCRYPTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SECURITY-001", "데이터 암호화 또는 복호화 중 오류가 발생했습니다."),
+    INVALID_ENCRYPTION_KEY(HttpStatus.INTERNAL_SERVER_ERROR, "SECURITY-002", "유효하지 않은 암호화 키 설정입니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
