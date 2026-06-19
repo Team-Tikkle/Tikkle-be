@@ -30,12 +30,22 @@ spring:
         format_sql: true
 
   ai:
+    # 결제 카테고리 분류용 (Gemini)
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
         chat:
           model: "gemini-2.5-flash"
           temperature: 0.0
+
+    # 2. 신규: 3주 차 주식 추천 코어용 (Claude)
+    anthropic:
+      api-key: ${GMS_KEY}
+      base-url: https://gms.ssafy.io/gmsapi/api.anthropic.com
+      chat:
+        model: claude-opus-4-8
+        max-tokens: 2048
+        temperature: 0.0
 
 jwt:
   secret: ${JWT_SECRET}
