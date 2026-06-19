@@ -7,11 +7,15 @@ import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
+import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
+import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
+import com.tikkle.user.exception.LinkedAccountNotFoundException;
 import com.tikkle.user.exception.UserNotFoundException;
+import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +38,7 @@ public class SettingsService {
     private final UserRepository userRepository;
     private final InvestmentSettingsRepository investmentSettingsRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
+    private final LinkedAccountRepository linkedAccountRepository;
     private final SettingsCacheManager settingsCacheManager;
 
     public SettingsResponse getSettings(String email) {
@@ -92,6 +97,16 @@ public class SettingsService {
         }
 
         syncAfterCommit(() -> settingsCacheManager.updateSpareChangeRules(userId, changed));
+    }
+
+    @Transactional
+    public void updateLinkedAccount(String email, UpdateLinkedAccountRequest request) {
+        User user = findActiveUserByEmail(email);
+
+        LinkedAccount account = linkedAccountRepository.findByUserId(user.getId())
+                .orElseThrow(LinkedAccountNotFoundException::new);
+
+        account.updateKisCredentials(request.kisAppKey(), request.kisAppSecret(), request.kisAccountNum());
     }
 
     private User findActiveUserByEmail(String email) {
