@@ -1,15 +1,7 @@
 package com.tikkle.insight.service;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.json.JsonMapper;
-import com.tikkle.global.exception.CustomException;
-import com.tikkle.global.exception.ErrorCode;
-import com.tikkle.insight.dto.response.BeginnerArticleDetailResponse;
-import com.tikkle.insight.dto.response.BeginnerArticleSummaryResponse;
-import com.tikkle.insight.dto.response.InvestmentTermResponse;
-import com.tikkle.insight.dto.response.MarketTopicResponse;
-import com.tikkle.insight.dto.response.RecommendedVideoResponse;
+import com.tikkle.insight.dto.response.*;
+import com.tikkle.insight.exception.ArticleNotFoundException;
 import com.tikkle.insight.repository.BeginnerArticleRepository;
 import com.tikkle.insight.repository.InvestmentTermRepository;
 import com.tikkle.insight.repository.MarketTopicRepository;
@@ -20,6 +12,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.List;
@@ -68,7 +63,7 @@ public class InsightService {
     public BeginnerArticleDetailResponse getArticle(Long id) {
         return beginnerArticleRepository.findById(id)
                 .map(BeginnerArticleDetailResponse::from)
-                .orElseThrow(() -> new CustomException(ErrorCode.ARTICLE_NOT_FOUND));
+                .orElseThrow(ArticleNotFoundException::new);
     }
 
     public List<RecommendedVideoResponse> getVideos() {
