@@ -2,5 +2,6 @@ package com.tikkle.investment.entity.enums;
 
 public enum ReturnPreference {
     DIVIDEND,
-    GROWTH
+    BLUE_CHIP,
+    HIGH_GROWTH
 }

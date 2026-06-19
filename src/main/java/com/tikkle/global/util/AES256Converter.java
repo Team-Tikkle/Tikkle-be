@@ -13,7 +13,8 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
-
+import com.tikkle.global.exception.EncryptionFailedException;
+import com.tikkle.global.exception.InvalidEncryptionKeyException;
 @Converter
 @Component
 @Slf4j
@@ -24,11 +25,11 @@ public class AES256Converter implements AttributeConverter<String, String> {
 
     public AES256Converter(@Value("${tikkle.encrypt.secret-key}") String secretKey) {
         if (!StringUtils.hasText(secretKey)) {
-            throw new IllegalArgumentException("tikkle.encrypt.secret-key must not be empty.");
+            throw new InvalidEncryptionKeyException();
         }
         byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length != 32) {
-            throw new IllegalArgumentException("tikkle.encrypt.secret-key must be a 32-byte string.");
+            throw new InvalidEncryptionKeyException();
         }
         this.secretKeySpec = new SecretKeySpec(keyBytes, "AES");
     }
@@ -55,7 +56,7 @@ public class AES256Converter implements AttributeConverter<String, String> {
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
             log.error("Failed to encrypt data.", e);
-            throw new RuntimeException("Failed to encrypt data", e);
+            throw new EncryptionFailedException();
         }
     }
 
@@ -81,7 +82,7 @@ public class AES256Converter implements AttributeConverter<String, String> {
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
             log.error("Failed to decrypt data.", e);
-            throw new RuntimeException("Failed to decrypt data", e);
+            throw new EncryptionFailedException();
         }
     }
 }

@@ -9,7 +9,9 @@
 | 테이블명 | 설명 |
 |---------|------|
 | `USERS` | 회원 기본 정보 |
-| `INVESTMENT_PROFILES` | 유저별 9축 투자 성향 설문 결과 |
+| `INVESTMENT_PROFILES` | 유저별 5축 투자 성향 설문 결과 |
+| `INVESTMENT_PROFILE_THEMES` | 투자 프로필별 선호 테마 (다중 선택) |
+| `INVESTMENT_PROFILE_VALUE_FILTERS` | 투자 프로필별 가치관 필터 (다중 선택) |
 | `CATEGORY_SPARE_CHANGE_RULES` | 카테고리별 다이나믹 잔돈 규칙 |
 | `LINKED_ACCOUNTS` | 금융 연동 정보 (한투 API 키, 타겟 카드 정보) |
 | `INVESTMENT_SETTINGS` | 매매 방식 등 공통 투자 설정 |
@@ -58,16 +60,21 @@ CREATE TABLE `PAYMENT_EVENTS` (
 CREATE TABLE `INVESTMENT_PROFILES` (
     `id`                        BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`                   BIGINT          NOT NULL,
-    `risk_tolerance`            VARCHAR(20)     NOT NULL,
-    `investment_term`           VARCHAR(20)     NOT NULL,
-    `investment_style`          VARCHAR(20)     NOT NULL,
-    `preferred_theme`           VARCHAR(30)     NOT NULL,
-    `stock_cap_preference`      VARCHAR(20)     NOT NULL,
+    `first_return_preference`   VARCHAR(30)     NOT NULL,
+    `second_return_preference`  VARCHAR(30)     NOT NULL,
+    `third_return_preference`   VARCHAR(30)     NOT NULL,
     `market_preference`         VARCHAR(20)     NOT NULL,
-    `esg_focus`                 VARCHAR(20)     NOT NULL,
-    `sin_industry_filter`       VARCHAR(30)     NOT NULL,
-    `return_preference`         VARCHAR(20)     NOT NULL,
     `diversification_type`      VARCHAR(20)     NOT NULL
+);
+
+CREATE TABLE `INVESTMENT_PROFILE_THEMES` (
+    `investment_profile_id`     BIGINT          NOT NULL,
+    `preferred_theme`           VARCHAR(30)     NOT NULL
+);
+
+CREATE TABLE `INVESTMENT_PROFILE_VALUE_FILTERS` (
+    `investment_profile_id`     BIGINT          NOT NULL,
+    `value_filter`              VARCHAR(30)     NOT NULL
 );
 
 CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
@@ -80,9 +87,9 @@ CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
 CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `kis_app_key`           VARCHAR(512)    NOT NULL,
-    `kis_app_secret`        VARCHAR(512)    NOT NULL,
-    `kis_account_num`       VARCHAR(512)    NOT NULL,
+    `kis_app_key`           VARCHAR(255)    NOT NULL,
+    `kis_app_secret`        TEXT            NOT NULL,
+    `kis_account_num`       VARCHAR(255)    NOT NULL,
     `target_card_company`   VARCHAR(50)     NOT NULL,
     `target_card_last_4`    VARCHAR(4)      NOT NULL
 );
@@ -142,11 +149,6 @@ CREATE TABLE `PORTFOLIOS` (
     `stock_id`          BIGINT          NOT NULL,
     `quantity`          DECIMAL(15,6)   NOT NULL,
     `avg_buy_price`     DECIMAL(15,2)   NOT NULL,
-    `total_buy_amount`  DECIMAL(15,2)   NOT NULL,
-    `current_price`     DECIMAL(15,2)   NOT NULL,
-    `evaluated_amount`  DECIMAL(15,2)   NOT NULL,
-    `evlu_pfls_amt`     DECIMAL(15,2)   NULL,
-    `evlu_pfls_rt`      DECIMAL(10,4)   NULL,
     `updated_at`        DATETIME        NOT NULL
 );
 
@@ -226,7 +228,9 @@ ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LIN
 
 ```
 USERS (1)
- ├── INVESTMENT_PROFILES (1)          - 유저별 9축 투자 성향
+ ├── INVESTMENT_PROFILES (1)          - 유저별 5축 투자 성향
+ │    ├── INVESTMENT_PROFILE_THEMES (N) - 관심 테마 (1:N 다중 선택)
+ │    └── INVESTMENT_PROFILE_VALUE_FILTERS (N) - 가치관 필터 (1:N 다중 선택)
  ├── CATEGORY_SPARE_CHANGE_RULES (N)  - 카테고리별 잔돈 규칙
  ├── LINKED_ACCOUNTS (1)              - 금융 연동 정보 (API 키, 타겟 카드 정보)
  ├── INVESTMENT_SETTINGS (1)          - 공통 투자 설정
@@ -261,13 +265,10 @@ STOCKS
 | `INVESTMENT_SETTINGS` | `executionMode` | `AUTO`, `MANUAL` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `ruleType` | `ROUND_UP_1000`, `ROUND_UP_5000`, `ROUND_UP_10000`, `ROUND_UP_50000`, `PERCENT_5`, `PERCENT_10`, `PERCENT_20`, `PERCENT_30` |
-| `INVESTMENT_PROFILES` | `riskTolerance` | `SAFE`, `MODERATE`, `AGGRESSIVE` |
-| `INVESTMENT_PROFILES` | `investmentTerm` | `SHORT_TERM`, `LONG_TERM` |
-| `INVESTMENT_PROFILES` | `investmentStyle` | `VALUE`, `MOMENTUM` |
-| `INVESTMENT_PROFILES` | `preferredTheme` | `TECH`, `BIO`, `SEMICONDUCTOR`, `GREEN`, `ENTERTAINMENT`, `NONE` |
-| `INVESTMENT_PROFILES` | `stockCapPreference` | `BLUE_CHIP`, `NEW_LISTING` |
+| `INVESTMENT_PROFILES` | `firstReturnPreference` | `DIVIDEND`, `BLUE_CHIP`, `HIGH_GROWTH` |
+| `INVESTMENT_PROFILES` | `secondReturnPreference` | `DIVIDEND`, `BLUE_CHIP`, `HIGH_GROWTH` |
+| `INVESTMENT_PROFILES` | `thirdReturnPreference` | `DIVIDEND`, `BLUE_CHIP`, `HIGH_GROWTH` |
 | `INVESTMENT_PROFILES` | `marketPreference` | `DOMESTIC`, `FOREIGN`, `BOTH` |
-| `INVESTMENT_PROFILES` | `esgFocus` | `NONE`, `ESG_DRIVEN` |
-| `INVESTMENT_PROFILES` | `sinIndustryFilter` | `NONE`, `WEAPON`, `TOBACCO`, `FOSSIL_FUEL` |
-| `INVESTMENT_PROFILES` | `returnPreference` | `DIVIDEND`, `GROWTH` |
+| `INVESTMENT_PROFILE_THEMES` | `preferredTheme` | `TECH`, `BIO`, `SEMICONDUCTOR`, `GREEN`, `ENTERTAINMENT`, `NONE` |
+| `INVESTMENT_PROFILE_VALUE_FILTERS` | `valueFilter` | `WEAPON`, `SIN_TAX`, `FOSSIL_FUEL`, `NONE` |
 | `INVESTMENT_PROFILES` | `diversificationType` | `CONCENTRATED`, `DIVERSIFIED` |

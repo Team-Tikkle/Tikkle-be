@@ -43,6 +43,9 @@ dependencies {
     // Spring AI for Google Gemini
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
+    // Spring AI for Anthropic Claude
+    implementation 'org.springframework.ai:spring-ai-starter-model-anthropic'
+
     // RSS 파싱 (Google News RSS 수집)
     implementation 'com.rometools:rome:2.1.0'
 

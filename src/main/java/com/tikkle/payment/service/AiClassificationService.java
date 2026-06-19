@@ -4,6 +4,8 @@ import com.tikkle.payment.dto.response.AiClassificationResponse;
 import com.tikkle.payment.exception.InvalidAiResponseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -11,8 +13,8 @@ import org.springframework.stereotype.Service;
 public class AiClassificationService {
     private final ChatClient chatClient;
 
-    public AiClassificationService(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder
+    public AiClassificationService(@Qualifier("googleGenAiChatModel") ChatModel chatModel) {
+        this.chatClient = ChatClient.builder(chatModel)
                 .defaultSystem("""
                         당신은 결제 가맹점 카테고리 분류 AI입니다.
                         사용자가 가맹점 이름을 입력하면, 가맹점의 핵심 상호명을 'keyword'로 추출하세요.

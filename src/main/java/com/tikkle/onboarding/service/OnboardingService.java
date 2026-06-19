@@ -81,15 +81,12 @@ public class OnboardingService {
     private void saveInvestmentProfile(User user, OnboardingRequest dto) {
         InvestmentProfile profile = InvestmentProfile.builder()
                 .user(user)
-                .riskTolerance(dto.riskTolerance())
-                .investmentTerm(dto.investmentTerm())
-                .investmentStyle(dto.investmentStyle())
-                .preferredTheme(dto.preferredTheme())
-                .stockCapPreference(dto.stockCapPreference())
+                .firstReturnPreference(dto.firstReturnPreference())
+                .secondReturnPreference(dto.secondReturnPreference())
+                .thirdReturnPreference(dto.thirdReturnPreference())
                 .marketPreference(dto.marketPreference())
-                .esgFocus(dto.esgFocus())
-                .sinIndustryFilter(dto.sinIndustryFilter())
-                .returnPreference(dto.returnPreference())
+                .preferredThemes(dto.preferredThemes())
+                .valueFilters(dto.valueFilters())
                 .diversificationType(dto.diversificationType())
                 .build();
         investmentProfileRepository.save(profile);
