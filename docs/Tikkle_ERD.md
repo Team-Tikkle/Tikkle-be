@@ -88,7 +88,7 @@ CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
     `kis_app_key`           VARCHAR(255)    NOT NULL,
-    `kis_app_secret`        VARCHAR(255)    NOT NULL,
+    `kis_app_secret`        TEXT            NOT NULL,
     `kis_account_num`       VARCHAR(255)    NOT NULL,
     `target_card_company`   VARCHAR(50)     NOT NULL,
     `target_card_last_4`    VARCHAR(4)      NOT NULL
@@ -149,11 +149,6 @@ CREATE TABLE `PORTFOLIOS` (
     `stock_id`          BIGINT          NOT NULL,
     `quantity`          DECIMAL(15,6)   NOT NULL,
     `avg_buy_price`     DECIMAL(15,2)   NOT NULL,
-    `total_buy_amount`  DECIMAL(15,2)   NOT NULL,
-    `current_price`     DECIMAL(15,2)   NOT NULL,
-    `evaluated_amount`  DECIMAL(15,2)   NOT NULL,
-    `evlu_pfls_amt`     DECIMAL(15,2)   NULL,
-    `evlu_pfls_rt`      DECIMAL(10,4)   NULL,
     `updated_at`        DATETIME        NOT NULL
 );
 
