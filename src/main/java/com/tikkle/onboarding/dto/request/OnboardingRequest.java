@@ -9,6 +9,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.AssertTrue;
 
 import java.util.List;
 
@@ -38,6 +40,7 @@ public record OnboardingRequest(
         @Schema(description = "연동 카드 번호 마지막 4자리", example = "1234")
         @NotBlank(message = "대상 카드 번호 마지막 4자리는 필수입니다.")
         @Size(min = 4, max = 4, message = "카드 번호 마지막 4자리를 입력해주세요.")
+        @Pattern(regexp = "^[0-9]{4}$", message = "카드 번호 마지막 4자리는 숫자 4자리여야 합니다.")
         String targetCardLast4,
 
         // 5대 투자 성향
@@ -60,12 +63,12 @@ public record OnboardingRequest(
         @Schema(description = "관심 투자 테마 리스트", example = "[\"TECH\", \"SEMICONDUCTOR\"]")
         @NotNull(message = "선호 테마를 지정해주세요.")
         @NotEmpty(message = "선호 테마를 하나 이상 선택해주세요.")
-        List<PreferredTheme> preferredThemes,
+        List<@NotNull(message = "테마 항목은 null일 수 없습니다.") PreferredTheme> preferredThemes,
 
         @Schema(description = "가치관 필터링 제외 업종 리스트", example = "[\"SIN_TAX\", \"FOSSIL_FUEL\"]")
         @NotNull(message = "가치관 필터를 지정해주세요.")
         @NotEmpty(message = "가치관 필터를 하나 이상 선택해주세요.")
-        List<ValueFilter> valueFilters,
+        List<@NotNull(message = "가치관 필터 항목은 null일 수 없습니다.") ValueFilter> valueFilters,
 
         @Schema(description = "분산 투자 선호 유형", example = "DIVERSIFIED", allowableValues = {"CONCENTRATED", "DIVERSIFIED"})
         @NotNull(message = "분산 투자 유형을 선택해주세요.")
@@ -93,5 +96,15 @@ public record OnboardingRequest(
             @NotNull(message = "잔돈 규칙 유형은 필수입니다.")
             RuleType ruleType
     ) {
+    }
+
+    @AssertTrue(message = "수익률 선호 순위는 중복될 수 없습니다.")
+    public boolean isValidPreferences() {
+        if (firstReturnPreference == null || secondReturnPreference == null || thirdReturnPreference == null) {
+            return true;
+        }
+        return firstReturnPreference != secondReturnPreference
+                && secondReturnPreference != thirdReturnPreference
+                && firstReturnPreference != thirdReturnPreference;
     }
 }
