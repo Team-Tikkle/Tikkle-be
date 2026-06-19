@@ -12,7 +12,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "INVESTMENT_TARGETS")
+@Table(name = "INVESTMENT_TARGETS", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_target_date", columnNames = {"user_id", "target_date"})
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InvestmentTarget {
