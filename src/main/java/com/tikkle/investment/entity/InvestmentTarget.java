@@ -50,4 +50,10 @@ public class InvestmentTarget {
         this.reason = reason;
         this.targetDate = targetDate;
     }
+
+    public void updateTarget(String ticker, String stockName, String reason) {
+        this.ticker = ticker;
+        this.stockName = stockName;
+        this.reason = reason;
+    }
 }
