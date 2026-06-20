@@ -76,8 +76,8 @@ public class InvestmentProfile {
         this.secondReturnPreference = secondReturnPreference;
         this.thirdReturnPreference = thirdReturnPreference;
         this.marketPreference = marketPreference;
-        this.preferredThemes = preferredThemes != null ? preferredThemes : new ArrayList<>();
-        this.valueFilters = valueFilters != null ? valueFilters : new ArrayList<>();
+        this.preferredThemes = preferredThemes != null ? new ArrayList<>(preferredThemes) : new ArrayList<>();
+        this.valueFilters = valueFilters != null ? new ArrayList<>(valueFilters) : new ArrayList<>();
         this.diversificationType = diversificationType;
     }
 }

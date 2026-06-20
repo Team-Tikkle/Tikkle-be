@@ -1,0 +1,11 @@
+package com.tikkle.payment.dto.response;
+
+public enum PaymentActionType {
+    ORDER_REQUESTED,
+    NEED_APPROVAL,
+    SCHEDULED_AUTO,
+    SCHEDULED_MANUAL,
+    IGNORE_DUPLICATE,
+    IGNORE_CARD_MISMATCH,
+    IGNORE_NO_SPARE_CHANGE
+}

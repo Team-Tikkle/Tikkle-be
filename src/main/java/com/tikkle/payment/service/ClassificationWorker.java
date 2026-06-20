@@ -11,6 +11,7 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.event.ClassificationRequestEvent;
+import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
@@ -44,7 +45,7 @@ public class ClassificationWorker {
         log.info("[AI Worker] 비동기 분류 작업 시작. PaymentEvent ID: {}", event.getPaymentEventId());
 
         PaymentEvent paymentEvent = paymentEventRepository.findById(event.getPaymentEventId())
-                .orElseThrow(() -> new RuntimeException("PaymentEvent not found for id: " + event.getPaymentEventId()));
+                .orElseThrow(PaymentEventNotFoundException::new);
 
         AiClassificationResponse classificationResult;
         try {

@@ -22,11 +22,10 @@ public class PaymentController implements PaymentSwagger {
     @Override
     @PostMapping
     public ApiResponse<?> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
-        // TODO: 추후 삭제 예정
-        log.info("Received payment scraping request: {}", request);
+        log.info("Received payment scraping request for transaction ID: {}", request.transactionId());
         
-        paymentService.processPaymentScraping(request);
+        var response = paymentService.processPaymentScraping(request);
         
-        return ApiResponse.successWithNoData();
+        return ApiResponse.success(response);
     }
 }
