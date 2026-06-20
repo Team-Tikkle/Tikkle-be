@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -100,6 +99,11 @@ public class AiPortfolioService {
             """;
 
         try {
+            // [TODO: OOM 방지] 현재 MVP 단계이므로 findAll()을 사용하지만, 
+            // 실 서비스 시에는 Spring Batch 나 Pagination을 활용해 유저를 청크 단위로 처리해야 합니다.
+            
+            // 외부 AI API 호출 (현재 Step 2 검증을 위해 임시 주석 처리)
+            /*
             return chatClient.prompt()
                     .user(u -> u.text(promptText)
                             .param("first", profile.getFirstReturnPreference())
@@ -112,6 +116,16 @@ public class AiPortfolioService {
                     )
                     .call()
                     .entity(new ParameterizedTypeReference<List<AiRecommendationDto>>() {});
+            */
+
+            // Dummy Data Injection for Step 2 testing
+            return List.of(
+                    new AiRecommendationDto("005930", "삼성전자", "안정적인 배당과 장기 성장성"),
+                    new AiRecommendationDto("AAPL", "애플", "강력한 글로벌 브랜드와 현금 흐름"),
+                    new AiRecommendationDto("MSFT", "마이크로소프트", "클라우드 및 AI 분야의 지속적 성장"),
+                    new AiRecommendationDto("TSLA", "테슬라", "전기차 및 자율주행 시장 선도"),
+                    new AiRecommendationDto("NVDA", "엔비디아", "AI 반도체 시장의 독보적 점유율")
+            );
         } catch (Exception e) {
             log.error("AI Recommendation API call failed", e);
             throw new AiRecommendationFailedException();

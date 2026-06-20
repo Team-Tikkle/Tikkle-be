@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(PERMIT_ALL_URLS).permitAll();
                     if (isLocal) {
-                        auth.requestMatchers("/api/auth/test-token", "/api/auth/test-signup").permitAll();
+                        auth.requestMatchers("/api/auth/test-token", "/api/auth/test-signup", "/api/test/**").permitAll();
                     }
                     auth.anyRequest().authenticated();
                 })
