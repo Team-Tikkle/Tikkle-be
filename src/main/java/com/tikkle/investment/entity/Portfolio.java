@@ -8,10 +8,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "PORTFOLIOS")
+@Table(name = "PORTFOLIOS", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_ticker", columnNames = {"user_id", "ticker"})
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Portfolio {
@@ -26,13 +30,35 @@ public class Portfolio {
     @Column(nullable = false, length = 50)
     private String ticker;
 
+    @Column(nullable = false, precision = 18, scale = 4)
+    private BigDecimal quantity = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 18, scale = 4)
+    private BigDecimal averagePrice = BigDecimal.ZERO;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    private Portfolio(User user, String ticker) {
+    private Portfolio(User user, String ticker, BigDecimal quantity, BigDecimal averagePrice) {
         this.user = user;
         this.ticker = ticker;
+        this.quantity = quantity != null ? quantity : BigDecimal.ZERO;
+        this.averagePrice = averagePrice != null ? averagePrice : BigDecimal.ZERO;
+    }
+
+    /**
+     * 매수 체결 시 기존 보유 수량과 평균 매수 단가를 갱신합니다.
+     * 가중 평균 공식: newAvg = (기존총액 + 신규총액) / (기존수량 + 신규수량)
+     */
+    public void updateHolding(BigDecimal executedPrice, BigDecimal executedQuantity) {
+        BigDecimal existingTotal = this.averagePrice.multiply(this.quantity);
+        BigDecimal newTotal = executedPrice.multiply(executedQuantity);
+        this.quantity = this.quantity.add(executedQuantity);
+        if (this.quantity.compareTo(BigDecimal.ZERO) > 0) {
+            this.averagePrice = existingTotal.add(newTotal)
+                    .divide(this.quantity, 4, RoundingMode.HALF_UP);
+        }
     }
 }
