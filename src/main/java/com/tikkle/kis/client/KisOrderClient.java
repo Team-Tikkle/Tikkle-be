@@ -1,7 +1,7 @@
 package com.tikkle.kis.client;
 
-import com.tikkle.kis.dto.KisOrderRequest;
-import com.tikkle.kis.dto.KisOrderResponse;
+import com.tikkle.kis.dto.request.KisOrderRequest;
+import com.tikkle.kis.dto.response.KisOrderResponse;
 import com.tikkle.kis.exception.KisOrderFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -4,12 +4,13 @@ import com.tikkle.investment.entity.Portfolio;
 import com.tikkle.investment.repository.PortfolioRepository;
 import com.tikkle.kis.client.KisAuthClient;
 import com.tikkle.kis.client.KisOrderClient;
-import com.tikkle.kis.dto.KisOrderRequest;
-import com.tikkle.kis.dto.KisOrderResponse;
+import com.tikkle.kis.dto.request.KisOrderRequest;
+import com.tikkle.kis.dto.response.KisOrderResponse;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
+import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +76,7 @@ public class BuyEventListener {
             // 3. 매수 성공 → PaymentEvent 상태 변경 + Portfolio Upsert
             paymentEvent.completeInvestment();
 
-            User user = userRepository.findById(event.userId()).orElseThrow();
+            User user = userRepository.findById(event.userId()).orElseThrow(UserNotFoundException::new);
             upsertPortfolio(user, event.ticker(), event.amount());
 
             log.info("[BuyEvent] Buy completed. userId={}, ticker={}, amount={}",

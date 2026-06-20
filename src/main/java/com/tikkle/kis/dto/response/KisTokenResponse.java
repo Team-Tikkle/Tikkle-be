@@ -1,4 +1,4 @@
-package com.tikkle.kis.dto;
+package com.tikkle.kis.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

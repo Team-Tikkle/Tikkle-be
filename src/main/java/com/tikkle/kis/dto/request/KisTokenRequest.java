@@ -1,4 +1,4 @@
-package com.tikkle.kis.dto;
+package com.tikkle.kis.dto.request;
 
 public record KisTokenRequest(
         String grant_type,

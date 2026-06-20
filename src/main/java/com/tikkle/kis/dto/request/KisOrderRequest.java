@@ -1,4 +1,4 @@
-package com.tikkle.kis.dto;
+package com.tikkle.kis.dto.request;
 
 /**
  * KIS 국내 주식 금액 기반 소수점 매수 요청 DTO

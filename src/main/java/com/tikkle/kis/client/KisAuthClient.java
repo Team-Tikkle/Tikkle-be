@@ -1,7 +1,7 @@
 package com.tikkle.kis.client;
 
-import com.tikkle.kis.dto.KisTokenRequest;
-import com.tikkle.kis.dto.KisTokenResponse;
+import com.tikkle.kis.dto.request.KisTokenRequest;
+import com.tikkle.kis.dto.response.KisTokenResponse;
 import com.tikkle.kis.exception.KisTokenIssueFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
