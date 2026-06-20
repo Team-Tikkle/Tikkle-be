@@ -1,7 +1,8 @@
 package com.tikkle.payment.event;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BuyEventListener {
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleBuyEvent(BuyEvent event) {
         log.info("[Buy Event Triggered] PaymentEvent ID: {}, Ticker: {}, Stock: {}, Amount: {}",
                 event.paymentEventId(), event.ticker(), event.stockName(), event.amount());
