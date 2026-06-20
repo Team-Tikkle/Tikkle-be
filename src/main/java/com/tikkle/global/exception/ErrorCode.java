@@ -40,6 +40,10 @@ public enum ErrorCode {
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
 
+    // KIS 증권사 연동
+    KIS_TOKEN_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "KIS-001", "KIS 토큰 발급에 실패했습니다."),
+    KIS_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "KIS-002", "KIS 매수 주문에 실패했습니다."),
+
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
     
