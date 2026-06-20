@@ -8,6 +8,7 @@ public enum PaymentStatus {
     // [2단계: 매매 대기] (Market Time Gate 분기점)
     PENDING,            // 장외 시간 결제 -> 익일 09:00 Spring Batch 일괄 매수 대기
     WAITING_APPROVAL,   // 수동 매매 설정 유저 -> 푸시 발송 후 앱 내 '승인' 버튼 클릭 대기
+    PENDING_APPROVAL,   // 장외 시간 결제 + 수동 매매 설정 유저 -> 대기 상태에서 승인 대기
 
     // [3단계: 매매 실행 및 결과]
     ORDERING,           // 장중 자동 매매 진행 중 -> KIS API 호출 직전의 임시 상태
