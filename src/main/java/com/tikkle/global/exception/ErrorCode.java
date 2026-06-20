@@ -36,6 +36,7 @@ public enum ErrorCode {
     EXPIRED_TIMESTAMP(HttpStatus.UNAUTHORIZED, "PAYMENT-002", "요청 시간이 만료되었습니다."),
     INVALID_AI_RESPONSE(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-003", "AI 응답 데이터가 유효하지 않습니다."),
     PAYMENT_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT-004", "결제 내역을 찾을 수 없습니다."),
+    UNKNOWN_PAYMENT_STATUS(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-005", "알 수 없는 결제 상태입니다."),
 
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
