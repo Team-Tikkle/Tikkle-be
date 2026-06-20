@@ -2,15 +2,18 @@ package com.tikkle.payment.service;
 
 import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
-import com.tikkle.payment.entity.CategorySpareChangeRule;
-import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
+import com.tikkle.payment.dto.response.PaymentActionType;
+import com.tikkle.payment.dto.response.PaymentScrapingResponse;
+import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.PaymentCategoryMapping;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.payment.event.BuyEvent;
 import com.tikkle.payment.event.ClassificationRequestEvent;
+import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.MarketTimeGate;
@@ -27,9 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -47,7 +50,7 @@ public class PaymentService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public void processPaymentScraping(PaymentScrapingRequest request) {
+    public PaymentScrapingResponse processPaymentScraping(PaymentScrapingRequest request) {
         // [1단계 Fail-Fast: Redis SETNX 중복 검증]
         String redisTxKey = "payment:tx:" + request.transactionId();
         Boolean isFirstRequest = redisTemplate.opsForValue()
@@ -55,7 +58,7 @@ public class PaymentService {
 
         if (Boolean.FALSE.equals(isFirstRequest)) {
             log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            return;
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null);
         }
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -70,7 +73,7 @@ public class PaymentService {
         // [JPA 롤백 방지] DB 2차 검증
         if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
             log.info("중복 결제 요청 조기 종료 (DB Hit) - transactionId: {}", request.transactionId());
-            return;
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null);
         }
 
         // Redis에서 유저 설정 통째로 가져오기
@@ -87,8 +90,12 @@ public class PaymentService {
             log.info("타겟 카드가 아니거나 온보딩 정보가 없어 조기 종료 (userId: {}, requestCard: {} {})",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
             redisTemplate.delete(redisTxKey);
-            return;
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null);
         }
+
+        // TODO : 추후 수정(더미 종목 주입)
+        String dummyTicker = "005930";
+        String dummyStockName = "삼성전자";
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
@@ -102,7 +109,7 @@ public class PaymentService {
 
             if (spareChange == 0) {
                 saveEvent(request, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-                return;
+                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, request.merchant(), request.amount(), 0, null, null);
             }
 
             // 💡 ExecutionMode를 Redis에서 조회하여 MarketTimeGate 판별
@@ -110,8 +117,16 @@ public class PaymentService {
             ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
 
             PaymentStatus status = marketTimeGate.getPaymentStatus(executionMode);
-            saveEvent(request, spareChange, status, null, category);
-            return;
+            PaymentEvent savedEvent = saveEvent(request, spareChange, status, null, category);
+
+            PaymentActionType actionType = mapStatusToActionType(status);
+
+            // [장중 + 자동]인 경우에 한해서만 실제 증권사 매수 이벤트 발생
+            if (status == PaymentStatus.ORDERING && savedEvent != null) {
+                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), dummyTicker, dummyStockName, spareChange));
+            }
+
+            return new PaymentScrapingResponse(actionType, request.merchant(), request.amount(), spareChange, dummyTicker, dummyStockName);
         }
 
         // [Phase 2: DB MISS - AI 분류기로 이관]
@@ -120,6 +135,23 @@ public class PaymentService {
         if (tempEvent != null) {
             eventPublisher.publishEvent(new ClassificationRequestEvent(this, tempEvent.getId(), request.merchant()));
         }
+
+        String execModeStr = (String) userSettings.get("executionMode");
+        ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
+        PaymentStatus expectedStatus = marketTimeGate.getPaymentStatus(executionMode);
+        PaymentActionType actionType = mapStatusToActionType(expectedStatus);
+
+        return new PaymentScrapingResponse(actionType, request.merchant(), request.amount(), 0, dummyTicker, dummyStockName);
+    }
+
+    private PaymentActionType mapStatusToActionType(PaymentStatus status) {
+        return switch (status) {
+            case ORDERING -> PaymentActionType.ORDER_REQUESTED;
+            case WAITING_APPROVAL -> PaymentActionType.NEED_APPROVAL;
+            case PENDING -> PaymentActionType.SCHEDULED_AUTO;
+            case PENDING_APPROVAL -> PaymentActionType.SCHEDULED_MANUAL;
+            default -> PaymentActionType.IGNORE_NO_SPARE_CHANGE;
+        };
     }
 
     // 💡 [새로 추가된 캐시 복구(Re-warming) 메서드]
