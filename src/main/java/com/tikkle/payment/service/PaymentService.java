@@ -123,7 +123,7 @@ public class PaymentService {
 
             // [장중 + 자동]인 경우에 한해서만 실제 증권사 매수 이벤트 발생
             if (status == PaymentStatus.ORDERING && savedEvent != null) {
-                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), dummyTicker, dummyStockName, spareChange));
+                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), request.userId(), dummyTicker, dummyStockName, spareChange));
             }
 
             return new PaymentScrapingResponse(actionType, request.merchant(), request.amount(), spareChange, dummyTicker, dummyStockName);

@@ -88,4 +88,9 @@ public class PaymentEvent {
         this.status = PaymentStatus.NOT_INVESTED;
         this.reason = reason;
     }
+
+    public void failInvestment(String reason) {
+        this.status = PaymentStatus.FAILED;
+        this.reason = reason;
+    }
 }
