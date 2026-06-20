@@ -150,7 +150,7 @@ public class PaymentService {
             case WAITING_APPROVAL -> PaymentActionType.NEED_APPROVAL;
             case PENDING -> PaymentActionType.SCHEDULED_AUTO;
             case PENDING_APPROVAL -> PaymentActionType.SCHEDULED_MANUAL;
-            default -> PaymentActionType.IGNORE_NO_SPARE_CHANGE;
+            default -> throw new IllegalArgumentException("Unknown PaymentStatus: " + status);
         };
     }
 

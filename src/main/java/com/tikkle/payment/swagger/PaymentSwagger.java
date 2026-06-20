@@ -18,7 +18,7 @@ public interface PaymentSwagger {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수신 성공 (중복/카드불일치/잔돈0원 건도 200으로 ActionType을 담아 응답)",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": { \"actionType\": \"ORDER_REQUESTED\", \"merchantName\": \"스타벅스\", \"paymentAmount\": 4500, \"spareChange\": 500, \"ticker\": \"005930\", \"stockName\": \"삼성전자\" } }"
+                            value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": { \"actionType\": \"ORDER_REQUESTED\", \"merchant\": \"스타벅스\", \"paymentAmount\": 4500, \"spareChange\": 500, \"ticker\": \"005930\", \"stockName\": \"삼성전자\" } }"
                     ))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청 (필수 파라미터 누락 등)",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
