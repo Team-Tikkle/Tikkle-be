@@ -70,7 +70,7 @@ class SettingsServiceTest {
         givenActiveUser();
         given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(
-                List.of(rule(PaymentCategory.CAFE, RuleType.PERCENT_5)));
+                List.of(rule(PaymentCategory.CAFE, RuleType.PERCENT_10)));
 
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
@@ -79,7 +79,7 @@ class SettingsServiceTest {
 
         Map<PaymentCategory, RuleType> result = response.spareChangeRules().stream()
                 .collect(Collectors.toMap(SettingsResponse.CategoryRule::category, SettingsResponse.CategoryRule::ruleType));
-        assertThat(result.get(PaymentCategory.CAFE)).isEqualTo(RuleType.PERCENT_5);
+        assertThat(result.get(PaymentCategory.CAFE)).isEqualTo(RuleType.PERCENT_10);
         assertThat(result).doesNotContainKey(PaymentCategory.SHOPPING);
     }
     @Test
@@ -124,7 +124,7 @@ class SettingsServiceTest {
     @DisplayName("updateSpareChangeRules - 기존은 변경, 없는 카테고리는 생성하고 변경분만 캐시에 반영한다")
     void updateSpareChangeRules_upsertsAndSyncsCache() {
         givenActiveUser();
-        CategorySpareChangeRule cafe = rule(PaymentCategory.CAFE, RuleType.PERCENT_5);
+        CategorySpareChangeRule cafe = rule(PaymentCategory.CAFE, RuleType.PERCENT_10);
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(List.of(cafe));
         given(categorySpareChangeRuleRepository.save(any(CategorySpareChangeRule.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));

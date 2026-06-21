@@ -36,7 +36,7 @@ class UpdateSpareChangeRulesRequestTest {
     @DisplayName("중복 카테고리가 있으면 검증에 실패한다")
     void rejectsDuplicateCategories() {
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_5),
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_10),
                 new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_10000)));
 
         Set<ConstraintViolation<UpdateSpareChangeRulesRequest>> violations = validator.validate(request);
@@ -50,7 +50,7 @@ class UpdateSpareChangeRulesRequestTest {
     @DisplayName("카테고리가 모두 고유하면 검증을 통과한다")
     void passesWhenCategoriesUnique() {
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_5),
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_10),
                 new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_10000)));
 
         Set<ConstraintViolation<UpdateSpareChangeRulesRequest>> violations = validator.validate(request);

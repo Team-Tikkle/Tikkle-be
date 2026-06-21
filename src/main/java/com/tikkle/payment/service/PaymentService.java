@@ -56,7 +56,7 @@ public class PaymentService {
 
         if (Boolean.FALSE.equals(isFirstRequest)) {
             log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -71,7 +71,7 @@ public class PaymentService {
         // [JPA 롤백 방지] DB 2차 검증
         if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
             log.info("중복 결제 요청 조기 종료 (DB Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         // Redis에서 유저 설정 통째로 가져오기
@@ -88,7 +88,7 @@ public class PaymentService {
             log.info("타겟 카드가 아니거나 온보딩 정보가 없어 조기 종료 (userId: {}, requestCard: {} {})",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
             redisTemplate.delete(redisTxKey);
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         // TODO : 추후 수정(더미 종목 주입)
@@ -108,19 +108,20 @@ public class PaymentService {
 
             if (spareChange == 0) {
                 saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
+                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
             }
 
             if (spareChange < 5000) {
                 saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
-                return new PaymentScrapingResponse(PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
+                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
             }
 
             ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
             ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
 
-            return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
+            Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
+            return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
         }
 
         // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
@@ -130,7 +131,7 @@ public class PaymentService {
         } catch (Exception e) {
             log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={}", request.merchant());
             // 타임아웃/실패 시 예외를 던지지 않고 200 OK 조기 종료 (DB 저장 X)
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         String keyword = aiResponse.keyword();
@@ -155,12 +156,12 @@ public class PaymentService {
         // 💡 3. 조기 차단(Fail-Fast) 방어선
         if (spareChange == 0) {
             saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
         }
 
         if (spareChange < 5000) {
             saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
         }
 
         ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
@@ -168,7 +169,8 @@ public class PaymentService {
         // 💡 4. 정상 파이프라인
         ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
 
-        return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
+        Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
+        return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
     }
 
 
