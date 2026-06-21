@@ -20,8 +20,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MarketTopicCollectService {
-    /** 시장 단위 광범위 키워드. 개별 종목명은 노이즈가 커 제외. */
-    private static final List<String> KEYWORDS = List.of("코스피", "코스닥", "증시", "주식");
+    private static final List<String> KEYWORDS = List.of("암호화폐", "가상자산", "비트코인", "코인");
     private static final int MAX_TITLE_LENGTH = 300;
     private static final int MAX_LINK_LENGTH = 500;
 
