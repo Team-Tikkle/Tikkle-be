@@ -25,6 +25,9 @@ public record PaymentHistoryResponse(
         String status,
 
         @Schema(description = "수동 승인 대기 만료 시간 (PENDING 상태일 때만 존재)", example = "2026-06-22T10:30:00", nullable = true)
-        LocalDateTime expiredAt
+        LocalDateTime expiredAt,
+
+        @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
+        LocalDateTime createdAt
 ) {
 }

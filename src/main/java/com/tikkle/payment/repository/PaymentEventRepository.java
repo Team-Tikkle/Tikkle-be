@@ -20,7 +20,7 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
             "WHERE p.userId = :userId " +
             "AND p.createdAt >= :startDate AND p.createdAt <= :endDate " +
             "AND p.status IN :statuses " +
-            "ORDER BY p.createdAt DESC")
+            "ORDER BY p.createdAt DESC, p.id DESC")
     org.springframework.data.domain.Slice<PaymentEvent> findHistoryFeed(
             @org.springframework.data.repository.query.Param("userId") Long userId,
             @org.springframework.data.repository.query.Param("startDate") java.time.LocalDateTime startDate,

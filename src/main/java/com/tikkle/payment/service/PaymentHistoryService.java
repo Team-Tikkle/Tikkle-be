@@ -59,6 +59,7 @@ public class PaymentHistoryService {
         
         // 데이터가 없는 달에 대한 방어 코드 (빈 리스트로 처리됨)
         Map<PaymentCategory, Long> categorySpendingMap = events.stream()
+                .filter(e -> e.getCategory() != null)
                 .collect(Collectors.groupingBy(
                         PaymentEvent::getCategory,
                         Collectors.summingLong(PaymentEvent::getAmount)
@@ -158,7 +159,8 @@ public class PaymentHistoryService {
                 event.getSpareChange(),
                 event.getCategory() != null ? event.getCategory().name() : null,
                 statusStr,
-                expiredAt
+                expiredAt,
+                event.getCreatedAt()
         );
     }
 }
