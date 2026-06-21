@@ -83,7 +83,7 @@ public record OnboardingRequest(
             @NotNull(message = "결제 카테고리는 필수입니다.")
             PaymentCategory category,
 
-            @Schema(description = "잔돈 저축 규칙 유형", example = "ROUND_UP_5000", allowableValues = {"ROUND_UP_1000", "ROUND_UP_5000", "ROUND_UP_10000", "ROUND_UP_50000", "FIXED_5000", "PERCENT_5", "PERCENT_10", "PERCENT_20", "PERCENT_30"})
+            @Schema(description = "잔돈 저축 규칙 유형", example = "ROUND_UP_10000", allowableValues = {"ROUND_UP_10000", "ROUND_UP_50000", "PERCENT_5", "PERCENT_10", "PERCENT_20", "PERCENT_30"})
             @NotNull(message = "잔돈 규칙 유형은 필수입니다.")
             RuleType ruleType
     ) {
