@@ -32,10 +32,13 @@ dependencies {
     // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    // JWT (jjwt)
+    // JWT (jjwt) for App Auth
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // JWT (auth0) for Upbit API Auth
+    implementation 'com.auth0:java-jwt:4.4.0'
 
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'

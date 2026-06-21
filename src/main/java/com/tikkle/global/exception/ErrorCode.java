@@ -41,9 +41,11 @@ public enum ErrorCode {
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
 
-    // KIS 증권사 연동
-    KIS_TOKEN_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "KIS-001", "KIS 토큰 발급에 실패했습니다."),
-    KIS_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "KIS-002", "KIS 매수 주문에 실패했습니다."),
+    // 업비트 거래소 연동
+    UPBIT_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-001", "업비트 매수 주문에 실패했습니다."),
+    UPBIT_ORDER_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-002", "업비트 체결 내역 조회에 실패했습니다."),
+    UPBIT_TOKEN_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-003", "업비트 인증 토큰 생성에 실패했습니다."),
+    UPBIT_ORDER_EXECUTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-004", "업비트 매수 체결 내역을 확인할 수 없습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
