@@ -10,5 +10,6 @@ import java.util.Optional;
 public interface PortfolioRepository extends JpaRepository<Portfolio, Long> {
     List<Portfolio> findByUserId(Long userId);
     List<Portfolio> findByUserIdIn(List<Long> userIds);
-    Optional<Portfolio> findByUserAndTicker(User user, String ticker);
+    Optional<Portfolio> findByUserAndMarket(User user, String market);
+    Optional<Portfolio> findByUserIdAndMarket(Long userId, String market);
 }

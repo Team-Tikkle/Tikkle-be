@@ -34,14 +34,14 @@ public class InvestmentTargetSaver {
                 .ifPresentOrElse(
                         existing -> {
                             log.info("InvestmentTarget already exists for user {} on {}. Updating target.", user.getId(), today);
-                            existing.updateTarget(best.ticker(), best.stockName(), best.reason());
+                            existing.updateTarget(best.market(), best.coinName(), best.reason());
                         },
                         () -> {
                             log.info("Creating new InvestmentTarget for user {} on {}.", user.getId(), today);
                             InvestmentTarget target = InvestmentTarget.builder()
                                     .user(user)
-                                    .ticker(best.ticker())
-                                    .stockName(best.stockName())
+                                    .market(best.market())
+                                    .coinName(best.coinName())
                                     .reason(best.reason())
                                     .targetDate(today)
                                     .build();

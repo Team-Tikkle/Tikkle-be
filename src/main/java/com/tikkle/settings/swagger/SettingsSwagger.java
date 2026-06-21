@@ -19,7 +19,7 @@ public interface SettingsSwagger {
     ApiResponse<SettingsResponse> getSettings(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "매매 방식 변경", description = "장중 결제 시 자동/수동 매매 방식(AUTO/MANUAL)을 변경합니다.")
+    @Operation(summary = "매매 방식 변경", description = "결제 시 자동/수동 매매 방식(AUTO/MANUAL)을 변경합니다.")
     ApiResponse<?> updateExecutionMode(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                        UpdateExecutionModeRequest request);
 
@@ -29,7 +29,7 @@ public interface SettingsSwagger {
                                           UpdateSpareChangeRulesRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "증권사 계정 및 API 키 수정", description = "KIS 앱 키/시크릿/계좌번호를 전체 교체합니다. 보안상 기존 값은 조회로 노출하지 않습니다.")
+    @Operation(summary = "거래소 계정 및 API 키 수정", description = "Upbit Access Key/Secret Key를 전체 교체합니다. 보안상 기존 값은 조회로 노출하지 않습니다.")
     ApiResponse<?> updateLinkedAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                        UpdateLinkedAccountRequest request);
 }

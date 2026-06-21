@@ -11,18 +11,15 @@ import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
-import com.tikkle.payment.event.BuyEvent;
-import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
-import com.tikkle.payment.service.component.MarketTimeGate;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
+import com.tikkle.upbit.service.UpbitTradeService;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -30,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +44,7 @@ public class PaymentService {
     private final LinkedAccountRepository linkedAccountRepository;
     private final InvestmentSettingsRepository investmentSettingsRepository;
     private final SpareChangeCalculator spareChangeCalculator;
-    private final MarketTimeGate marketTimeGate;
-    private final ApplicationEventPublisher eventPublisher;
+    private final UpbitTradeService upbitTradeService;
     private final AiClassificationService aiClassificationService;
 
     @Transactional
@@ -59,7 +56,7 @@ public class PaymentService {
 
         if (Boolean.FALSE.equals(isFirstRequest)) {
             log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -74,7 +71,7 @@ public class PaymentService {
         // [JPA 롤백 방지] DB 2차 검증
         if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
             log.info("중복 결제 요청 조기 종료 (DB Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         // Redis에서 유저 설정 통째로 가져오기
@@ -91,12 +88,12 @@ public class PaymentService {
             log.info("타겟 카드가 아니거나 온보딩 정보가 없어 조기 종료 (userId: {}, requestCard: {} {})",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
             redisTemplate.delete(redisTxKey);
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         // TODO : 추후 수정(더미 종목 주입)
-        String dummyTicker = "005930";
-        String dummyStockName = "삼성전자";
+        String dummyMarket = "KRW-BTC";
+        String dummyCoinName = "비트코인";
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
@@ -111,24 +108,19 @@ public class PaymentService {
 
             if (spareChange == 0) {
                 saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null);
+                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
             }
 
-            // 💡 ExecutionMode를 Redis에서 조회하여 MarketTimeGate 판별
-            String execModeStr = (String) userSettings.get("executionMode");
-            ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
-
-            PaymentStatus status = marketTimeGate.getPaymentStatus(executionMode);
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, status, null, category);
-
-            PaymentActionType actionType = mapStatusToActionType(status);
-
-            // [장중 + 자동]인 경우에 한해서만 실제 증권사 매수 이벤트 발생
-            if (status == PaymentStatus.ORDERING && savedEvent != null) {
-                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), request.userId(), dummyTicker, dummyStockName, spareChange));
+            if (spareChange < 5000) {
+                saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
+                return new PaymentScrapingResponse(PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
             }
 
-            return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyTicker, dummyStockName);
+            ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
+
+            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
+
+            return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
         }
 
         // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
@@ -138,7 +130,7 @@ public class PaymentService {
         } catch (Exception e) {
             log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={}", request.merchant());
             // 타임아웃/실패 시 예외를 던지지 않고 200 OK 조기 종료 (DB 저장 X)
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
         String keyword = aiResponse.keyword();
@@ -163,34 +155,23 @@ public class PaymentService {
         // 💡 3. 조기 차단(Fail-Fast) 방어선
         if (spareChange == 0) {
             saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-            return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
         }
 
-        // 💡 4. 정상 파이프라인 (4-Type 분기 처리)
-        String execModeStr = (String) userSettings.get("executionMode");
-        ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
-
-        PaymentStatus status = marketTimeGate.getPaymentStatus(executionMode);
-        PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, status, null, category);
-
-        PaymentActionType actionType = mapStatusToActionType(status);
-
-        if (status == PaymentStatus.ORDERING && savedEvent != null) {
-            eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), request.userId(), dummyTicker, dummyStockName, spareChange));
+        if (spareChange < 5000) {
+            saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
         }
 
-        return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyTicker, dummyStockName);
+        ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
+
+        // 💡 4. 정상 파이프라인
+        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
+
+        return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
     }
 
-    private PaymentActionType mapStatusToActionType(PaymentStatus status) {
-        return switch (status) {
-            case ORDERING -> PaymentActionType.ORDER_REQUESTED;
-            case WAITING_APPROVAL -> PaymentActionType.NEED_APPROVAL;
-            case PENDING -> PaymentActionType.SCHEDULED_AUTO;
-            case PENDING_APPROVAL -> PaymentActionType.SCHEDULED_MANUAL;
-            default -> throw new UnknownPaymentStatusException();
-        };
-    }
+
 
     // 💡 [새로 추가된 캐시 복구(Re-warming) 메서드]
     private Map<Object, Object> getUserSettingsCacheOrDb(Long userId) {
@@ -235,6 +216,16 @@ public class PaymentService {
         return new HashMap<>(cacheData);
     }
 
+    private ExecutionMode getExecutionModeFromCacheOrDb(Map<Object, Object> userSettings, Long userId) {
+        String executionModeStr = (String) userSettings.get("executionMode");
+        if (executionModeStr != null) {
+            return ExecutionMode.valueOf(executionModeStr);
+        }
+        return investmentSettingsRepository.findByUserId(userId)
+                .map(com.tikkle.investment.entity.InvestmentSettings::getExecutionMode)
+                .orElse(ExecutionMode.MANUAL);
+    }
+
     private RuleType getRuleTypeFromCacheOrDb(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
         String ruleTypeStr = (String) userSettings.get(category.name());
 
@@ -247,7 +238,7 @@ public class PaymentService {
         return categorySpareChangeRuleRepository.findByUserIdAndCategory(userId, category)
                 .or(() -> categorySpareChangeRuleRepository.findDefaultByUserId(userId))
                 .map(CategorySpareChangeRule::getRuleType)
-                .orElse(RuleType.ROUND_UP_1000);
+                .orElse(RuleType.ROUND_UP_10000);
     }
 
     private PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category) {
@@ -274,6 +265,29 @@ public class PaymentService {
                 return null;
             } else {
                 throw e;
+            }
+        }
+    }
+
+    private record ExecutionResult(PaymentStatus status, PaymentActionType actionType, BigDecimal executedPrice, BigDecimal executedVolume, String reason, PaymentEvent savedEvent) {}
+
+    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String dummyMarket) {
+        if (executionMode == ExecutionMode.MANUAL) {
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category);
+            return new ExecutionResult(PaymentStatus.WAITING_APPROVAL, PaymentActionType.WAITING_APPROVAL, null, null, null, savedEvent);
+        } else {
+            // 외부 호출 전 ORDERING 상태로 선 저장 (원장 불일치 방어)
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category);
+            try {
+                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
+                // 성공 시 상태 업데이트
+                savedEvent.completeInvestment();
+                return new ExecutionResult(PaymentStatus.INVESTED, PaymentActionType.ORDER_REQUESTED, tradeResult.executedPrice(), tradeResult.executedVolume(), null, savedEvent);
+            } catch (Exception e) {
+                log.error("업비트 자동 매수 실패", e);
+                // 실패 시 상태 업데이트
+                savedEvent.failInvestment(e.getMessage());
+                return new ExecutionResult(PaymentStatus.FAILED, PaymentActionType.UPBIT_ORDER_FAILED, null, null, e.getMessage(), savedEvent);
             }
         }
     }

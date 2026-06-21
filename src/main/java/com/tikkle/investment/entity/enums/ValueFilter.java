@@ -1,8 +1,8 @@
 package com.tikkle.investment.entity.enums;
 
 public enum ValueFilter {
-    WEAPON,
-    SIN_TAX,
-    FOSSIL_FUEL,
+    PROOF_OF_WORK,
+    PROOF_OF_STAKE,
+    SMART_CONTRACT,
     NONE
 }

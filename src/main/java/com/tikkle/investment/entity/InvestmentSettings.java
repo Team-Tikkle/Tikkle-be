@@ -31,7 +31,7 @@ public class InvestmentSettings {
         this.executionMode = executionMode;
     }
 
-    public void changeMode(ExecutionMode executionMode) {
-        this.executionMode = executionMode;
+    public void changeMode(ExecutionMode mode) {
+        this.executionMode = mode;
     }
 }

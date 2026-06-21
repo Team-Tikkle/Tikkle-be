@@ -1,10 +1,11 @@
 package com.tikkle.investment.entity.enums;
 
 public enum PreferredTheme {
-    TECH,
-    BIO,
-    SEMICONDUCTOR,
-    GREEN,
-    ENTERTAINMENT,
+    DEFI,
+    NFT,
+    LAYER1,
+    LAYER2,
+    MEME,
+    WEB3,
     NONE
 }

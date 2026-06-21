@@ -69,9 +69,8 @@ public class OnboardingService {
     private void saveLinkedAccount(User user, OnboardingRequest dto) {
         LinkedAccount account = LinkedAccount.builder()
                 .user(user)
-                .kisAppKey(dto.kisAppKey())
-                .kisAppSecret(dto.kisAppSecret())
-                .kisAccountNum(dto.kisAccountNum())
+                .upbitAccessKey(dto.upbitAccessKey())
+                .upbitSecretKey(dto.upbitSecretKey())
                 .targetCardCompany(dto.targetCardCompany())
                 .targetCardLast4(dto.targetCardLast4())
                 .build();
@@ -84,7 +83,6 @@ public class OnboardingService {
                 .firstReturnPreference(dto.firstReturnPreference())
                 .secondReturnPreference(dto.secondReturnPreference())
                 .thirdReturnPreference(dto.thirdReturnPreference())
-                .marketPreference(dto.marketPreference())
                 .preferredThemes(dto.preferredThemes())
                 .valueFilters(dto.valueFilters())
                 .diversificationType(dto.diversificationType())
@@ -99,6 +97,7 @@ public class OnboardingService {
                 .build();
         investmentSettingsRepository.save(settings);
     }
+
 
     private List<CategorySpareChangeRule> saveCategorySpareChangeRules(User user, List<OnboardingRequest.CategoryRuleDto> ruleDtos) {
         Set<PaymentCategory> distinctCategories = ruleDtos.stream()

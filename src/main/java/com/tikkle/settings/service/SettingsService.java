@@ -106,7 +106,7 @@ public class SettingsService {
         LinkedAccount account = linkedAccountRepository.findByUserId(user.getId())
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
-        account.updateKisCredentials(request.kisAppKey(), request.kisAppSecret(), request.kisAccountNum());
+        account.updateUpbitCredentials(request.upbitAccessKey(), request.upbitSecretKey());
     }
 
     private User findActiveUserByEmail(String email) {

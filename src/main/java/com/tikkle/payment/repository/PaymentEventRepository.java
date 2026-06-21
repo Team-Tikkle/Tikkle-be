@@ -10,4 +10,5 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
     boolean existsByTransactionId(String transactionId);
     List<PaymentEvent> findByStatus(PaymentStatus status);
     List<PaymentEvent> findByIdIn(List<Long> ids);
+    List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, java.time.LocalDateTime dateTime);
 }
