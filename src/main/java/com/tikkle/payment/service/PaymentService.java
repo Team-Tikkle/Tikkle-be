@@ -12,7 +12,7 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.event.BuyEvent;
-import com.tikkle.payment.event.ClassificationRequestEvent;
+import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
@@ -48,6 +48,7 @@ public class PaymentService {
     private final SpareChangeCalculator spareChangeCalculator;
     private final MarketTimeGate marketTimeGate;
     private final ApplicationEventPublisher eventPublisher;
+    private final AiClassificationService aiClassificationService;
 
     @Transactional
     public PaymentScrapingResponse processPaymentScraping(PaymentScrapingRequest request) {
@@ -102,14 +103,15 @@ public class PaymentService {
         if (!mappings.isEmpty()) {
             PaymentCategoryMapping mapping = mappings.get(0); // 가장 긴 키워드 매칭
             PaymentCategory category = mapping.getCategory();
+            String keyword = mapping.getKeyword();
 
             // 💡 잔돈 룰 조회 (최적화: 이미 가져온 userSettings 맵 사용)
             RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, userSettings);
             int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
 
             if (spareChange == 0) {
-                saveEvent(request, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
-                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, request.merchant(), request.amount(), 0, null, null);
+                saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
+                return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null);
             }
 
             // 💡 ExecutionMode를 Redis에서 조회하여 MarketTimeGate 판별
@@ -117,31 +119,67 @@ public class PaymentService {
             ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
 
             PaymentStatus status = marketTimeGate.getPaymentStatus(executionMode);
-            PaymentEvent savedEvent = saveEvent(request, spareChange, status, null, category);
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, status, null, category);
 
             PaymentActionType actionType = mapStatusToActionType(status);
 
             // [장중 + 자동]인 경우에 한해서만 실제 증권사 매수 이벤트 발생
             if (status == PaymentStatus.ORDERING && savedEvent != null) {
-                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), dummyTicker, dummyStockName, spareChange));
+                eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), request.userId(), dummyTicker, dummyStockName, spareChange));
             }
 
-            return new PaymentScrapingResponse(actionType, request.merchant(), request.amount(), spareChange, dummyTicker, dummyStockName);
+            return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyTicker, dummyStockName);
         }
 
-        // [Phase 2: DB MISS - AI 분류기로 이관]
-        // Null Constraint 방어를 위해 잔돈에 0원을 세팅하여 임시 원장 저장
-        PaymentEvent tempEvent = saveEvent(request, 0, PaymentStatus.CLASSIFYING, "가맹점 분류 대기", null);
-        if (tempEvent != null) {
-            eventPublisher.publishEvent(new ClassificationRequestEvent(this, tempEvent.getId(), request.merchant()));
+        // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
+        com.tikkle.payment.dto.response.AiClassificationResponse aiResponse;
+        try {
+            aiResponse = aiClassificationService.classify(request.merchant());
+        } catch (Exception e) {
+            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={}", request.merchant());
+            // 타임아웃/실패 시 예외를 던지지 않고 200 OK 조기 종료 (DB 저장 X)
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null);
         }
 
+        String keyword = aiResponse.keyword();
+        PaymentCategory category = aiResponse.category();
+
+        // 💡 1. 분류된 결과 캐싱 (다음 캐시 히트를 위함)
+        try {
+            paymentCategoryMappingRepository.save(
+                    PaymentCategoryMapping.builder()
+                            .keyword(keyword)
+                            .category(category)
+                            .build()
+            );
+        } catch (DataIntegrityViolationException e) {
+            log.info("이미 다른 요청에서 매핑 데이터를 저장했습니다. keyword={}", keyword);
+        }
+
+        // 💡 2. 잔돈 룰 조회 (최적화: 이미 가져온 userSettings 맵 사용)
+        RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, userSettings);
+        int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
+
+        // 💡 3. 조기 차단(Fail-Fast) 방어선
+        if (spareChange == 0) {
+            saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
+            return new PaymentScrapingResponse(PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null);
+        }
+
+        // 💡 4. 정상 파이프라인 (4-Type 분기 처리)
         String execModeStr = (String) userSettings.get("executionMode");
         ExecutionMode executionMode = (execModeStr != null) ? ExecutionMode.valueOf(execModeStr) : ExecutionMode.MANUAL;
-        PaymentStatus expectedStatus = marketTimeGate.getPaymentStatus(executionMode);
-        PaymentActionType actionType = mapStatusToActionType(expectedStatus);
 
-        return new PaymentScrapingResponse(actionType, request.merchant(), request.amount(), 0, dummyTicker, dummyStockName);
+        PaymentStatus status = marketTimeGate.getPaymentStatus(executionMode);
+        PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, status, null, category);
+
+        PaymentActionType actionType = mapStatusToActionType(status);
+
+        if (status == PaymentStatus.ORDERING && savedEvent != null) {
+            eventPublisher.publishEvent(new BuyEvent(savedEvent.getId(), request.userId(), dummyTicker, dummyStockName, spareChange));
+        }
+
+        return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyTicker, dummyStockName);
     }
 
     private PaymentActionType mapStatusToActionType(PaymentStatus status) {
@@ -150,7 +188,7 @@ public class PaymentService {
             case WAITING_APPROVAL -> PaymentActionType.NEED_APPROVAL;
             case PENDING -> PaymentActionType.SCHEDULED_AUTO;
             case PENDING_APPROVAL -> PaymentActionType.SCHEDULED_MANUAL;
-            default -> throw new IllegalArgumentException("Unknown PaymentStatus: " + status);
+            default -> throw new UnknownPaymentStatusException();
         };
     }
 
@@ -183,7 +221,13 @@ public class PaymentService {
         cacheData.put("targetCardCompany", account.getTargetCardCompany());
         cacheData.put("targetCardLast4", account.getTargetCardLast4());
         cacheData.put("executionMode", investSettings.getExecutionMode().name());
-        rules.forEach(rule -> cacheData.put(rule.getCategory().name(), rule.getRuleType().name()));
+        rules.forEach(rule -> {
+            if (rule.getCategory() == null) {
+                cacheData.put("DEFAULT_RULE", rule.getRuleType().name());
+            } else {
+                cacheData.put(rule.getCategory().name(), rule.getRuleType().name());
+            }
+        });
 
         // 3. 찾은 데이터를 Redis에 다시 적재 (Re-warming)
         redisTemplate.opsForHash().putAll(redisKey, cacheData);
@@ -206,14 +250,14 @@ public class PaymentService {
                 .orElse(RuleType.ROUND_UP_1000);
     }
 
-    private PaymentEvent saveEvent(PaymentScrapingRequest request, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category) {
+    private PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category) {
         log.info("결제 이벤트 저장 시도. status: {}, spareChange: {}", status, spareChange);
         try {
             PaymentEvent event = PaymentEvent.builder()
                     .userId(request.userId())
                     .cardCompany(request.cardCompany())
                     .cardNumberLast4(request.cardNumberLast4())
-                    .merchant(request.merchant())
+                    .merchant(keyword != null ? keyword : request.merchant())
                     .amount(request.amount())
                     .spareChange(spareChange)
                     .category(category)

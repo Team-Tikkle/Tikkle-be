@@ -57,6 +57,11 @@ tikkle:
     secret-key: ${PAYMENT_SECRET_KEY}
   encrypt:
     secret-key: ${TIKKLE_ENCRYPT_SECRET_KEY}
+
+kis:
+  api:
+    base-url: https://openapivts.koreainvestment.com:29443
+
 app:
   cors:
     allowed-origins: http://localhost:5173,https://localhost

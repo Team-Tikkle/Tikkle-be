@@ -8,6 +8,10 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 @Slf4j
 @Service
 public class AiClassificationService {
@@ -32,20 +36,30 @@ public class AiClassificationService {
                 .build();
     }
 
-    public AiClassificationResponse classify(String merchant) {
+    public AiClassificationResponse classify(String merchant) throws TimeoutException {
         log.info("AI 분류 요청: {}", merchant);
 
-        AiClassificationResponse response = chatClient.prompt()
-                .user(merchant)
-                .call()
-                .entity(AiClassificationResponse.class);
+        try {
+            AiClassificationResponse response = CompletableFuture.supplyAsync(() ->
+                    chatClient.prompt()
+                            .user(merchant)
+                            .call()
+                            .entity(AiClassificationResponse.class)
+            ).get(3, TimeUnit.SECONDS);
 
-        log.info("AI 분류 응답: {}", response);
+            log.info("AI 분류 응답: {}", response);
 
-        if (response == null || response.keyword() == null || response.category() == null) {
+            if (response == null || response.keyword() == null || response.category() == null) {
+                throw new InvalidAiResponseException();
+            }
+
+            return response;
+        } catch (TimeoutException e) {
+            log.error("AI 분류 타임아웃 발생 (3초 초과): {}", merchant);
+            throw e;
+        } catch (Exception e) {
+            log.error("AI 분류 중 오류 발생: {}", e.getMessage());
             throw new InvalidAiResponseException();
         }
-
-        return response;
     }
 }

@@ -17,8 +17,7 @@
 | `INVESTMENT_SETTINGS` | 매매 방식 등 공통 투자 설정 |
 | `PAYMENT_EVENTS` | 결제 이벤트 원장 |
 | `PAYMENT_CATEGORY_MAPPINGS` | AI 분류 결과 |
-| `STOCKS` | 투자 가능 종목 마스터 |
-| `INVESTMENT_TARGETS` | 카테고리별/기본 투자 종목 지정 |
+| `INVESTMENT_TARGETS` | 일자별 AI 추천 타겟 종목 지정 |
 | `INVESTMENT_ORDERS` | 매수/매도 주문 원장 |
 | `PORTFOLIOS` | 보유 종목 현황 |
 | `MARKET_TOPICS` | 투데이 마켓 토픽 (뉴스, Google News RSS 수집) |
@@ -87,9 +86,9 @@ CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
 CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `kis_app_key`           VARCHAR(255)    NOT NULL,
-    `kis_app_secret`        TEXT            NOT NULL,
-    `kis_account_num`       VARCHAR(255)    NOT NULL,
+    `kis_app_key`           VARCHAR(512)    NOT NULL,
+    `kis_app_secret`        VARCHAR(512)    NOT NULL,
+    `kis_account_num`       VARCHAR(512)    NOT NULL,
     `target_card_company`   VARCHAR(50)     NOT NULL,
     `target_card_last_4`    VARCHAR(4)      NOT NULL
 );
@@ -109,47 +108,32 @@ CREATE TABLE `PAYMENT_CATEGORY_MAPPINGS` (
     `classified_at`     DATETIME        NOT NULL
 );
 
-CREATE TABLE `STOCKS` (
-    `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
-    `ticker`        VARCHAR(20)     NOT NULL,
-    `name`          VARCHAR(100)    NOT NULL,
-    `industry_code` VARCHAR(20)     NOT NULL,
-    `exchange`      VARCHAR(20)     NOT NULL,
-    `is_active`     BOOLEAN         NOT NULL
-);
-
 CREATE TABLE `INVESTMENT_TARGETS` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
-    `category`      VARCHAR(30)     NULL,
-    `stock_id`      BIGINT          NOT NULL,
-    `updated_at`    DATETIME        NOT NULL
+    `ticker`        VARCHAR(50)     NOT NULL,
+    `stock_name`    VARCHAR(100)    NOT NULL,
+    `reason`        TEXT            NULL,
+    `target_date`   DATE            NOT NULL,
+    `created_at`    DATETIME        NOT NULL
 );
 
 CREATE TABLE `INVESTMENT_ORDERS` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`           BIGINT          NOT NULL,
-    `payment_event_id`  BIGINT          NOT NULL,
-    `stock_id`          BIGINT          NOT NULL,
-    `amount`            DECIMAL(15,2)   NOT NULL,
-    `quantity`          DECIMAL(15,6)   NULL,
-    `price`             DECIMAL(15,2)   NULL,
-    `order_type`        VARCHAR(10)     NOT NULL    DEFAULT 'BUY',
+    `ticker`            VARCHAR(50)     NOT NULL,
+    `total_amount`      INT             NOT NULL,
     `status`            VARCHAR(20)     NOT NULL    DEFAULT 'PENDING',
-    `kis_order_no`      VARCHAR(20)     NULL,
-    `ord_dvsn`          VARCHAR(5)      NULL,
-    `reject_reason`     VARCHAR(200)    NULL,
-    `ordered_at`        DATETIME        NOT NULL,
-    `executed_at`       DATETIME        NULL
+    `created_at`        DATETIME        NOT NULL
 );
 
 CREATE TABLE `PORTFOLIOS` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`           BIGINT          NOT NULL,
-    `stock_id`          BIGINT          NOT NULL,
-    `quantity`          DECIMAL(15,6)   NOT NULL,
-    `avg_buy_price`     DECIMAL(15,2)   NOT NULL,
-    `updated_at`        DATETIME        NOT NULL
+    `ticker`            VARCHAR(50)     NOT NULL,
+    `quantity`          DECIMAL(18,4)   NOT NULL,
+    `average_price`     DECIMAL(18,4)   NOT NULL,
+    `created_at`        DATETIME        NOT NULL
 );
 
 -- 인사이트 관련 테이블 (생략)
@@ -201,7 +185,6 @@ ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `PK_CATEGORY_SPARE_CH
 ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS`                 PRIMARY KEY (`id`);
 ALTER TABLE `INVESTMENT_SETTINGS`           ADD CONSTRAINT `PK_INVESTMENT_SETTINGS`             PRIMARY KEY (`id`);
 ALTER TABLE `PAYMENT_CATEGORY_MAPPINGS`     ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPINGS`       PRIMARY KEY (`id`);
-ALTER TABLE `STOCKS`                        ADD CONSTRAINT `PK_STOCKS`                          PRIMARY KEY (`id`);
 ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `PK_INVESTMENT_TARGETS`              PRIMARY KEY (`id`);
 ALTER TABLE `INVESTMENT_ORDERS`             ADD CONSTRAINT `PK_INVESTMENT_ORDERS`               PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `PK_PORTFOLIOS`                      PRIMARY KEY (`id`);
@@ -217,7 +200,7 @@ ALTER TABLE `INVESTMENT_PROFILES`           ADD CONSTRAINT `UQ_INVESTMENT_PROFIL
 ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `UQ_CATEGORY_RULES_USER_CATEGORY`        UNIQUE (`user_id`, `category`);
 ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_USER_ID`             UNIQUE (`user_id`);
 ALTER TABLE `INVESTMENT_SETTINGS`           ADD CONSTRAINT `UQ_INVESTMENT_SETTINGS_USER_ID`         UNIQUE (`user_id`);
-ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `UQ_USER_CATEGORY_TARGET`                UNIQUE (`user_id`, `category`);
+ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `UQ_USER_TARGET_DATE`                    UNIQUE (`user_id`, `target_date`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`                  UNIQUE (`link`);
 
 ```
@@ -236,14 +219,9 @@ USERS (1)
  ├── INVESTMENT_SETTINGS (1)          - 공통 투자 설정
  ├── PAYMENT_EVENTS (N)               - 결제 이벤트
  │    └── PAYMENT_CATEGORY_MAPPINGS (1) - AI 분류 결과
- ├── INVESTMENT_TARGETS (N)           - 카테고리별/기본 투자 종목 지정
+ ├── INVESTMENT_TARGETS (N)           - 일자별 AI 추천 타겟 종목 지정
  ├── INVESTMENT_ORDERS (N)            - 매수/매도 주문 원장
  └── PORTFOLIOS (N)                   - 보유 종목 현황
-
-STOCKS
- ├── INVESTMENT_TARGETS     (1:N)
- ├── INVESTMENT_ORDERS      (1:N)
- └── PORTFOLIOS             (1:N)
 
 인사이트 (독립 테이블, FK 없음)
  ├── MARKET_TOPICS          외부 RSS 주기 수집
