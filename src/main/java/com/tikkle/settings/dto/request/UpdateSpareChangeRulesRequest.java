@@ -35,7 +35,7 @@ public record UpdateSpareChangeRulesRequest(
             @NotNull(message = "결제 카테고리는 필수입니다.")
             PaymentCategory category,
 
-            @Schema(description = "잔돈 저축 규칙 유형", example = "ROUND_UP_10000", allowableValues = {"ROUND_UP_10000", "ROUND_UP_50000", "PERCENT_5", "PERCENT_10", "PERCENT_20", "PERCENT_30"})
+            @Schema(description = "잔돈 저축 규칙 유형", example = "ROUND_UP_10000", allowableValues = {"ROUND_UP_10000", "ROUND_UP_20000", "ROUND_UP_30000", "ROUND_UP_40000", "ROUND_UP_50000", "PERCENT_10", "PERCENT_15", "PERCENT_20", "PERCENT_25", "PERCENT_30"})
             @NotNull(message = "잔돈 규칙 유형은 필수입니다.")
             RuleType ruleType
     ) {
