@@ -23,15 +23,11 @@ public class LinkedAccount {
     // AES-256 양방향 암호화가 적용된 상태로 적재
     @Convert(converter = AES256Converter.class)
     @Column(nullable = false, length = 512)
-    private String kisAppKey;
+    private String upbitAccessKey;
 
     @Convert(converter = AES256Converter.class)
     @Column(nullable = false, length = 512)
-    private String kisAppSecret;
-
-    @Convert(converter = AES256Converter.class)
-    @Column(nullable = false, length = 512)
-    private String kisAccountNum;
+    private String upbitSecretKey;
 
     @Column(nullable = false, length = 50)
     private String targetCardCompany;
@@ -40,18 +36,16 @@ public class LinkedAccount {
     private String targetCardLast4;
 
     @Builder
-    private LinkedAccount(User user, String kisAppKey, String kisAppSecret, String kisAccountNum, String targetCardCompany, String targetCardLast4) {
+    private LinkedAccount(User user, String upbitAccessKey, String upbitSecretKey, String targetCardCompany, String targetCardLast4) {
         this.user = user;
-        this.kisAppKey = kisAppKey;
-        this.kisAppSecret = kisAppSecret;
-        this.kisAccountNum = kisAccountNum;
+        this.upbitAccessKey = upbitAccessKey;
+        this.upbitSecretKey = upbitSecretKey;
         this.targetCardCompany = targetCardCompany;
         this.targetCardLast4 = targetCardLast4;
     }
 
-    public void updateKisCredentials(String kisAppKey, String kisAppSecret, String kisAccountNum) {
-        this.kisAppKey = kisAppKey;
-        this.kisAppSecret = kisAppSecret;
-        this.kisAccountNum = kisAccountNum;
+    public void updateUpbitCredentials(String upbitAccessKey, String upbitSecretKey) {
+        this.upbitAccessKey = upbitAccessKey;
+        this.upbitSecretKey = upbitSecretKey;
     }
 }

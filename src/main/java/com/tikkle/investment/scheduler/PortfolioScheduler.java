@@ -20,11 +20,7 @@ public class PortfolioScheduler {
     private final AiPortfolioService aiPortfolioService;
     private final StringRedisTemplate redisTemplate;
 
-    @Schedules({
-            @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul"),
-            @Scheduled(cron = "0 30 11 * * *", zone = "Asia/Seoul"),
-            @Scheduled(cron = "0 30 14 * * *", zone = "Asia/Seoul")
-    })
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     public void scheduleDailyPortfolioTargets() {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         // 분 단위까지만 키로 사용하여 1분 이내에 실행되는 클러스터 노드들 간의 중복 실행 방지

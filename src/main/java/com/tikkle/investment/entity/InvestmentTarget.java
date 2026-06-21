@@ -26,11 +26,11 @@ public class InvestmentTarget {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 50)
-    private String ticker;
+    @Column(nullable = false, length = 20)
+    private String market;
 
     @Column(nullable = false, length = 100)
-    private String stockName;
+    private String coinName;
 
     @Column(columnDefinition = "TEXT")
     private String reason;
@@ -43,17 +43,17 @@ public class InvestmentTarget {
     private LocalDateTime createdAt;
 
     @Builder
-    private InvestmentTarget(User user, String ticker, String stockName, String reason, LocalDate targetDate) {
+    private InvestmentTarget(User user, String market, String coinName, String reason, LocalDate targetDate) {
         this.user = user;
-        this.ticker = ticker;
-        this.stockName = stockName;
+        this.market = market;
+        this.coinName = coinName;
         this.reason = reason;
         this.targetDate = targetDate;
     }
 
-    public void updateTarget(String ticker, String stockName, String reason) {
-        this.ticker = ticker;
-        this.stockName = stockName;
+    public void updateTarget(String market, String coinName, String reason) {
+        this.market = market;
+        this.coinName = coinName;
         this.reason = reason;
     }
 }

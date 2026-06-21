@@ -1,6 +1,9 @@
 package com.tikkle.investment.entity;
 
-import com.tikkle.investment.entity.enums.*;
+import com.tikkle.investment.entity.enums.DiversificationType;
+import com.tikkle.investment.entity.enums.PreferredTheme;
+import com.tikkle.investment.entity.enums.ReturnPreference;
+import com.tikkle.investment.entity.enums.ValueFilter;
 import com.tikkle.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -36,10 +39,6 @@ public class InvestmentProfile {
     @Column(nullable = false, length = 30)
     private ReturnPreference thirdReturnPreference;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private MarketPreference marketPreference;
-
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "investment_profile_themes",
@@ -67,7 +66,6 @@ public class InvestmentProfile {
                               ReturnPreference firstReturnPreference,
                               ReturnPreference secondReturnPreference,
                               ReturnPreference thirdReturnPreference,
-                              MarketPreference marketPreference,
                               List<PreferredTheme> preferredThemes,
                               List<ValueFilter> valueFilters,
                               DiversificationType diversificationType) {
@@ -75,7 +73,6 @@ public class InvestmentProfile {
         this.firstReturnPreference = firstReturnPreference;
         this.secondReturnPreference = secondReturnPreference;
         this.thirdReturnPreference = thirdReturnPreference;
-        this.marketPreference = marketPreference;
         this.preferredThemes = preferredThemes != null ? new ArrayList<>(preferredThemes) : new ArrayList<>();
         this.valueFilters = valueFilters != null ? new ArrayList<>(valueFilters) : new ArrayList<>();
         this.diversificationType = diversificationType;

@@ -1,7 +1,7 @@
 package com.tikkle.investment.entity.enums;
 
 public enum ReturnPreference {
-    DIVIDEND,
-    BLUE_CHIP,
-    HIGH_GROWTH
+    STABLE_YIELD,
+    BLUE_CHIP_COIN,
+    HIGH_RISK_ALTCOIN
 }

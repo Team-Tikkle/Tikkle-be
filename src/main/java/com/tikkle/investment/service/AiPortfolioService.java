@@ -86,13 +86,12 @@ public class AiPortfolioService {
 
     private List<AiRecommendationDto> fetchAiRecommendations(InvestmentProfile profile) {
         String promptText = """
-            Recommend top 5 stocks based on the following investment profile.
+            Recommend top 5 cryptocurrencies based on the following investment profile.
             Order them by relevance from 1st to 5th.
             
             - First Return Preference: {first}
             - Second Return Preference: {second}
             - Third Return Preference: {third}
-            - Market Preference: {market}
             - Diversification Type: {div}
             - Preferred Themes: {themes}
             - Value Filters: {filters}
@@ -109,7 +108,6 @@ public class AiPortfolioService {
                             .param("first", profile.getFirstReturnPreference())
                             .param("second", profile.getSecondReturnPreference())
                             .param("third", profile.getThirdReturnPreference())
-                            .param("market", profile.getMarketPreference())
                             .param("div", profile.getDiversificationType())
                             .param("themes", profile.getPreferredThemes().stream().map(Enum::name).collect(Collectors.joining(",")))
                             .param("filters", profile.getValueFilters().stream().map(Enum::name).collect(Collectors.joining(",")))
@@ -120,11 +118,11 @@ public class AiPortfolioService {
 
             // Dummy Data Injection for Step 2 testing
             return List.of(
-                    new AiRecommendationDto("005930", "삼성전자", "안정적인 배당과 장기 성장성"),
-                    new AiRecommendationDto("AAPL", "애플", "강력한 글로벌 브랜드와 현금 흐름"),
-                    new AiRecommendationDto("MSFT", "마이크로소프트", "클라우드 및 AI 분야의 지속적 성장"),
-                    new AiRecommendationDto("TSLA", "테슬라", "전기차 및 자율주행 시장 선도"),
-                    new AiRecommendationDto("NVDA", "엔비디아", "AI 반도체 시장의 독보적 점유율")
+                    new AiRecommendationDto("KRW-BTC", "비트코인", "최초의 암호화폐이자 디지털 금으로 평가됨"),
+                    new AiRecommendationDto("KRW-ETH", "이더리움", "스마트 컨트랙트를 지원하는 최대의 플랫폼 코인"),
+                    new AiRecommendationDto("KRW-SOL", "솔라나", "빠른 처리 속도와 낮은 수수료를 강점으로 하는 레이어1"),
+                    new AiRecommendationDto("KRW-XRP", "리플", "글로벌 송금 네트워크에 사용되는 디지털 자산"),
+                    new AiRecommendationDto("KRW-DOGE", "도지코인", "대표적인 밈 코인으로 강력한 커뮤니티 보유")
             );
         } catch (Exception e) {
             log.error("AI Recommendation API call failed", e);
@@ -136,7 +134,6 @@ public class AiPortfolioService {
         String first = profile.getFirstReturnPreference().name();
         String second = profile.getSecondReturnPreference().name();
         String third = profile.getThirdReturnPreference().name();
-        String market = profile.getMarketPreference().name();
         String div = profile.getDiversificationType().name();
 
         String themes = profile.getPreferredThemes().stream()
@@ -149,6 +146,6 @@ public class AiPortfolioService {
                 .sorted()
                 .collect(Collectors.joining("-"));
 
-        return String.join(":", first, second, third, market, div, themes, filters);
+        return String.join(":", first, second, third, div, themes, filters);
     }
 }

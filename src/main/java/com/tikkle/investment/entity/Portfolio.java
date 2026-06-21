@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "PORTFOLIOS", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_user_ticker", columnNames = {"user_id", "ticker"})
+        @UniqueConstraint(name = "uq_user_market", columnNames = {"user_id", "market"})
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -27,13 +27,13 @@ public class Portfolio {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 50)
-    private String ticker;
+    @Column(nullable = false, length = 20)
+    private String market;
 
-    @Column(nullable = false, precision = 18, scale = 4)
+    @Column(nullable = false, precision = 20, scale = 8)
     private BigDecimal quantity = BigDecimal.ZERO;
 
-    @Column(nullable = false, precision = 18, scale = 4)
+    @Column(nullable = false, precision = 20, scale = 4)
     private BigDecimal averagePrice = BigDecimal.ZERO;
 
     @CreationTimestamp
@@ -41,9 +41,9 @@ public class Portfolio {
     private LocalDateTime createdAt;
 
     @Builder
-    private Portfolio(User user, String ticker, BigDecimal quantity, BigDecimal averagePrice) {
+    private Portfolio(User user, String market, BigDecimal quantity, BigDecimal averagePrice) {
         this.user = user;
-        this.ticker = ticker;
+        this.market = market;
         this.quantity = quantity != null ? quantity : BigDecimal.ZERO;
         this.averagePrice = averagePrice != null ? averagePrice : BigDecimal.ZERO;
     }

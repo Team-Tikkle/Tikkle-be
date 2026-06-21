@@ -23,8 +23,8 @@ public class PortfolioScoringEngine {
             return null;
         }
 
-        Set<String> portfolioTickers = userPortfolios.stream()
-                .map(Portfolio::getTicker)
+        Set<String> portfolioMarkets = userPortfolios.stream()
+                .map(Portfolio::getMarket)
                 .collect(Collectors.toSet());
 
         AiRecommendationDto bestRecommendation = recommendations.get(0);
@@ -36,8 +36,8 @@ public class PortfolioScoringEngine {
             int baseScore = BASE_SCORES[i];
             int bonusScore = 0;
 
-            if (!portfolioTickers.isEmpty() && diversificationType != null) {
-                boolean inPortfolio = portfolioTickers.contains(dto.ticker());
+            if (!portfolioMarkets.isEmpty() && diversificationType != null) {
+                boolean inPortfolio = portfolioMarkets.contains(dto.market());
 
                 if (diversificationType == DiversificationType.DIVERSIFIED && !inPortfolio) {
                     bonusScore = BONUS_SCORE;
