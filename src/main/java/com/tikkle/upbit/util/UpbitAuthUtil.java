@@ -14,6 +14,9 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class UpbitAuthUtil {
     public static String generateToken(String accessKey, String secretKey, String queryString) {
+        if (queryString == null || queryString.trim().isEmpty()) {
+            throw new IllegalArgumentException("queryString cannot be null or empty");
+        }
         try {
             Algorithm algorithm = Algorithm.HMAC256(secretKey);
             String jwtToken = JWT.create()
