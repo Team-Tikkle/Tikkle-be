@@ -18,7 +18,6 @@
 | `PAYMENT_EVENTS` | 결제 이벤트 원장 |
 | `PAYMENT_CATEGORY_MAPPINGS` | AI 분류 결과 |
 | `INVESTMENT_TARGETS` | 일자별 AI 추천 타겟 종목 지정 |
-| `INVESTMENT_ORDERS` | 매수/매도 주문 원장 |
 | `PORTFOLIOS` | 보유 종목 현황 |
 | `MARKET_TOPICS` | 투데이 마켓 토픽 (뉴스, Google News RSS 수집) |
 | `INVESTMENT_TERMS` | 투자 용어집 (시딩) |
@@ -86,9 +85,8 @@ CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
 CREATE TABLE `LINKED_ACCOUNTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `kis_app_key`           VARCHAR(512)    NOT NULL,
-    `kis_app_secret`        VARCHAR(512)    NOT NULL,
-    `kis_account_num`       VARCHAR(512)    NOT NULL,
+    `upbit_access_key`      VARCHAR(512)    NOT NULL,
+    `upbit_secret_key`      VARCHAR(512)    NOT NULL,
     `target_card_company`   VARCHAR(50)     NOT NULL,
     `target_card_last_4`    VARCHAR(4)      NOT NULL
 );
@@ -111,28 +109,19 @@ CREATE TABLE `PAYMENT_CATEGORY_MAPPINGS` (
 CREATE TABLE `INVESTMENT_TARGETS` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
-    `ticker`        VARCHAR(50)     NOT NULL,
-    `stock_name`    VARCHAR(100)    NOT NULL,
+    `market`        VARCHAR(20)     NOT NULL,
+    `coin_name`     VARCHAR(100)    NOT NULL,
     `reason`        TEXT            NULL,
     `target_date`   DATE            NOT NULL,
     `created_at`    DATETIME        NOT NULL
 );
 
-CREATE TABLE `INVESTMENT_ORDERS` (
-    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
-    `user_id`           BIGINT          NOT NULL,
-    `ticker`            VARCHAR(50)     NOT NULL,
-    `total_amount`      INT             NOT NULL,
-    `status`            VARCHAR(20)     NOT NULL    DEFAULT 'PENDING',
-    `created_at`        DATETIME        NOT NULL
-);
-
 CREATE TABLE `PORTFOLIOS` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`           BIGINT          NOT NULL,
-    `ticker`            VARCHAR(50)     NOT NULL,
-    `quantity`          DECIMAL(18,4)   NOT NULL,
-    `average_price`     DECIMAL(18,4)   NOT NULL,
+    `market`            VARCHAR(20)     NOT NULL,
+    `quantity`          DECIMAL(20,8)   NOT NULL,
+    `average_price`     DECIMAL(20,4)   NOT NULL,
     `created_at`        DATETIME        NOT NULL
 );
 
@@ -186,7 +175,6 @@ ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS` 
 ALTER TABLE `INVESTMENT_SETTINGS`           ADD CONSTRAINT `PK_INVESTMENT_SETTINGS`             PRIMARY KEY (`id`);
 ALTER TABLE `PAYMENT_CATEGORY_MAPPINGS`     ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPINGS`       PRIMARY KEY (`id`);
 ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `PK_INVESTMENT_TARGETS`              PRIMARY KEY (`id`);
-ALTER TABLE `INVESTMENT_ORDERS`             ADD CONSTRAINT `PK_INVESTMENT_ORDERS`               PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `PK_PORTFOLIOS`                      PRIMARY KEY (`id`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `PK_MARKET_TOPICS`                   PRIMARY KEY (`id`);
 ALTER TABLE `INVESTMENT_TERMS`              ADD CONSTRAINT `PK_INVESTMENT_TERMS`                PRIMARY KEY (`id`);
@@ -220,7 +208,6 @@ USERS (1)
  ├── PAYMENT_EVENTS (N)               - 결제 이벤트
  │    └── PAYMENT_CATEGORY_MAPPINGS (1) - AI 분류 결과
  ├── INVESTMENT_TARGETS (N)           - 일자별 AI 추천 타겟 종목 지정
- ├── INVESTMENT_ORDERS (N)            - 매수/매도 주문 원장
  └── PORTFOLIOS (N)                   - 보유 종목 현황
 
 인사이트 (독립 테이블, FK 없음)
@@ -239,7 +226,6 @@ USERS (1)
 | `USERS` | `status` | `ACTIVE`, `WITHDRAWN` |
 | `USERS` | `provider` | `GOOGLE` (*AuthProvider.java 참고*) |
 | `PAYMENT_EVENTS` | `status` | `NOT_INVESTED`, `CLASSIFYING`, `PENDING`, `WAITING_APPROVAL`, `ORDERING`, `INVESTED`, `FAILED`, `EXPIRED` |
-| `INVESTMENT_ORDERS` | `status` | `PENDING`, `EXECUTED`, `FAILED` |
 | `INVESTMENT_SETTINGS` | `executionMode` | `AUTO`, `MANUAL` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `ruleType` | `ROUND_UP_1000`, `ROUND_UP_5000`, `ROUND_UP_10000`, `ROUND_UP_50000`, `PERCENT_5`, `PERCENT_10`, `PERCENT_20`, `PERCENT_30` |
