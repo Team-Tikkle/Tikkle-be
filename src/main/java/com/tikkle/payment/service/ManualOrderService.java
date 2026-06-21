@@ -1,7 +1,7 @@
 package com.tikkle.payment.service;
 
-import com.tikkle.global.exception.CustomException;
-import com.tikkle.global.exception.ErrorCode;
+import com.tikkle.payment.exception.PaymentEventNotFoundException;
+import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.repository.PaymentEventRepository;
@@ -25,10 +25,10 @@ public class ManualOrderService {
     @Transactional
     public void approveOrder(Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId)
-                .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR)); // TODO: NotFoundException 정의
+                .orElseThrow(PaymentEventNotFoundException::new);
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR); // TODO: InvalidStatusException 정의
+            throw new UnknownPaymentStatusException();
         }
 
         try {
@@ -45,10 +45,10 @@ public class ManualOrderService {
     @Transactional
     public void rejectOrder(Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId)
-                .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR)); // TODO: NotFoundException 정의
+                .orElseThrow(PaymentEventNotFoundException::new);
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR); // TODO: InvalidStatusException 정의
+            throw new UnknownPaymentStatusException();
         }
 
         event.skipInvestment("사용자에 의한 수동 매수 거절");

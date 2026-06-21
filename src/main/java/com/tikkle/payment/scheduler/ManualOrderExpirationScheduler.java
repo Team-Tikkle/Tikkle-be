@@ -24,7 +24,6 @@ public class ManualOrderExpirationScheduler {
     public void expireOldManualOrders() {
         LocalDateTime twentyFourHoursAgo = LocalDateTime.now().minusHours(24);
 
-        // TODO: Repository에 메서드 추가 필요
         List<PaymentEvent> expiredEvents = paymentEventRepository.findByStatusAndCreatedAtBefore(PaymentStatus.WAITING_APPROVAL, twentyFourHoursAgo);
 
         if (!expiredEvents.isEmpty()) {

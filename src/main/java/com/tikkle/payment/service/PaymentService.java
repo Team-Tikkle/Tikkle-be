@@ -118,33 +118,9 @@ public class PaymentService {
 
             ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
-            PaymentStatus status;
-            PaymentActionType actionType;
-            BigDecimal executedPrice = null;
-            BigDecimal executedVolume = null;
-            String reason = null;
+            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
 
-            if (executionMode == ExecutionMode.MANUAL) {
-                status = PaymentStatus.WAITING_APPROVAL;
-                actionType = PaymentActionType.WAITING_APPROVAL;
-            } else {
-                try {
-                    UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
-                    status = PaymentStatus.INVESTED;
-                    actionType = PaymentActionType.ORDER_REQUESTED;
-                    executedPrice = tradeResult.executedPrice();
-                    executedVolume = tradeResult.executedVolume();
-                } catch (Exception e) {
-                    log.error("업비트 자동 매수 실패 (DB HIT 파이프라인)", e);
-                    status = PaymentStatus.FAILED;
-                    actionType = PaymentActionType.UPBIT_ORDER_FAILED;
-                    reason = e.getMessage();
-                }
-            }
-
-            saveEvent(request, keyword, spareChange, status, reason, category);
-
-            return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, executedPrice, executedVolume);
+            return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
         }
 
         // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
@@ -190,33 +166,9 @@ public class PaymentService {
         ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
         // 💡 4. 정상 파이프라인
-        PaymentStatus status;
-        PaymentActionType actionType;
-        BigDecimal executedPrice = null;
-        BigDecimal executedVolume = null;
-        String reason = null;
+        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
 
-        if (executionMode == ExecutionMode.MANUAL) {
-            status = PaymentStatus.WAITING_APPROVAL;
-            actionType = PaymentActionType.WAITING_APPROVAL;
-        } else {
-            try {
-                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
-                status = PaymentStatus.INVESTED;
-                actionType = PaymentActionType.ORDER_REQUESTED;
-                executedPrice = tradeResult.executedPrice();
-                executedVolume = tradeResult.executedVolume();
-            } catch (Exception e) {
-                log.error("업비트 자동 매수 실패 (DB MISS 파이프라인)", e);
-                status = PaymentStatus.FAILED;
-                actionType = PaymentActionType.UPBIT_ORDER_FAILED;
-                reason = e.getMessage();
-            }
-        }
-
-        saveEvent(request, keyword, spareChange, status, reason, category);
-
-        return new PaymentScrapingResponse(actionType, keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, executedPrice, executedVolume);
+        return new PaymentScrapingResponse(result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
     }
 
 
@@ -313,6 +265,29 @@ public class PaymentService {
                 return null;
             } else {
                 throw e;
+            }
+        }
+    }
+
+    private record ExecutionResult(PaymentStatus status, PaymentActionType actionType, BigDecimal executedPrice, BigDecimal executedVolume, String reason, PaymentEvent savedEvent) {}
+
+    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String dummyMarket) {
+        if (executionMode == ExecutionMode.MANUAL) {
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category);
+            return new ExecutionResult(PaymentStatus.WAITING_APPROVAL, PaymentActionType.WAITING_APPROVAL, null, null, null, savedEvent);
+        } else {
+            // 외부 호출 전 ORDERING 상태로 선 저장 (원장 불일치 방어)
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category);
+            try {
+                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
+                // 성공 시 상태 업데이트
+                savedEvent.completeInvestment();
+                return new ExecutionResult(PaymentStatus.INVESTED, PaymentActionType.ORDER_REQUESTED, tradeResult.executedPrice(), tradeResult.executedVolume(), null, savedEvent);
+            } catch (Exception e) {
+                log.error("업비트 자동 매수 실패", e);
+                // 실패 시 상태 업데이트
+                savedEvent.failInvestment(e.getMessage());
+                return new ExecutionResult(PaymentStatus.FAILED, PaymentActionType.UPBIT_ORDER_FAILED, null, null, e.getMessage(), savedEvent);
             }
         }
     }
