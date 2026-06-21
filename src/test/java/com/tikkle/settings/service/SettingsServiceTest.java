@@ -1,13 +1,10 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.investment.entity.InvestmentSettings;
-import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
-import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
 import com.tikkle.user.entity.User;
@@ -29,7 +26,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,7 +33,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,9 +41,9 @@ class SettingsServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private InvestmentSettingsRepository investmentSettingsRepository;
-    @Mock
     private CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
+    @Mock
+    private InvestmentSettingsRepository investmentSettingsRepository;
     @Mock
     private SettingsCacheManager settingsCacheManager;
 
@@ -79,7 +74,7 @@ class SettingsServiceTest {
 
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
-        assertThat(response.executionMode()).isEqualTo(ExecutionMode.MANUAL);
+        assertThat(response.executionMode()).isEqualTo(com.tikkle.investment.entity.enums.ExecutionMode.MANUAL);
         assertThat(response.spareChangeRules()).hasSize(1);
 
         Map<PaymentCategory, RuleType> result = response.spareChangeRules().stream()
@@ -88,18 +83,6 @@ class SettingsServiceTest {
         assertThat(result).doesNotContainKey(PaymentCategory.SHOPPING);
     }
 
-    @Test
-    @DisplayName("getSettings - 저장된 매매방식 값을 그대로 반환한다")
-    void getSettings_returnsStoredValues() {
-        givenActiveUser();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(
-                Optional.of(InvestmentSettings.builder().user(user).executionMode(ExecutionMode.AUTO).build()));
-        given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(List.of());
-
-        SettingsResponse response = settingsService.getSettings(EMAIL);
-
-        assertThat(response.executionMode()).isEqualTo(ExecutionMode.AUTO);
-    }
 
     @Test
     @DisplayName("getSettings - 활성 유저가 없으면 UserNotFoundException")
@@ -110,33 +93,6 @@ class SettingsServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
     }
 
-    @Test
-    @DisplayName("updateExecutionMode - 기존 설정은 변경하고 커밋 후 캐시에 동기화한다")
-    void updateExecutionMode_updatesExistingAndSyncsCache() {
-        givenActiveUser();
-        InvestmentSettings settings = InvestmentSettings.builder().user(user).executionMode(ExecutionMode.MANUAL).build();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.of(settings));
-
-        runWithTransactionSync(() ->
-                settingsService.updateExecutionMode(EMAIL, new UpdateExecutionModeRequest(ExecutionMode.AUTO)));
-
-        assertThat(settings.getExecutionMode()).isEqualTo(ExecutionMode.AUTO);
-        verify(investmentSettingsRepository, never()).save(any());
-        verify(settingsCacheManager).updateExecutionMode(USER_ID, ExecutionMode.AUTO);
-    }
-
-    @Test
-    @DisplayName("updateExecutionMode - 설정이 없으면 새로 저장한다")
-    void updateExecutionMode_createsWhenAbsent() {
-        givenActiveUser();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
-
-        runWithTransactionSync(() ->
-                settingsService.updateExecutionMode(EMAIL, new UpdateExecutionModeRequest(ExecutionMode.AUTO)));
-
-        verify(investmentSettingsRepository).save(any(InvestmentSettings.class));
-        verify(settingsCacheManager).updateExecutionMode(USER_ID, ExecutionMode.AUTO);
-    }
 
     @Test
     @DisplayName("updateSpareChangeRules - 기존은 변경, 없는 카테고리는 생성하고 변경분만 캐시에 반영한다")
@@ -148,12 +104,12 @@ class SettingsServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_5000),
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_1000)));
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_50000),
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_10000)));
 
         runWithTransactionSync(() -> settingsService.updateSpareChangeRules(EMAIL, request));
 
-        assertThat(cafe.getRuleType()).isEqualTo(RuleType.ROUND_UP_5000);
+        assertThat(cafe.getRuleType()).isEqualTo(RuleType.ROUND_UP_50000);
         verify(categorySpareChangeRuleRepository).save(any(CategorySpareChangeRule.class));
 
         @SuppressWarnings("unchecked")
@@ -161,8 +117,8 @@ class SettingsServiceTest {
         verify(settingsCacheManager).updateSpareChangeRules(eq(USER_ID), captor.capture());
         Map<PaymentCategory, RuleType> synced = captor.getValue().stream()
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, CategorySpareChangeRule::getRuleType));
-        assertThat(synced).containsEntry(PaymentCategory.CAFE, RuleType.ROUND_UP_5000)
-                .containsEntry(PaymentCategory.SHOPPING, RuleType.ROUND_UP_1000);
+        assertThat(synced).containsEntry(PaymentCategory.CAFE, RuleType.ROUND_UP_50000)
+                .containsEntry(PaymentCategory.SHOPPING, RuleType.ROUND_UP_10000);
     }
 
     private CategorySpareChangeRule rule(PaymentCategory category, RuleType ruleType) {

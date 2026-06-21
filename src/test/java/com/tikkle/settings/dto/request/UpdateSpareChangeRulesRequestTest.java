@@ -37,7 +37,7 @@ class UpdateSpareChangeRulesRequestTest {
     void rejectsDuplicateCategories() {
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
                 new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_5),
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_1000)));
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.ROUND_UP_10000)));
 
         Set<ConstraintViolation<UpdateSpareChangeRulesRequest>> violations = validator.validate(request);
 
@@ -51,7 +51,7 @@ class UpdateSpareChangeRulesRequestTest {
     void passesWhenCategoriesUnique() {
         UpdateSpareChangeRulesRequest request = new UpdateSpareChangeRulesRequest(List.of(
                 new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.CAFE, RuleType.PERCENT_5),
-                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_1000)));
+                new UpdateSpareChangeRulesRequest.RuleItem(PaymentCategory.SHOPPING, RuleType.ROUND_UP_10000)));
 
         Set<ConstraintViolation<UpdateSpareChangeRulesRequest>> violations = validator.validate(request);
 
