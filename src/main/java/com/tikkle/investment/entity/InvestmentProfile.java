@@ -1,9 +1,6 @@
 package com.tikkle.investment.entity;
 
-import com.tikkle.investment.entity.enums.DiversificationType;
-import com.tikkle.investment.entity.enums.PreferredTheme;
-import com.tikkle.investment.entity.enums.ReturnPreference;
-import com.tikkle.investment.entity.enums.ValueFilter;
+import com.tikkle.investment.entity.enums.*;
 import com.tikkle.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -15,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "investment_profiles")
+@Table(name = "INVESTMENT_PROFILES")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InvestmentProfile {
@@ -29,52 +26,41 @@ public class InvestmentProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private ReturnPreference firstReturnPreference;
+    private RiskTolerance riskTolerance;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private ReturnPreference secondReturnPreference;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private ReturnPreference thirdReturnPreference;
+    private TrendSensitivity trendSensitivity;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-            name = "investment_profile_themes",
+            name = "INVESTMENT_PROFILE_THEMES",
             joinColumns = @JoinColumn(name = "investment_profile_id")
     )
-    @Column(name = "preferred_theme", nullable = false)
+    @Column(name = "theme", nullable = false)
     @Enumerated(EnumType.STRING)
-    private List<PreferredTheme> preferredThemes = new ArrayList<>();
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "investment_profile_value_filters",
-            joinColumns = @JoinColumn(name = "investment_profile_id")
-    )
-    @Column(name = "value_filter", nullable = false)
-    @Enumerated(EnumType.STRING)
-    private List<ValueFilter> valueFilters = new ArrayList<>();
+    private List<CryptoTheme> cryptoThemes = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private DiversificationType diversificationType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private MemeAcceptance memeAcceptance;
+
     @Builder
     private InvestmentProfile(User user,
-                              ReturnPreference firstReturnPreference,
-                              ReturnPreference secondReturnPreference,
-                              ReturnPreference thirdReturnPreference,
-                              List<PreferredTheme> preferredThemes,
-                              List<ValueFilter> valueFilters,
-                              DiversificationType diversificationType) {
+                              RiskTolerance riskTolerance,
+                              TrendSensitivity trendSensitivity,
+                              List<CryptoTheme> cryptoThemes,
+                              DiversificationType diversificationType,
+                              MemeAcceptance memeAcceptance) {
         this.user = user;
-        this.firstReturnPreference = firstReturnPreference;
-        this.secondReturnPreference = secondReturnPreference;
-        this.thirdReturnPreference = thirdReturnPreference;
-        this.preferredThemes = preferredThemes != null ? new ArrayList<>(preferredThemes) : new ArrayList<>();
-        this.valueFilters = valueFilters != null ? new ArrayList<>(valueFilters) : new ArrayList<>();
+        this.riskTolerance = riskTolerance;
+        this.trendSensitivity = trendSensitivity;
+        this.cryptoThemes = cryptoThemes != null ? new ArrayList<>(cryptoThemes) : new ArrayList<>();
         this.diversificationType = diversificationType;
+        this.memeAcceptance = memeAcceptance;
     }
 }
