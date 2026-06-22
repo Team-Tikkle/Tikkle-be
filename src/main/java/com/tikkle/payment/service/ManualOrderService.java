@@ -1,6 +1,5 @@
 package com.tikkle.payment.service;
 
-import com.tikkle.auth.exception.ResourceAccessDeniedException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.entity.PaymentEvent;
