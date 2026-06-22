@@ -53,6 +53,9 @@ public class UpbitOrderClient {
                     .body(params)
                     .retrieve()
                     .body(UpbitOrderResponse.class);
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            log.error("업비트 매수 주문 실패 - Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            throw new UpbitOrderFailedException();
         } catch (Exception e) {
             log.error("업비트 매수 주문 실패", e);
             throw new UpbitOrderFailedException();
