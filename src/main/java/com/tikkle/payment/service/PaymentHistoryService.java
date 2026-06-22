@@ -50,7 +50,7 @@ public class PaymentHistoryService {
         List<PaymentEvent> events = paymentEventRepository.findByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
 
         // 2. 전체 누적 대기 건수 카운트
-        long pendingCount = paymentEventRepository.countByUserIdAndStatus(userId, com.tikkle.payment.entity.enums.PaymentStatus.WAITING_APPROVAL);
+        long pendingCount = paymentEventRepository.countByUserIdAndStatus(userId, PaymentStatus.WAITING_APPROVAL);
 
         // 3. 메모리 집계
         long totalPayment = 0;

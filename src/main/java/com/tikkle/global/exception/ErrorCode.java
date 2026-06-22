@@ -46,6 +46,8 @@ public enum ErrorCode {
     UPBIT_ORDER_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-002", "업비트 체결 내역 조회에 실패했습니다."),
     UPBIT_TOKEN_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-003", "업비트 인증 토큰 생성에 실패했습니다."),
     UPBIT_ORDER_EXECUTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-004", "업비트 매수 체결 내역을 확인할 수 없습니다."),
+    UPBIT_MARKET_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-005", "업비트 마켓 리스트 조회에 실패했습니다."),
+    UPBIT_TICKER_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-006", "업비트 실시간 시세 조회에 실패했습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
