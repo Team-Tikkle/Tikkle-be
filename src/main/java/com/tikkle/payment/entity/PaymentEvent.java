@@ -11,6 +11,8 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+import com.tikkle.investment.entity.Coin;
+
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -56,8 +58,12 @@ public class PaymentEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_coin_market")
+    private Coin targetCoin;
+
     @Builder
-    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason) {
+    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason, Coin targetCoin) {
         this.userId = userId;
         this.cardCompany = cardCompany;
         this.cardNumberLast4 = cardNumberLast4;
@@ -68,6 +74,7 @@ public class PaymentEvent {
         this.transactionId = transactionId;
         this.status = status;
         this.reason = reason;
+        this.targetCoin = targetCoin;
     }
 
     public void startClassifying() {

@@ -17,6 +17,7 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"targetCoin"})
     @org.springframework.data.jpa.repository.Query("SELECT p FROM PaymentEvent p " +
             "WHERE p.userId = :userId " +
             "AND p.createdAt >= :startDate AND p.createdAt <= :endDate " +

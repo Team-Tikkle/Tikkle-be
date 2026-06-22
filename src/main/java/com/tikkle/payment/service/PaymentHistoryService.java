@@ -1,6 +1,7 @@
 package com.tikkle.payment.service;
 
 
+import com.tikkle.global.exception.InvalidInputValueException;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
@@ -9,9 +10,8 @@ import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
-import com.tikkle.user.repository.UserRepository;
-import com.tikkle.global.exception.InvalidInputValueException;
 import com.tikkle.user.exception.UserNotFoundException;
+import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +19,6 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
@@ -152,6 +151,9 @@ public class PaymentHistoryService {
             statusStr = "PENDING";
         }
 
+        String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;
+        String targetCoinName = event.getTargetCoin() != null ? event.getTargetCoin().getKoreanName() : null;
+
         return new PaymentHistoryResponse(
                 event.getId(),
                 event.getMerchant(),
@@ -160,6 +162,8 @@ public class PaymentHistoryService {
                 event.getCategory() != null ? event.getCategory().name() : null,
                 statusStr,
                 expiredAt,
+                targetCoinMarket,
+                targetCoinName,
                 event.getCreatedAt()
         );
     }

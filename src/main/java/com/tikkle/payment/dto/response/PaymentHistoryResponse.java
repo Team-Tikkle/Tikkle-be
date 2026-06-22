@@ -27,7 +27,12 @@ public record PaymentHistoryResponse(
         @Schema(description = "수동 승인 대기 만료 시간 (PENDING 상태일 때만 존재)", example = "2026-06-22T10:30:00", nullable = true)
         LocalDateTime expiredAt,
 
+        @Schema(description = "투자 대상 코인 마켓명", example = "KRW-BTC", nullable = true)
+        String targetCoinMarket,
+
+        @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
+        String targetCoinName,
+
         @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
         LocalDateTime createdAt
-) {
-}
+) {}
