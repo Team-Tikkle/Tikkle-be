@@ -1,5 +1,6 @@
 package com.tikkle.payment.service;
 
+import com.tikkle.auth.exception.ResourceAccessDeniedException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.entity.PaymentEvent;
@@ -18,14 +19,19 @@ public class ManualOrderService {
 
     private final PaymentEventRepository paymentEventRepository;
     private final UpbitTradeService upbitTradeService;
+    private final org.springframework.beans.factory.ObjectProvider<ManualOrderService> selfProvider;
 
     // 더미 데이터 주입: AI 연동 전까지 하드코딩
     private static final String DUMMY_MARKET = "KRW-BTC";
 
     @Transactional
-    public void approveOrder(Long eventId) {
+    public void approveOrder(Long userId, Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId)
                 .orElseThrow(PaymentEventNotFoundException::new);
+
+        if (!event.getUserId().equals(userId)) {
+            throw new ResourceAccessDeniedException();
+        }
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
             throw new UnknownPaymentStatusException();
@@ -37,15 +43,26 @@ public class ManualOrderService {
             event.completeInvestment();
         } catch (Exception e) {
             log.error("수동 승인 후 업비트 체결 실패", e);
-            event.failInvestment(e.getMessage());
+            selfProvider.getObject().markAsFailed(eventId, e.getMessage());
             throw e; // Controller Advisor 등에서 처리
         }
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void markAsFailed(Long eventId, String reason) {
+        paymentEventRepository.findById(eventId).ifPresent(event -> {
+            event.failInvestment(reason);
+        });
+    }
+
     @Transactional
-    public void rejectOrder(Long eventId) {
+    public void rejectOrder(Long userId, Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId)
                 .orElseThrow(PaymentEventNotFoundException::new);
+
+        if (!event.getUserId().equals(userId)) {
+            throw new ResourceAccessDeniedException();
+        }
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
             throw new UnknownPaymentStatusException();

@@ -21,6 +21,11 @@ public class PaymentSecurityInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+        // GET 등 다른 HTTP 메서드는 서명 검증을 생략 (웹훅 POST 요청만 검증)
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         String signature = request.getHeader("X-Tikkle-Signature");
         String timestampStr = request.getHeader("X-Tikkle-Timestamp");
 

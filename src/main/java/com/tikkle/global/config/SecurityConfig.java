@@ -30,8 +30,7 @@ public class SecurityConfig {
             "/api/auth/reissue",
             "/api/auth/oauth/**",
             "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/api/payments"
+            "/v3/api-docs/**"
     };
 
     @Bean
@@ -45,6 +44,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(PERMIT_ALL_URLS).permitAll();
+                    auth.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments").permitAll();
                     if (isLocal) {
                         auth.requestMatchers("/api/auth/test-token", "/api/auth/test-signup", "/api/test/**").permitAll();
                     }
