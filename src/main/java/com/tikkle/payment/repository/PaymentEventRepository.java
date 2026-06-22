@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long> {
     boolean existsByTransactionId(String transactionId);
+    java.util.Optional<PaymentEvent> findByIdAndUserId(Long id, Long userId);
     List<PaymentEvent> findByStatus(PaymentStatus status);
     List<PaymentEvent> findByIdIn(List<Long> ids);
     List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, java.time.LocalDateTime dateTime);
