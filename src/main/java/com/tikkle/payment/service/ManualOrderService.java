@@ -26,12 +26,8 @@ public class ManualOrderService {
 
     @Transactional
     public void approveOrder(Long userId, Long eventId) {
-        PaymentEvent event = paymentEventRepository.findById(eventId)
+        PaymentEvent event = paymentEventRepository.findByIdAndUserId(eventId, userId)
                 .orElseThrow(PaymentEventNotFoundException::new);
-
-        if (!event.getUserId().equals(userId)) {
-            throw new ResourceAccessDeniedException();
-        }
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
             throw new UnknownPaymentStatusException();
@@ -57,12 +53,8 @@ public class ManualOrderService {
 
     @Transactional
     public void rejectOrder(Long userId, Long eventId) {
-        PaymentEvent event = paymentEventRepository.findById(eventId)
+        PaymentEvent event = paymentEventRepository.findByIdAndUserId(eventId, userId)
                 .orElseThrow(PaymentEventNotFoundException::new);
-
-        if (!event.getUserId().equals(userId)) {
-            throw new ResourceAccessDeniedException();
-        }
 
         if (event.getStatus() != PaymentStatus.WAITING_APPROVAL) {
             throw new UnknownPaymentStatusException();
