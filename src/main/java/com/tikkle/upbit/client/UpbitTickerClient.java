@@ -28,13 +28,14 @@ public class UpbitTickerClient {
 
     public List<UpbitTickerResponse> getTickers(String markets) {
         try {
-            return restClient.get()
+            List<UpbitTickerResponse> response = restClient.get()
                     .uri("/v1/ticker?markets=" + markets)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<UpbitTickerResponse>>() {});
+            return response != null ? response : java.util.Collections.emptyList();
         } catch (Exception e) {
             log.error("업비트 시세 조회 실패 (markets: {})", markets, e);
-            throw new RuntimeException("업비트 실시간 시세 조회에 실패했습니다.", e);
+            throw new com.tikkle.upbit.exception.UpbitTickerInquiryFailedException();
         }
     }
 }

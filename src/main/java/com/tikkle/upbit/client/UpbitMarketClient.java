@@ -28,13 +28,14 @@ public class UpbitMarketClient {
 
     public List<UpbitMarketResponse> getAllMarkets() {
         try {
-            return restClient.get()
+            List<UpbitMarketResponse> response = restClient.get()
                     .uri("/v1/market/all?isDetails=false")
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<UpbitMarketResponse>>() {});
+            return response != null ? response : java.util.Collections.emptyList();
         } catch (Exception e) {
             log.error("업비트 마켓 리스트 조회 실패", e);
-            throw new RuntimeException("업비트 마켓 리스트 조회에 실패했습니다.", e);
+            throw new com.tikkle.upbit.exception.UpbitMarketInquiryFailedException();
         }
     }
 }
