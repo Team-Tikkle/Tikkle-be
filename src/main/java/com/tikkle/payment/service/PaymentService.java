@@ -1,6 +1,8 @@
 package com.tikkle.payment.service;
 
 import com.tikkle.investment.entity.enums.ExecutionMode;
+import com.tikkle.investment.entity.Coin;
+import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
 import com.tikkle.payment.dto.response.PaymentActionType;
@@ -46,6 +48,7 @@ public class PaymentService {
     private final SpareChangeCalculator spareChangeCalculator;
     private final UpbitTradeService upbitTradeService;
     private final AiClassificationService aiClassificationService;
+    private final CoinRepository coinRepository;
 
     @Transactional
     public PaymentScrapingResponse processPaymentScraping(PaymentScrapingRequest request) {
@@ -94,6 +97,7 @@ public class PaymentService {
         // TODO : 추후 수정(더미 종목 주입)
         String dummyMarket = "KRW-BTC";
         String dummyCoinName = "비트코인";
+        Coin targetCoin = coinRepository.findById(dummyMarket).orElse(null);
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
@@ -107,18 +111,18 @@ public class PaymentService {
             int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
 
             if (spareChange == 0) {
-                saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
+                saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category, targetCoin);
                 return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
             }
 
             if (spareChange < 5000) {
-                saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
+                saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category, targetCoin);
                 return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
             }
 
             ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
-            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
+            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket, targetCoin);
 
             Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
             return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
@@ -155,19 +159,19 @@ public class PaymentService {
 
         // 💡 3. 조기 차단(Fail-Fast) 방어선
         if (spareChange == 0) {
-            saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category);
+            saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category, targetCoin);
             return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
         }
 
         if (spareChange < 5000) {
-            saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category);
+            saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category, targetCoin);
             return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
         }
 
         ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
         // 💡 4. 정상 파이프라인
-        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket);
+        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket, targetCoin);
 
         Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
         return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
@@ -243,7 +247,7 @@ public class PaymentService {
                 .orElse(RuleType.ROUND_UP_10000);
     }
 
-    private PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category) {
+    private PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
         log.info("결제 이벤트 저장 시도. status: {}, spareChange: {}", status, spareChange);
         try {
             PaymentEvent event = PaymentEvent.builder()
@@ -257,6 +261,7 @@ public class PaymentService {
                     .transactionId(request.transactionId())
                     .status(status)
                     .reason(reason)
+                    .targetCoin(targetCoin)
                     .build();
 
             return paymentEventRepository.save(event);
@@ -273,13 +278,13 @@ public class PaymentService {
 
     private record ExecutionResult(PaymentStatus status, PaymentActionType actionType, BigDecimal executedPrice, BigDecimal executedVolume, String reason, PaymentEvent savedEvent) {}
 
-    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String dummyMarket) {
+    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String dummyMarket, Coin targetCoin) {
         if (executionMode == ExecutionMode.MANUAL) {
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category);
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
             return new ExecutionResult(PaymentStatus.WAITING_APPROVAL, PaymentActionType.WAITING_APPROVAL, null, null, null, savedEvent);
         } else {
             // 외부 호출 전 ORDERING 상태로 선 저장 (원장 불일치 방어)
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category);
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category, targetCoin);
             try {
                 UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
                 // 성공 시 상태 업데이트
