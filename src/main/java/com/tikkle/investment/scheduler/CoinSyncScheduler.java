@@ -21,7 +21,7 @@ public class CoinSyncScheduler {
     private final UpbitMarketClient upbitMarketClient;
     private final CoinRepository coinRepository;
 
-    @Scheduled(cron = "0 0 4 * * *") // 매일 새벽 4시 실행
+    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul") // 매일 새벽 4시 실행
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void syncCoinMetadata() {

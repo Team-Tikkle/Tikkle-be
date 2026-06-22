@@ -53,7 +53,11 @@ public class PortfolioService {
         }
         
         Map<String, BigDecimal> tickerPriceMap = tickers.stream()
-                .collect(Collectors.toMap(UpbitTickerResponse::market, UpbitTickerResponse::tradePrice));
+                .filter(t -> t.tradePrice() != null)
+                .collect(Collectors.toMap(
+                        UpbitTickerResponse::market, 
+                        UpbitTickerResponse::tradePrice, 
+                        (existing, replacement) -> existing));
 
         // 코인 한글명 매핑용 DB 조회
         Map<String, String> coinNameMap = coinRepository.findAllById(holdingMarketCodes).stream()
