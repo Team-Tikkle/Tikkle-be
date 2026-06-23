@@ -97,7 +97,7 @@ public class PaymentService {
         // TODO : 추후 수정(더미 종목 주입)
         String dummyMarket = "KRW-BTC";
         String dummyCoinName = "비트코인";
-        Coin targetCoin = coinRepository.findById(dummyMarket).orElse(null);
+        Coin targetCoin = coinRepository.findById(dummyMarket).orElseThrow();
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
