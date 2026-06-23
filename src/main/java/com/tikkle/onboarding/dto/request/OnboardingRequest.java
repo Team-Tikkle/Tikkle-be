@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 온보딩 시 클라이언트로부터 수신하는 통합 Request DTO
@@ -50,7 +51,7 @@ public record OnboardingRequest(
         @Schema(description = "관심 산업/테마 리스트 (다중 선택)", example = "[\"LAYER_1\", \"AI\", \"DEFI\"]")
         @NotNull(message = "관심 테마를 지정해주세요.")
         @NotEmpty(message = "관심 테마를 하나 이상 선택해주세요.")
-        List<@NotNull(message = "테마 항목은 null일 수 없습니다.") CryptoTheme> cryptoThemes,
+        Set<@NotNull(message = "테마 항목은 null일 수 없습니다.") CryptoTheme> cryptoThemes,
 
         @Schema(description = "포트폴리오 분산도", example = "BALANCED", allowableValues = {"CONCENTRATED", "BALANCED", "DIVERSIFIED"})
         @NotNull(message = "분산 투자 방식을 선택해주세요.")

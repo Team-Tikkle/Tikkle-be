@@ -8,11 +8,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@Table(name = "INVESTMENT_PROFILES")
+@Table(name = "investment_profile")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InvestmentProfile {
@@ -34,12 +34,12 @@ public class InvestmentProfile {
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-            name = "INVESTMENT_PROFILE_THEMES",
+            name = "investment_profile_themes",
             joinColumns = @JoinColumn(name = "investment_profile_id")
     )
     @Column(name = "theme", nullable = false)
     @Enumerated(EnumType.STRING)
-    private List<CryptoTheme> cryptoThemes = new ArrayList<>();
+    private Set<CryptoTheme> cryptoThemes = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -53,13 +53,13 @@ public class InvestmentProfile {
     private InvestmentProfile(User user,
                               RiskTolerance riskTolerance,
                               TrendSensitivity trendSensitivity,
-                              List<CryptoTheme> cryptoThemes,
+                              Set<CryptoTheme> cryptoThemes,
                               DiversificationType diversificationType,
                               MemeAcceptance memeAcceptance) {
         this.user = user;
         this.riskTolerance = riskTolerance;
         this.trendSensitivity = trendSensitivity;
-        this.cryptoThemes = cryptoThemes != null ? new ArrayList<>(cryptoThemes) : new ArrayList<>();
+        this.cryptoThemes = cryptoThemes != null ? new java.util.HashSet<>(cryptoThemes) : new java.util.HashSet<>();
         this.diversificationType = diversificationType;
         this.memeAcceptance = memeAcceptance;
     }
