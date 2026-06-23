@@ -80,12 +80,11 @@ public class OnboardingService {
     private void saveInvestmentProfile(User user, OnboardingRequest dto) {
         InvestmentProfile profile = InvestmentProfile.builder()
                 .user(user)
-                .firstReturnPreference(dto.firstReturnPreference())
-                .secondReturnPreference(dto.secondReturnPreference())
-                .thirdReturnPreference(dto.thirdReturnPreference())
-                .preferredThemes(dto.preferredThemes())
-                .valueFilters(dto.valueFilters())
+                .riskTolerance(dto.riskTolerance())
+                .trendSensitivity(dto.trendSensitivity())
+                .cryptoThemes(dto.cryptoThemes())
                 .diversificationType(dto.diversificationType())
+                .memeAcceptance(dto.memeAcceptance())
                 .build();
         investmentProfileRepository.save(profile);
     }

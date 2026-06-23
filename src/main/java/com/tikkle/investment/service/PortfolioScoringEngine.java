@@ -43,6 +43,9 @@ public class PortfolioScoringEngine {
                     bonusScore = BONUS_SCORE;
                 } else if (diversificationType == DiversificationType.CONCENTRATED && inPortfolio) {
                     bonusScore = BONUS_SCORE;
+                } else if (diversificationType == DiversificationType.BALANCED) {
+                    // BALANCED: 보유/미보유 무관하게 기본 스코어만 사용 (편향 없음)
+                    bonusScore = 0;
                 }
             }
 

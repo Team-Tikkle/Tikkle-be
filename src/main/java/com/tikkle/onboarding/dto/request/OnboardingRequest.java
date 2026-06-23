@@ -10,9 +10,9 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.AssertTrue;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 온보딩 시 클라이언트로부터 수신하는 통합 Request DTO
@@ -40,38 +40,41 @@ public record OnboardingRequest(
         String targetCardLast4,
 
         // 5대 투자 성향
-        @Schema(description = "1순위 수익률 선호 유형", example = "HIGH_RISK_ALTCOIN", allowableValues = {"STABLE_YIELD", "BLUE_CHIP_COIN", "HIGH_RISK_ALTCOIN"})
-        @NotNull(message = "1순위 수익률 선호를 선택해주세요.")
-        ReturnPreference firstReturnPreference,
+        @Schema(description = "하락장 방어 심리", example = "HOLD", allowableValues = {"SELL_IMMEDIATELY", "HOLD", "BUY_MORE"})
+        @NotNull(message = "하락장 방어 심리를 선택해주세요.")
+        RiskTolerance riskTolerance,
 
-        @Schema(description = "2순위 수익률 선호 유형", example = "BLUE_CHIP_COIN", allowableValues = {"STABLE_YIELD", "BLUE_CHIP_COIN", "HIGH_RISK_ALTCOIN"})
-        @NotNull(message = "2순위 수익률 선호를 선택해주세요.")
-        ReturnPreference secondReturnPreference,
+        @Schema(description = "트렌드 민감도", example = "PARTIAL_TREND", allowableValues = {"FUNDAMENTAL_ONLY", "PARTIAL_TREND", "FULL_TREND"})
+        @NotNull(message = "트렌드 민감도를 선택해주세요.")
+        TrendSensitivity trendSensitivity,
 
-        @Schema(description = "3순위 수익률 선호 유형", example = "STABLE_YIELD", allowableValues = {"STABLE_YIELD", "BLUE_CHIP_COIN", "HIGH_RISK_ALTCOIN"})
-        @NotNull(message = "3순위 수익률 선호를 선택해주세요.")
-        ReturnPreference thirdReturnPreference,
+        @Schema(description = "관심 산업/테마 리스트 (다중 선택)", example = "[\"LAYER_1\", \"AI\", \"DEFI\"]")
+        @NotNull(message = "관심 테마를 지정해주세요.")
+        @NotEmpty(message = "관심 테마를 하나 이상 선택해주세요.")
+        Set<@NotNull(message = "테마 항목은 null일 수 없습니다.") CryptoTheme> cryptoThemes,
 
-        @Schema(description = "관심 투자 테마 리스트", example = "[\"DEFI\", \"WEB3\"]")
-        @NotNull(message = "선호 테마를 지정해주세요.")
-        @NotEmpty(message = "선호 테마를 하나 이상 선택해주세요.")
-        List<@NotNull(message = "테마 항목은 null일 수 없습니다.") PreferredTheme> preferredThemes,
-
-        @Schema(description = "가치관 필터링 제외 업종 리스트", example = "[\"PROOF_OF_WORK\", \"SMART_CONTRACT\"]")
-        @NotNull(message = "가치관 필터를 지정해주세요.")
-        @NotEmpty(message = "가치관 필터를 하나 이상 선택해주세요.")
-        List<@NotNull(message = "가치관 필터 항목은 null일 수 없습니다.") ValueFilter> valueFilters,
-
-        @Schema(description = "분산 투자 선호 유형", example = "DIVERSIFIED", allowableValues = {"CONCENTRATED", "DIVERSIFIED"})
+        @Schema(description = "포트폴리오 분산도", example = "BALANCED", allowableValues = {"CONCENTRATED", "BALANCED", "DIVERSIFIED"})
         @NotNull(message = "분산 투자 방식을 선택해주세요.")
         DiversificationType diversificationType,
 
-        @Schema(description = "매매 실행 방식", example = "AUTOMATIC", allowableValues = {"AUTOMATIC", "MANUAL"})
+        @Schema(description = "밈 코인 수용도", example = "SMALL", allowableValues = {"NONE", "SMALL", "ACTIVE"})
+        @NotNull(message = "밈 코인 수용도를 선택해주세요.")
+        MemeAcceptance memeAcceptance,
+
+        @Schema(description = "매매 실행 방식", example = "AUTO", allowableValues = {"AUTO", "MANUAL"})
         @NotNull(message = "매매 방식을 선택해주세요.")
         ExecutionMode executionMode,
 
         // 7대 카테고리별 잔돈 규칙
-        @Schema(description = "7대 결제 카테고리별 잔돈 저축 규칙 리스트")
+        @Schema(description = "7대 결제 카테고리별 잔돈 저축 규칙 리스트", example = "[\n" +
+                "  { \"category\": \"CAFE\", \"ruleType\": \"ROUND_UP_10000\" },\n" +
+                "  { \"category\": \"MART\", \"ruleType\": \"ROUND_UP_20000\" },\n" +
+                "  { \"category\": \"FOOD\", \"ruleType\": \"ROUND_UP_30000\" },\n" +
+                "  { \"category\": \"SHOPPING\", \"ruleType\": \"ROUND_UP_40000\" },\n" +
+                "  { \"category\": \"TRAFFIC\", \"ruleType\": \"ROUND_UP_50000\" },\n" +
+                "  { \"category\": \"CULTURE\", \"ruleType\": \"PERCENT_10\" },\n" +
+                "  { \"category\": \"ETC\", \"ruleType\": \"PERCENT_20\" }\n" +
+                "]")
         @NotNull(message = "카테고리별 잔돈 규칙은 필수입니다.")
         @Size(min = 7, max = 7, message = "7개의 카테고리 규칙을 모두 설정해야 합니다.")
         @Valid
@@ -87,15 +90,5 @@ public record OnboardingRequest(
             @NotNull(message = "잔돈 규칙 유형은 필수입니다.")
             RuleType ruleType
     ) {
-    }
-
-    @AssertTrue(message = "수익률 선호 순위는 중복될 수 없습니다.")
-    public boolean isValidPreferences() {
-        if (firstReturnPreference == null || secondReturnPreference == null || thirdReturnPreference == null) {
-            return true;
-        }
-        return firstReturnPreference != secondReturnPreference
-                && secondReturnPreference != thirdReturnPreference
-                && firstReturnPreference != thirdReturnPreference;
     }
 }

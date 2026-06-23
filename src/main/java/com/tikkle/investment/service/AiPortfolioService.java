@@ -89,12 +89,11 @@ public class AiPortfolioService {
             Recommend top 5 cryptocurrencies based on the following investment profile.
             Order them by relevance from 1st to 5th.
             
-            - First Return Preference: {first}
-            - Second Return Preference: {second}
-            - Third Return Preference: {third}
-            - Diversification Type: {div}
+            - Risk Tolerance: {riskTolerance} (score: {riskScore}/10)
+            - Trend Sensitivity: {trendSensitivity} (score: {trendScore}/10)
             - Preferred Themes: {themes}
-            - Value Filters: {filters}
+            - Diversification Type: {diversification}
+            - Meme Coin Acceptance: {memeAcceptance} (max weight: {memeMaxWeight}%)
             """;
 
         try {
@@ -105,12 +104,14 @@ public class AiPortfolioService {
             /*
             return chatClient.prompt()
                     .user(u -> u.text(promptText)
-                            .param("first", profile.getFirstReturnPreference())
-                            .param("second", profile.getSecondReturnPreference())
-                            .param("third", profile.getThirdReturnPreference())
-                            .param("div", profile.getDiversificationType())
-                            .param("themes", profile.getPreferredThemes().stream().map(Enum::name).collect(Collectors.joining(",")))
-                            .param("filters", profile.getValueFilters().stream().map(Enum::name).collect(Collectors.joining(",")))
+                            .param("riskTolerance", profile.getRiskTolerance().name())
+                            .param("riskScore", String.valueOf(profile.getRiskTolerance().getScore()))
+                            .param("trendSensitivity", profile.getTrendSensitivity().name())
+                            .param("trendScore", String.valueOf(profile.getTrendSensitivity().getScore()))
+                            .param("themes", profile.getCryptoThemes().stream().map(Enum::name).collect(Collectors.joining(",")))
+                            .param("diversification", profile.getDiversificationType().name())
+                            .param("memeAcceptance", profile.getMemeAcceptance().name())
+                            .param("memeMaxWeight", String.valueOf(profile.getMemeAcceptance().getMaxWeightPercent()))
                     )
                     .call()
                     .entity(new ParameterizedTypeReference<List<AiRecommendationDto>>() {});
@@ -131,21 +132,16 @@ public class AiPortfolioService {
     }
 
     private String generateProfileHashKey(InvestmentProfile profile) {
-        String first = profile.getFirstReturnPreference().name();
-        String second = profile.getSecondReturnPreference().name();
-        String third = profile.getThirdReturnPreference().name();
+        String risk = profile.getRiskTolerance().name();
+        String trend = profile.getTrendSensitivity().name();
         String div = profile.getDiversificationType().name();
+        String meme = profile.getMemeAcceptance().name();
 
-        String themes = profile.getPreferredThemes().stream()
+        String themes = profile.getCryptoThemes().stream()
                 .map(Enum::name)
                 .sorted()
                 .collect(Collectors.joining("-"));
 
-        String filters = profile.getValueFilters().stream()
-                .map(Enum::name)
-                .sorted()
-                .collect(Collectors.joining("-"));
-
-        return String.join(":", first, second, third, div, themes, filters);
+        return String.join(":", risk, trend, themes, div, meme);
     }
 }
