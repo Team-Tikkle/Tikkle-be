@@ -15,7 +15,7 @@ public class AiPortfolioScheduler {
     private final AiPortfolioService aiPortfolioService;
 
     // 매일 자정과 정오에 15개 후보군 풀 생성 (12시간 주기)
-    @Scheduled(cron = "0 0 0,12 * * *")
+    @Scheduled(cron = "0 0 0,12 * * *", zone = "Asia/Seoul")
     public void scheduleDailyTargets() {
         log.info("[Scheduler] Triggering 12-hour AI Macro Universe generation...");
         aiPortfolioService.generateMacroUniverses();

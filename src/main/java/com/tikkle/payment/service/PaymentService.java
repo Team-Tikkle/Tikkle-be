@@ -171,7 +171,9 @@ public class PaymentService {
             }
         }
 
-        Coin targetCoin = coinRepository.findById(targetMarket).orElseThrow();
+        final String finalTargetMarket = targetMarket;
+        Coin targetCoin = coinRepository.findById(targetMarket)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("기본 마켓 코인이 설정되지 않았습니다: " + finalTargetMarket));
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());

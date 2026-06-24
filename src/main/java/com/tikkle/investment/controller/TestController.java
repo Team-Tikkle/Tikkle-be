@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/test")
 @RequiredArgsConstructor
+@org.springframework.context.annotation.Profile("local")
 public class TestController {
     private final AiPortfolioScheduler aiPortfolioScheduler;
 
