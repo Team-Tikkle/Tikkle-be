@@ -5,5 +5,7 @@ import java.math.BigDecimal;
 
 public record UpbitTickerResponse(
         @JsonProperty("market") String market,
-        @JsonProperty("trade_price") BigDecimal tradePrice
+        @JsonProperty("trade_price") BigDecimal tradePrice,
+        @JsonProperty("signed_change_rate") Double signedChangeRate,
+        @JsonProperty("acc_trade_price_24h") BigDecimal accTradePrice24h
 ) {}
