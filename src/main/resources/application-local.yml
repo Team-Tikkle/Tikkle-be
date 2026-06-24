@@ -43,9 +43,8 @@ spring:
       api-key: ${GMS_KEY}
       base-url: https://gms.ssafy.io/gmsapi/api.anthropic.com
       chat:
-        model: claude-opus-4-8
+        model: claude-sonnet-4-6
         max-tokens: 2048
-        temperature: 0.0
 
 jwt:
   secret: ${JWT_SECRET}
@@ -57,10 +56,6 @@ tikkle:
     secret-key: ${PAYMENT_SECRET_KEY}
   encrypt:
     secret-key: ${TIKKLE_ENCRYPT_SECRET_KEY}
-
-kis:
-  api:
-    base-url: https://openapivts.koreainvestment.com:29443
 
 app:
   cors:
