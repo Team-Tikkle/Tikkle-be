@@ -20,9 +20,6 @@ public class ManualOrderService {
     private final UpbitTradeService upbitTradeService;
     private final org.springframework.beans.factory.ObjectProvider<ManualOrderService> selfProvider;
 
-    // 더미 데이터 주입: AI 연동 전까지 하드코딩
-    private static final String DUMMY_MARKET = "KRW-BTC";
-
     @Transactional
     public void approveOrder(Long userId, Long eventId) {
         PaymentEvent event = paymentEventRepository.findByIdAndUserId(eventId, userId)
@@ -33,8 +30,9 @@ public class ManualOrderService {
         }
 
         try {
-            // 업비트 동기 매수 및 원장 업데이트
-            upbitTradeService.executeTrade(event.getUserId(), DUMMY_MARKET, event.getSpareChange());
+            // 업비트 동기 매수 및 원장 업데이트 (AI가 지정한 타겟 코인 매수)
+            String targetMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : "KRW-BTC";
+            upbitTradeService.executeTrade(event.getUserId(), targetMarket, event.getSpareChange());
             event.completeInvestment();
         } catch (Exception e) {
             log.error("수동 승인 후 업비트 체결 실패", e);
