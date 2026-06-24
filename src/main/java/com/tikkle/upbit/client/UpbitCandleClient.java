@@ -16,8 +16,13 @@ public class UpbitCandleClient {
     private final RestClient restClient;
 
     public UpbitCandleClient() {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000);
+        factory.setReadTimeout(10000);
+        
         this.restClient = RestClient.builder()
                 .baseUrl("https://api.upbit.com/v1")
+                .requestFactory(factory)
                 .defaultHeaders(headers -> {
                     headers.setAccept(List.of(MediaType.APPLICATION_JSON));
                 })

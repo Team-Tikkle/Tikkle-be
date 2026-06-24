@@ -10,7 +10,7 @@ public record UpbitCandleResponse(
         @JsonProperty("candle_acc_trade_price") BigDecimal candleAccTradePrice
 ) {
     public double getChangeRate() {
-        if (openingPrice == null || openingPrice.compareTo(BigDecimal.ZERO) == 0) return 0.0;
+        if (openingPrice == null || tradePrice == null || openingPrice.compareTo(BigDecimal.ZERO) == 0) return 0.0;
         return tradePrice.subtract(openingPrice)
                 .divide(openingPrice, 4, java.math.RoundingMode.HALF_UP)
                 .doubleValue();
