@@ -1,9 +1,15 @@
 package com.tikkle.payment.service;
 
-import com.tikkle.investment.entity.enums.ExecutionMode;
+import com.tikkle.investment.dto.response.AiCandidateResponse;
+import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.Coin;
+import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.investment.repository.CoinRepository;
+import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.investment.repository.InvestmentSettingsRepository;
+import com.tikkle.investment.service.AiPortfolioService;
+import com.tikkle.investment.service.PortfolioScoringEngine;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
 import com.tikkle.payment.dto.response.PaymentActionType;
 import com.tikkle.payment.dto.response.PaymentScrapingResponse;
@@ -17,6 +23,8 @@ import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
+import com.tikkle.upbit.client.UpbitTickerClient;
+import com.tikkle.upbit.dto.response.UpbitTickerResponse;
 import com.tikkle.upbit.service.UpbitTradeService;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,12 +36,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -49,6 +59,12 @@ public class PaymentService {
     private final UpbitTradeService upbitTradeService;
     private final AiClassificationService aiClassificationService;
     private final CoinRepository coinRepository;
+
+    private final InvestmentProfileRepository investmentProfileRepository;
+    private final AiPortfolioService aiPortfolioService;
+    private final PortfolioScoringEngine portfolioScoringEngine;
+    private final UpbitTickerClient upbitTickerClient;
+    private final JsonMapper objectMapper;
 
     @Transactional
     public PaymentScrapingResponse processPaymentScraping(PaymentScrapingRequest request) {
@@ -94,10 +110,70 @@ public class PaymentService {
             return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null, null, null);
         }
 
-        // TODO : 추후 수정(더미 종목 주입)
-        String dummyMarket = "KRW-BTC";
-        String dummyCoinName = "비트코인";
-        Coin targetCoin = coinRepository.findById(dummyMarket).orElseThrow();
+        // [Stage 2: 실시간 퀀트 스코어링 결합]
+        InvestmentProfile profile = investmentProfileRepository.findByUserId(request.userId()).orElse(null);
+        String targetMarket = "KRW-BTC";
+        String targetCoinName = "비트코인";
+
+        if (profile != null) {
+            String hashKey = aiPortfolioService.generateProfileHashKey(profile);
+            String redisKey = "ai:candidates:" + hashKey;
+            String jsonCandidates = redisTemplate.opsForValue().get(redisKey);
+
+            if (jsonCandidates != null) {
+                try {
+                    AiCandidateResponse candidateResponse = objectMapper.readValue(jsonCandidates, AiCandidateResponse.class);
+                    List<AiRecommendationDto> macroCandidates = candidateResponse.candidates();
+
+                    if (macroCandidates != null && !macroCandidates.isEmpty()) {
+                        // DB(Coin 테이블)에 등록된 유효한 마켓(KRW-BTC 등)만 필터링 (AI 환각 방어)
+                        List<String> validMarkets = coinRepository.findAll().stream().map(Coin::getMarket).toList();
+                        
+                        List<AiRecommendationDto> validCandidates = macroCandidates.stream()
+                                .filter(dto -> validMarkets.contains(dto.market()))
+                                .toList();
+
+                        if (!validCandidates.isEmpty()) {
+                            String marketsParam = validCandidates.stream()
+                                    .map(AiRecommendationDto::market)
+                                    .collect(Collectors.joining(","));
+                            
+                            List<UpbitTickerResponse> tickers = upbitTickerClient.getTickers(marketsParam);
+                            
+                            List<String> pastPurchasedMarkets = paymentEventRepository.findRecentPurchasedMarkets(
+                                    request.userId(),
+                                    org.springframework.data.domain.PageRequest.of(0, 10)
+                            );
+
+                            List<AiRecommendationDto> finalTargets = portfolioScoringEngine.selectRealtimeTargets(
+                                    validCandidates, 
+                                    tickers, 
+                                    profile,
+                                    pastPurchasedMarkets
+                            );
+
+                        if (!finalTargets.isEmpty()) {
+                            log.info("📊 실시간 퀀트 스코어링 완료! 상위 3개 후보군: {}", 
+                                    finalTargets.stream().limit(3).map(dto -> dto.coinName() + "(" + dto.market() + ")").toList());
+
+                            // 현재 MVP 버전에서는 1순위 타겟 종목에 전액 매수하도록 처리
+                            targetMarket = finalTargets.get(0).market();
+                            targetCoinName = finalTargets.get(0).coinName();
+                            log.info("🎯 최종 매수 타겟 코인 확정: {} ({})", targetCoinName, targetMarket);
+                        } else {
+                            log.warn("⚠️ 퀀트 스코어링 후 유효한 후보군이 없습니다. Fallback으로 기본 코인(BTC)을 매수합니다.");
+                        }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("AI 후보군 Redis 파싱 및 실시간 퀀트 스코어링 실패. Fallback으로 BTC를 매수합니다.", e);
+                }
+            }
+        }
+
+        final String finalTargetMarket = targetMarket;
+        Coin targetCoin = coinRepository.findById(targetMarket)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("기본 마켓 코인이 설정되지 않았습니다: " + finalTargetMarket));
 
         // [Phase 1: DB HIT - 가맹점 1차 분류]
         List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
@@ -122,10 +198,10 @@ public class PaymentService {
 
             ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
-            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket, targetCoin);
+            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, targetMarket, targetCoin);
 
             Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
-            return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
+            return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, targetMarket, targetCoinName, result.executedPrice(), result.executedVolume());
         }
 
         // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
@@ -133,9 +209,8 @@ public class PaymentService {
         try {
             aiResponse = aiClassificationService.classify(request.merchant());
         } catch (Exception e) {
-            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={}", request.merchant());
-            // 타임아웃/실패 시 예외를 던지지 않고 200 OK 조기 종료 (DB 저장 X)
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CLASSIFICATION_FAILED, request.merchant(), request.amount(), 0, null, null, null, null);
+            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={} -> ETC 카테고리로 폴백(Fallback) 처리합니다.", request.merchant());
+            aiResponse = new com.tikkle.payment.dto.response.AiClassificationResponse(request.merchant(), PaymentCategory.ETC);
         }
 
         String keyword = aiResponse.keyword();
@@ -171,10 +246,10 @@ public class PaymentService {
         ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
 
         // 💡 4. 정상 파이프라인
-        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, dummyMarket, targetCoin);
+        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, targetMarket, targetCoin);
 
         Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
-        return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, dummyMarket, dummyCoinName, result.executedPrice(), result.executedVolume());
+        return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, targetMarket, targetCoinName, result.executedPrice(), result.executedVolume());
     }
 
 
@@ -278,7 +353,7 @@ public class PaymentService {
 
     private record ExecutionResult(PaymentStatus status, PaymentActionType actionType, BigDecimal executedPrice, BigDecimal executedVolume, String reason, PaymentEvent savedEvent) {}
 
-    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String dummyMarket, Coin targetCoin) {
+    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String targetMarket, Coin targetCoin) {
         if (executionMode == ExecutionMode.MANUAL) {
             PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
             return new ExecutionResult(PaymentStatus.WAITING_APPROVAL, PaymentActionType.WAITING_APPROVAL, null, null, null, savedEvent);
@@ -286,7 +361,7 @@ public class PaymentService {
             // 외부 호출 전 ORDERING 상태로 선 저장 (원장 불일치 방어)
             PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category, targetCoin);
             try {
-                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), dummyMarket, spareChange);
+                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), targetMarket, spareChange);
                 // 성공 시 상태 업데이트
                 savedEvent.completeInvestment();
                 return new ExecutionResult(PaymentStatus.INVESTED, PaymentActionType.ORDER_REQUESTED, tradeResult.executedPrice(), tradeResult.executedVolume(), null, savedEvent);

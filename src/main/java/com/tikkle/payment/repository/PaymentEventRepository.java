@@ -17,6 +17,9 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
+    @org.springframework.data.jpa.repository.Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = 'INVESTED' ORDER BY p.createdAt DESC")
+    List<String> findRecentPurchasedMarkets(@org.springframework.data.repository.query.Param("userId") Long userId, org.springframework.data.domain.Pageable pageable);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"targetCoin"})
     @org.springframework.data.jpa.repository.Query("SELECT p FROM PaymentEvent p " +
             "WHERE p.userId = :userId " +

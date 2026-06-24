@@ -17,7 +17,7 @@
 | `investment_settings` | 매매 방식(자동/수동) 등 공통 투자 설정 |
 | `PAYMENT_EVENTS` | 결제 이벤트 원장 |
 | `payment_category_mapping` | 가맹점 키워드 → 카테고리 분류 사전 (전역 캐시, AI 학습 결과 누적) |
-| `INVESTMENT_TARGETS` | 일자별 AI 추천 타겟 종목 지정 |
+| `ai_recommendation_history` | 12시간 주기 AI 추천 15종목 유니버스 이력 (Risk x Trend 9개 조합별 캐싱용) |
 | `PORTFOLIOS` | 보유 종목 현황 |
 | `COIN_METADATA` | 업비트 마켓(코인) 메타데이터 (마켓코드/한글명/영문명, 매일 동기화) |
 | `MARKET_TOPICS` | 투데이 마켓 토픽 (Google News RSS 수집) |
@@ -101,14 +101,14 @@ CREATE TABLE `payment_category_mapping` (
     `category`      VARCHAR(30)     NOT NULL    -- PaymentCategory
 );
 
-CREATE TABLE `INVESTMENT_TARGETS` (
-    `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
-    `user_id`       BIGINT          NOT NULL,
-    `market`        VARCHAR(20)     NOT NULL,
-    `coin_name`     VARCHAR(100)    NOT NULL,
-    `reason`        TEXT            NULL,
-    `target_date`   DATE            NOT NULL,
-    `created_at`    DATETIME        NOT NULL
+CREATE TABLE `ai_recommendation_history` (
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `profile_hash_key`  VARCHAR(255)    NOT NULL,   -- 예: BUY_MORE:FULL_TREND
+    `fng_index`         VARCHAR(255)    NOT NULL,
+    `btc_dominance`     VARCHAR(255)    NOT NULL,
+    `weekly_trend`      VARCHAR(255)    NOT NULL,
+    `candidates_json`   TEXT            NOT NULL,   -- 15개 추천 후보군 JSON
+    `created_at`        DATETIME        NOT NULL
 );
 
 CREATE TABLE `PORTFOLIOS` (
@@ -175,7 +175,7 @@ ALTER TABLE `category_spare_change_rules`   ADD CONSTRAINT `PK_CATEGORY_SPARE_CH
 ALTER TABLE `linked_accounts`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS`             PRIMARY KEY (`id`);
 ALTER TABLE `investment_settings`           ADD CONSTRAINT `PK_INVESTMENT_SETTINGS`         PRIMARY KEY (`id`);
 ALTER TABLE `payment_category_mapping`      ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPING`    PRIMARY KEY (`id`);
-ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `PK_INVESTMENT_TARGETS`          PRIMARY KEY (`id`);
+ALTER TABLE `ai_recommendation_history`     ADD CONSTRAINT `PK_AI_RECOMMENDATION_HISTORY`   PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `PK_PORTFOLIOS`                  PRIMARY KEY (`id`);
 ALTER TABLE `COIN_METADATA`                 ADD CONSTRAINT `PK_COIN_METADATA`               PRIMARY KEY (`market`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `PK_MARKET_TOPICS`               PRIMARY KEY (`id`);
@@ -191,7 +191,6 @@ ALTER TABLE `category_spare_change_rules`   ADD CONSTRAINT `UQ_CATEGORY_RULES_US
 ALTER TABLE `linked_accounts`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_USER`        UNIQUE (`user_id`);
 ALTER TABLE `investment_settings`           ADD CONSTRAINT `UQ_INVESTMENT_SETTINGS_USER`    UNIQUE (`user_id`);
 ALTER TABLE `payment_category_mapping`      ADD CONSTRAINT `UQ_PAYMENT_CAT_MAPPING_KEYWORD` UNIQUE (`keyword`);
-ALTER TABLE `INVESTMENT_TARGETS`            ADD CONSTRAINT `UQ_USER_TARGET_DATE`            UNIQUE (`user_id`, `target_date`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `UQ_USER_MARKET`                 UNIQUE (`user_id`, `market`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`          UNIQUE (`link`);
 
@@ -212,12 +211,12 @@ USERS (1)
  ├── linked_accounts (1)                 - 금융 연동 정보 (Upbit API 키, 타겟 카드)
  ├── investment_settings (1)             - 공통 투자 설정 (자동/수동)
  ├── PAYMENT_EVENTS (N)                  - 결제 이벤트 (user_id 스칼라 보관)
- ├── INVESTMENT_TARGETS (N)              - 일자별 AI 추천 타겟 (user_id+target_date UNIQUE)
  └── PORTFOLIOS (N)                      - 보유 종목 현황 (user_id+market UNIQUE)
 
-PAYMENT_EVENTS (N) ──> COIN_METADATA (1)  - target_coin_market FK (당일 배정 타겟 코인)
+PAYMENT_EVENTS (N) ──> COIN_METADATA (1)  - target_coin_market FK (실시간 퀀트 스코어링 기반 매수 타겟 코인)
 
 payment_category_mapping  - 전역 키워드→카테고리 사전 (유저 무관, AI 분류 결과 누적 캐시)
+ai_recommendation_history - AI 매크로 유니버스 후보군 (12시간 주기 9개 성향 조합별 캐싱)
 COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
 
 인사이트 (독립 테이블, FK 없음)

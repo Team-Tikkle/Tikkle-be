@@ -45,7 +45,7 @@ public class AiClassificationService {
                             .user(merchant)
                             .call()
                             .entity(AiClassificationResponse.class)
-            ).get(3, TimeUnit.SECONDS);
+            ).get(5, TimeUnit.SECONDS);
 
             log.info("AI 분류 응답: {}", response);
 
@@ -55,7 +55,7 @@ public class AiClassificationService {
 
             return response;
         } catch (TimeoutException e) {
-            log.error("AI 분류 타임아웃 발생 (3초 초과): {}", merchant);
+            log.error("AI 분류 타임아웃 발생 (5초 초과): {}", merchant);
             throw e;
         } catch (Exception e) {
             log.error("AI 분류 중 오류 발생: {}", e.getMessage());
