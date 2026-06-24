@@ -1,147 +1,175 @@
 package com.tikkle.investment.service;
 
+import com.tikkle.investment.client.CoinGeckoClient;
+import com.tikkle.investment.client.FearAndGreedClient;
+import com.tikkle.investment.dto.response.AiCandidateResponse;
 import com.tikkle.investment.dto.response.AiRecommendationDto;
+import com.tikkle.investment.entity.AiRecommendationHistory;
 import com.tikkle.investment.entity.InvestmentProfile;
-import com.tikkle.investment.entity.Portfolio;
 import com.tikkle.investment.exception.AiRecommendationFailedException;
+import com.tikkle.investment.repository.AiRecommendationHistoryRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
-import com.tikkle.investment.repository.PortfolioRepository;
-import com.tikkle.user.entity.User;
+import com.tikkle.upbit.client.UpbitCandleClient;
+import com.tikkle.upbit.dto.response.UpbitCandleResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class AiPortfolioService {
     private final ChatClient chatClient;
     private final InvestmentProfileRepository investmentProfileRepository;
-    private final PortfolioRepository portfolioRepository;
-    private final PortfolioScoringEngine scoringEngine;
-    private final InvestmentTargetSaver targetSaver;
+    private final FearAndGreedClient fearAndGreedClient;
+    private final CoinGeckoClient coinGeckoClient;
+    private final UpbitCandleClient upbitCandleClient;
+    private final StringRedisTemplate redisTemplate;
+    private final JsonMapper objectMapper;
+    private final AiRecommendationHistoryRepository historyRepository;
 
     public AiPortfolioService(
             @Qualifier("anthropicChatModel") ChatModel anthropicChatModel,
             InvestmentProfileRepository investmentProfileRepository,
-            PortfolioRepository portfolioRepository,
-            PortfolioScoringEngine scoringEngine,
-            InvestmentTargetSaver targetSaver) {
+            FearAndGreedClient fearAndGreedClient,
+            CoinGeckoClient coinGeckoClient,
+            UpbitCandleClient upbitCandleClient,
+            StringRedisTemplate redisTemplate,
+            JsonMapper objectMapper,
+            AiRecommendationHistoryRepository historyRepository) {
         this.chatClient = ChatClient.builder(anthropicChatModel).build();
         this.investmentProfileRepository = investmentProfileRepository;
-        this.portfolioRepository = portfolioRepository;
-        this.scoringEngine = scoringEngine;
-        this.targetSaver = targetSaver;
+        this.fearAndGreedClient = fearAndGreedClient;
+        this.coinGeckoClient = coinGeckoClient;
+        this.upbitCandleClient = upbitCandleClient;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.historyRepository = historyRepository;
     }
 
-    public void generateDailyTargets() {
-        log.info("Starting daily portfolio target generation.");
-        List<InvestmentProfile> allProfiles = investmentProfileRepository.findAll();
+    public void generateMacroUniverses() {
+        log.info("Starting AI Macro Universe generation (Stage 1).");
+        
+        // 1. Context Data 수집
+        String fngIndex = fearAndGreedClient.getFearAndGreedIndex();
+        String btcDom = coinGeckoClient.getBtcDominance();
+        
+        // 주간 추세 데이터 수집 (BTC, ETH)
+        List<UpbitCandleResponse> btcCandles = upbitCandleClient.getWeeklyCandles("KRW-BTC", 1);
+        List<UpbitCandleResponse> ethCandles = upbitCandleClient.getWeeklyCandles("KRW-ETH", 1);
+        
+        String btcWeekly = btcCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", btcCandles.get(0).getChangeRate() * 100);
+        String ethWeekly = ethCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", ethCandles.get(0).getChangeRate() * 100);
+        String weeklyTrend = String.format("BTC 1W Change: %s, ETH 1W Change: %s", btcWeekly, ethWeekly);
+        
+        log.info("[Macro Context] Fetched External Data -> F&G Index: {}, BTC Dominance: {}%, Weekly Trend: {}", fngIndex, btcDom, weeklyTrend);
+        
+        // 모든 RiskTolerance와 TrendSensitivity의 조합 (최대 3x3 = 9개)을 생성합니다.
+        for (com.tikkle.investment.entity.enums.RiskTolerance risk : com.tikkle.investment.entity.enums.RiskTolerance.values()) {
+            for (com.tikkle.investment.entity.enums.TrendSensitivity trend : com.tikkle.investment.entity.enums.TrendSensitivity.values()) {
+                String hashKey = risk.name() + ":" + trend.name();
+                try {
+                    List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(risk, trend, fngIndex, btcDom, weeklyTrend);
+                    
+                    // Redis에 12시간 TTL로 캐싱
+                    String redisKey = "ai:candidates:" + hashKey;
+                    String jsonValue = objectMapper.writeValueAsString(new AiCandidateResponse(aiCandidates));
+                    redisTemplate.opsForValue().set(redisKey, jsonValue, Duration.ofHours(12));
+                    log.info("Successfully cached 15 candidates in Redis for hash: {}", hashKey);
 
-        Map<String, List<InvestmentProfile>> groupedProfiles = allProfiles.stream()
-                .collect(Collectors.groupingBy(this::generateProfileHashKey));
-
-        for (Map.Entry<String, List<InvestmentProfile>> entry : groupedProfiles.entrySet()) {
-            List<InvestmentProfile> profilesInGroup = entry.getValue();
-            InvestmentProfile refProfile = profilesInGroup.get(0);
-
-            try {
-                List<AiRecommendationDto> aiRecommendations = fetchAiRecommendations(refProfile);
-
-                List<Long> userIds = profilesInGroup.stream()
-                        .map(p -> p.getUser().getId())
-                        .toList();
-                
-                Map<Long, List<Portfolio>> portfoliosByUserId = portfolioRepository.findByUserIdIn(userIds).stream()
-                        .collect(Collectors.groupingBy(p -> p.getUser().getId()));
-
-                for (InvestmentProfile profile : profilesInGroup) {
-                    try {
-                        processUserRecommendation(profile, aiRecommendations, portfoliosByUserId);
-                    } catch (Exception innerEx) {
-                        log.error("Failed to process recommendation for user {}", profile.getUser().getId(), innerEx);
-                    }
+                    // DB에 히스토리 저장 (Analytics 및 백테스팅 용도)
+                    AiRecommendationHistory history = AiRecommendationHistory.builder()
+                            .profileHashKey(hashKey)
+                            .fngIndex(fngIndex)
+                            .btcDominance(btcDom)
+                            .weeklyTrend(weeklyTrend)
+                            .candidatesJson(jsonValue)
+                            .build();
+                    historyRepository.save(history);
+                    log.info("Successfully saved AI recommendation history to DB for hash: {}", hashKey);
+                    
+                } catch (Exception e) {
+                    log.error("Failed to fetch/cache macro candidates for group: {}", hashKey, e);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch recommendations for group: {}", entry.getKey(), e);
             }
         }
-        log.info("Finished daily portfolio target generation.");
+        log.info("Finished AI Macro Universe generation for all 9 combinations.");
     }
 
-    private void processUserRecommendation(InvestmentProfile profile, List<AiRecommendationDto> recommendations, Map<Long, List<Portfolio>> portfoliosByUserId) {
-        User user = profile.getUser();
-        List<Portfolio> portfolios = portfoliosByUserId.getOrDefault(user.getId(), List.of());
-
-        AiRecommendationDto best = scoringEngine.selectBestRecommendation(
-                recommendations, portfolios, profile.getDiversificationType());
-
-        targetSaver.saveTarget(user, best);
-    }
-
-    private List<AiRecommendationDto> fetchAiRecommendations(InvestmentProfile profile) {
+    private List<AiRecommendationDto> fetchAiMacroCandidates(com.tikkle.investment.entity.enums.RiskTolerance risk, com.tikkle.investment.entity.enums.TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend) {
         String promptText = """
-            Recommend top 5 cryptocurrencies based on the following investment profile.
-            Order them by relevance from 1st to 5th.
-            
-            - Risk Tolerance: {riskTolerance} (score: {riskScore}/10)
-            - Trend Sensitivity: {trendSensitivity} (score: {trendScore}/10)
-            - Preferred Themes: {themes}
-            - Diversification Type: {diversification}
-            - Meme Coin Acceptance: {memeAcceptance} (max weight: {memeMaxWeight}%)
+            You are a top-tier quantitative crypto portfolio manager. 
+            Based on the user's Risk Tolerance, Trend Sensitivity, and current macro market context, output a 'Broad Candidate Pool' of 30 to 40 cryptocurrencies from the Upbit KRW market.
+            This broad pool will later be dynamically filtered and scored by a backend quant engine based on the user's specific theme preferences, meme coin acceptance, and real-time volatility.
+
+            [Market Context]
+            - Fear & Greed Index: {fngIndex} (0-100)
+            - BTC Dominance: {btcDom}%
+            - 7-Day Macro Market Trend: {weeklyTrend}
+
+            [User Profile (Pool Constraints)]
+            - Risk Tolerance (Reaction to crashes): {riskTolerance}
+            - Trend Sensitivity (Reaction to hype): {trendSensitivity}
+
+            [Constraints & Rules]
+            1. Select EXACTLY 15 coins that fit the Risk Tolerance and Trend Sensitivity in the current macro market. DO NOT exceed 15 coins.
+            2. If Risk Tolerance is 'SELL_IMMEDIATELY' and the market is fearful, ensure heavy blue-chips (BTC/ETH) are prominent. If 'BUY_MORE', include fundamentally strong altcoins that have dropped in price.
+            3. If Trend Sensitivity is 'FUNDAMENTAL_ONLY', avoid hype/trend coins. If 'FULL_TREND', aggressively include current narrative hot coins (e.g., AI, Memes).
+            4. CRITICAL: Your pool must be extremely diverse and cover ALL major themes so the backend has enough variety to filter. Ensure you include coins from: LAYER_1, DEFI, AI, WEB3_GAMING, RWA, and MEME.
+            5. Output the result in valid JSON containing an array of 'candidates'.
+            6. Each candidate MUST contain: 'market' (MUST be exactly in 'KRW-XXX' format, e.g., 'KRW-BTC', 'KRW-SOL'), 'coinName', 'reason' (keep reason VERY SHORT, max 20 chars), 'theme' (must be exactly one of LAYER_1, DEFI, AI, WEB3_GAMING, RWA, MEME), and 'isMeme' (boolean true/false).
+            7. DO NOT add any conversational text outside the JSON.
             """;
 
         try {
-            // [TODO: OOM 방지] 현재 MVP 단계이므로 findAll()을 사용하지만, 
-            // 실 서비스 시에는 Spring Batch 나 Pagination을 활용해 유저를 청크 단위로 처리해야 합니다.
-            
-            // 외부 AI API 호출 (현재 Step 2 검증을 위해 임시 주석 처리)
-            /*
-            return chatClient.prompt()
+            String responseText = chatClient.prompt()
                     .user(u -> u.text(promptText)
-                            .param("riskTolerance", profile.getRiskTolerance().name())
-                            .param("riskScore", String.valueOf(profile.getRiskTolerance().getScore()))
-                            .param("trendSensitivity", profile.getTrendSensitivity().name())
-                            .param("trendScore", String.valueOf(profile.getTrendSensitivity().getScore()))
-                            .param("themes", profile.getCryptoThemes().stream().map(Enum::name).collect(Collectors.joining(",")))
-                            .param("diversification", profile.getDiversificationType().name())
-                            .param("memeAcceptance", profile.getMemeAcceptance().name())
-                            .param("memeMaxWeight", String.valueOf(profile.getMemeAcceptance().getMaxWeightPercent()))
+                            .param("fngIndex", fngIndex)
+                            .param("btcDom", btcDom)
+                            .param("weeklyTrend", weeklyTrend)
+                            .param("riskTolerance", risk.name())
+                            .param("trendSensitivity", trend.name())
                     )
                     .call()
-                    .entity(new ParameterizedTypeReference<List<AiRecommendationDto>>() {});
-            */
+                    .content();
+            
+            // LLM이 흔히 붙이는 마크다운 백틱(```json) 제거
+            if (responseText != null) {
+                responseText = responseText.trim();
+                if (responseText.startsWith("```json")) {
+                    responseText = responseText.substring(7);
+                } else if (responseText.startsWith("```")) {
+                    responseText = responseText.substring(3);
+                }
+                if (responseText.endsWith("```")) {
+                    responseText = responseText.substring(0, responseText.length() - 3);
+                }
+                responseText = responseText.trim();
+            }
 
-            // Dummy Data Injection for Step 2 testing
-            return List.of(
-                    new AiRecommendationDto("KRW-BTC", "비트코인", "최초의 암호화폐이자 디지털 금으로 평가됨"),
-                    new AiRecommendationDto("KRW-ETH", "이더리움", "스마트 컨트랙트를 지원하는 최대의 플랫폼 코인"),
-                    new AiRecommendationDto("KRW-SOL", "솔라나", "빠른 처리 속도와 낮은 수수료를 강점으로 하는 레이어1"),
-                    new AiRecommendationDto("KRW-XRP", "리플", "글로벌 송금 네트워크에 사용되는 디지털 자산"),
-                    new AiRecommendationDto("KRW-DOGE", "도지코인", "대표적인 밈 코인으로 강력한 커뮤니티 보유")
-            );
+            AiCandidateResponse response = objectMapper.readValue(responseText, AiCandidateResponse.class);
+                    
+            log.info("AI generated {} candidates for Risk: {}, Trend: {}", 
+                    response.candidates().size(), risk.name(), trend.name());
+            return response.candidates();
         } catch (Exception e) {
             log.error("AI Recommendation API call failed", e);
             throw new AiRecommendationFailedException();
         }
     }
 
-    private String generateProfileHashKey(InvestmentProfile profile) {
+    public String generateProfileHashKey(InvestmentProfile profile) {
         String risk = profile.getRiskTolerance().name();
         String trend = profile.getTrendSensitivity().name();
-        String div = profile.getDiversificationType().name();
-        String meme = profile.getMemeAcceptance().name();
 
-        String themes = profile.getCryptoThemes().stream()
-                .map(Enum::name)
-                .sorted()
-                .collect(Collectors.joining("-"));
-
-        return String.join(":", risk, trend, themes, div, meme);
+        // 최적화 (The Ultimate Architecture): 오직 Risk와 Trend 조합만 사용하여 유니버스 그룹화 (최대 3x3 = 9개 조합)
+        // Theme과 Meme은 백엔드 스코어링 엔진(Stage 2)에서 실시간 처리됨.
+        return String.join(":", risk, trend);
     }
 }
