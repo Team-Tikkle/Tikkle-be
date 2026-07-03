@@ -2,7 +2,6 @@ package com.tikkle.settings.controller;
 
 import com.tikkle.auth.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
-import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
@@ -25,13 +24,6 @@ public class SettingsController implements SettingsSwagger {
         return ApiResponse.success(settingsService.getSettings(userDetails.getUsername()));
     }
 
-    @Override
-    @PatchMapping("/execution-mode")
-    public ApiResponse<?> updateExecutionMode(@AuthenticationPrincipal CustomUserDetails userDetails,
-                                              @RequestBody @Valid UpdateExecutionModeRequest request) {
-        settingsService.updateExecutionMode(userDetails.getUsername(), request);
-        return ApiResponse.successWithNoData();
-    }
 
     @Override
     @PatchMapping("/spare-change-rules")
