@@ -1,6 +1,5 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
@@ -43,8 +42,6 @@ class SettingsServiceTest {
     @Mock
     private CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     @Mock
-    private InvestmentSettingsRepository investmentSettingsRepository;
-    @Mock
     private SettingsCacheManager settingsCacheManager;
 
     @InjectMocks
@@ -65,16 +62,14 @@ class SettingsServiceTest {
     }
 
     @Test
-    @DisplayName("getSettings - DB에 저장된 카테고리 룰만 반환하고, 미설정 매매방식은 MANUAL로 채운다")
+    @DisplayName("getSettings - DB에 저장된 카테고리 룰만 반환한다")
     void getSettings_returnsStoredRules() {
         givenActiveUser();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
         given(categorySpareChangeRuleRepository.findByUserId(USER_ID)).willReturn(
                 List.of(rule(PaymentCategory.CAFE, RuleType.PERCENT_10)));
 
         SettingsResponse response = settingsService.getSettings(EMAIL);
 
-        assertThat(response.executionMode()).isEqualTo(com.tikkle.investment.entity.enums.ExecutionMode.MANUAL);
         assertThat(response.spareChangeRules()).hasSize(1);
 
         Map<PaymentCategory, RuleType> result = response.spareChangeRules().stream()
@@ -82,33 +77,7 @@ class SettingsServiceTest {
         assertThat(result.get(PaymentCategory.CAFE)).isEqualTo(RuleType.PERCENT_10);
         assertThat(result).doesNotContainKey(PaymentCategory.SHOPPING);
     }
-    @Test
-    @DisplayName("updateExecutionMode - 기존 설정이 있으면 수정하고 캐시에 동기화한다")
-    void updateExecutionMode_updatesExistingAndSyncsCache() {
-        givenActiveUser();
-        com.tikkle.investment.entity.InvestmentSettings settings = com.tikkle.investment.entity.InvestmentSettings.builder()
-                .user(user)
-                .executionMode(com.tikkle.investment.entity.enums.ExecutionMode.MANUAL)
-                .build();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.of(settings));
 
-        runWithTransactionSync(() -> settingsService.updateExecutionMode(EMAIL, new com.tikkle.settings.dto.request.UpdateExecutionModeRequest(com.tikkle.investment.entity.enums.ExecutionMode.AUTO)));
-
-        assertThat(settings.getExecutionMode()).isEqualTo(com.tikkle.investment.entity.enums.ExecutionMode.AUTO);
-        verify(settingsCacheManager).updateExecutionMode(USER_ID, com.tikkle.investment.entity.enums.ExecutionMode.AUTO);
-    }
-
-    @Test
-    @DisplayName("updateExecutionMode - 기존 설정이 없으면 생성하고 캐시에 동기화한다")
-    void updateExecutionMode_createsNewAndSyncsCache() {
-        givenActiveUser();
-        given(investmentSettingsRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
-
-        runWithTransactionSync(() -> settingsService.updateExecutionMode(EMAIL, new com.tikkle.settings.dto.request.UpdateExecutionModeRequest(com.tikkle.investment.entity.enums.ExecutionMode.AUTO)));
-
-        verify(investmentSettingsRepository).save(any(com.tikkle.investment.entity.InvestmentSettings.class));
-        verify(settingsCacheManager).updateExecutionMode(USER_ID, com.tikkle.investment.entity.enums.ExecutionMode.AUTO);
-    }
 
     @Test
     @DisplayName("getSettings - 활성 유저가 없으면 UserNotFoundException")

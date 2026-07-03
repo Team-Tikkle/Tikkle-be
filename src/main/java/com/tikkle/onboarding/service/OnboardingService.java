@@ -1,9 +1,7 @@
 package com.tikkle.onboarding.service;
 
 import com.tikkle.investment.entity.InvestmentProfile;
-import com.tikkle.investment.entity.InvestmentSettings;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
-import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.onboarding.dto.request.OnboardingRequest;
 import com.tikkle.onboarding.exception.DuplicateCategoryRuleException;
 import com.tikkle.onboarding.exception.OnboardingAlreadyCompletedException;
@@ -12,6 +10,7 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
+import com.tikkle.user.entity.enums.TargetCardCompany;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
@@ -35,7 +34,6 @@ public class OnboardingService {
     private final UserRepository userRepository;
     private final LinkedAccountRepository linkedAccountRepository;
     private final InvestmentProfileRepository investmentProfileRepository;
-    private final InvestmentSettingsRepository investmentSettingsRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final RedisTemplate<String, String> redisTemplate;
 
@@ -52,13 +50,12 @@ public class OnboardingService {
 
             saveLinkedAccount(user, request);
             saveInvestmentProfile(user, request);
-            saveInvestmentSettings(user, request);
             List<CategorySpareChangeRule> rules = saveCategorySpareChangeRules(user, request.categoryRules());
 
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    warmUpUserSettingsCache(userId, request.targetCardCompany(), request.targetCardLast4(), request.executionMode().name(), rules);
+                    cacheUserSettings(userId, request.targetCardLast4(), rules);
                 }
             });
         } catch (DataIntegrityViolationException e) {
@@ -71,7 +68,7 @@ public class OnboardingService {
                 .user(user)
                 .upbitAccessKey(dto.upbitAccessKey())
                 .upbitSecretKey(dto.upbitSecretKey())
-                .targetCardCompany(dto.targetCardCompany())
+                .targetCardCompany(TargetCardCompany.KBANK.getCompanyName())
                 .targetCardLast4(dto.targetCardLast4())
                 .build();
         linkedAccountRepository.save(account);
@@ -88,15 +85,6 @@ public class OnboardingService {
                 .build();
         investmentProfileRepository.save(profile);
     }
-
-    private void saveInvestmentSettings(User user, OnboardingRequest dto) {
-        InvestmentSettings settings = InvestmentSettings.builder()
-                .user(user)
-                .executionMode(dto.executionMode())
-                .build();
-        investmentSettingsRepository.save(settings);
-    }
-
 
     private List<CategorySpareChangeRule> saveCategorySpareChangeRules(User user, List<OnboardingRequest.CategoryRuleDto> ruleDtos) {
         Set<PaymentCategory> distinctCategories = ruleDtos.stream()
@@ -117,14 +105,12 @@ public class OnboardingService {
         return categorySpareChangeRuleRepository.saveAll(rules);
     }
 
-    public void warmUpUserSettingsCache(Long userId, String targetCardCompany, String targetCardLast4, String executionMode, List<CategorySpareChangeRule> rules) {
+    public void cacheUserSettings(Long userId, String targetCardLast4, List<CategorySpareChangeRule> rules) {
         String redisKey = USER_SETTINGS_CACHE_PREFIX + userId;
+
         Map<String, String> cacheData = new HashMap<>();
-
-        cacheData.put("targetCardCompany", targetCardCompany);
+        cacheData.put("targetCardCompany", TargetCardCompany.KBANK.getCompanyName());
         cacheData.put("targetCardLast4", targetCardLast4);
-        cacheData.put("executionMode", executionMode);
-
 
         rules.forEach(rule ->
                 cacheData.put(rule.getCategory().name(), rule.getRuleType().name())

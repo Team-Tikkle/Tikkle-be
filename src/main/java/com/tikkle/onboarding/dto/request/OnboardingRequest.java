@@ -5,11 +5,7 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 
 import java.util.List;
 import java.util.Set;
@@ -27,11 +23,6 @@ public record OnboardingRequest(
         @Schema(description = "Upbit 발급 Secret Key", example = "92837498234asdfasdf...")
         @NotBlank(message = "Upbit Secret Key는 필수입니다.")
         String upbitSecretKey,
-
-        @Schema(description = "연동할 카드사 명", example = "신한카드")
-        @NotBlank(message = "대상 카드사는 필수입니다.")
-        @Size(max = 20, message = "대상 카드사는 최대 20자까지 입력 가능합니다.")
-        String targetCardCompany,
 
         @Schema(description = "연동 카드 번호 마지막 4자리", example = "1234")
         @NotBlank(message = "대상 카드 번호 마지막 4자리는 필수입니다.")
@@ -60,10 +51,6 @@ public record OnboardingRequest(
         @Schema(description = "밈 코인 수용도", example = "SMALL", allowableValues = {"NONE", "SMALL", "ACTIVE"})
         @NotNull(message = "밈 코인 수용도를 선택해주세요.")
         MemeAcceptance memeAcceptance,
-
-        @Schema(description = "매매 실행 방식", example = "AUTO", allowableValues = {"AUTO", "MANUAL"})
-        @NotNull(message = "매매 방식을 선택해주세요.")
-        ExecutionMode executionMode,
 
         // 7대 카테고리별 잔돈 규칙
         @Schema(description = "7대 결제 카테고리별 잔돈 저축 규칙 리스트", example = "[\n" +

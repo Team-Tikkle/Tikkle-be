@@ -1,6 +1,5 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,11 +18,6 @@ public class SettingsCacheManager {
     private final RedisTemplate<String, String> redisTemplate;
 
     private static final String USER_SETTINGS_CACHE_PREFIX = "user:settings:";
-    private static final String EXECUTION_MODE_FIELD = "executionMode";
-
-    public void updateExecutionMode(Long userId, ExecutionMode executionMode) {
-        redisTemplate.opsForHash().put(cacheKey(userId), EXECUTION_MODE_FIELD, executionMode.name());
-    }
 
     public void updateSpareChangeRules(Long userId, List<CategorySpareChangeRule> rules) {
         String cacheKey = cacheKey(userId);

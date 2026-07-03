@@ -1,12 +1,8 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.investment.entity.InvestmentSettings;
-import com.tikkle.investment.entity.enums.ExecutionMode;
-import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
-import com.tikkle.settings.dto.request.UpdateExecutionModeRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
@@ -36,7 +32,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class SettingsService {
     private final UserRepository userRepository;
-    private final InvestmentSettingsRepository investmentSettingsRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final LinkedAccountRepository linkedAccountRepository;
     private final SettingsCacheManager settingsCacheManager;
@@ -45,33 +40,13 @@ public class SettingsService {
         User user = findActiveUserByEmail(email);
         Long userId = user.getId();
 
-        ExecutionMode executionMode = investmentSettingsRepository.findByUserId(userId)
-                .map(InvestmentSettings::getExecutionMode)
-                .orElse(ExecutionMode.MANUAL);
-
         List<SettingsResponse.CategoryRule> spareChangeRules = categorySpareChangeRuleRepository.findByUserId(userId).stream()
                 .map(rule -> new SettingsResponse.CategoryRule(rule.getCategory(), rule.getRuleType()))
                 .toList();
 
-        return new SettingsResponse(executionMode, spareChangeRules);
+        return new SettingsResponse(spareChangeRules);
     }
 
-    @Transactional
-    public void updateExecutionMode(String email, UpdateExecutionModeRequest request) {
-        User user = findActiveUserByEmail(email);
-        Long userId = user.getId();
-        ExecutionMode executionMode = request.executionMode();
-
-        investmentSettingsRepository.findByUserId(userId)
-                .ifPresentOrElse(
-                        settings -> settings.changeMode(executionMode),
-                        () -> investmentSettingsRepository.save(InvestmentSettings.builder()
-                                .user(user)
-                                .executionMode(executionMode)
-                                .build()));
-
-        syncAfterCommit(() -> settingsCacheManager.updateExecutionMode(userId, executionMode));
-    }
 
     @Transactional
     public void updateSpareChangeRules(String email, UpdateSpareChangeRulesRequest request) {
