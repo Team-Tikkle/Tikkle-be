@@ -4,10 +4,8 @@ import com.tikkle.investment.dto.response.AiCandidateResponse;
 import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.Coin;
 import com.tikkle.investment.entity.InvestmentProfile;
-import com.tikkle.investment.entity.enums.ExecutionMode;
 import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
-import com.tikkle.investment.repository.InvestmentSettingsRepository;
 import com.tikkle.investment.service.AiPortfolioService;
 import com.tikkle.investment.service.PortfolioScoringEngine;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
@@ -25,7 +23,6 @@ import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
 import com.tikkle.upbit.client.UpbitTickerClient;
 import com.tikkle.upbit.dto.response.UpbitTickerResponse;
-import com.tikkle.upbit.service.UpbitTradeService;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +35,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,9 +50,7 @@ public class PaymentService {
     private final PaymentCategoryMappingRepository paymentCategoryMappingRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final LinkedAccountRepository linkedAccountRepository;
-    private final InvestmentSettingsRepository investmentSettingsRepository;
     private final SpareChangeCalculator spareChangeCalculator;
-    private final UpbitTradeService upbitTradeService;
     private final AiClassificationService aiClassificationService;
     private final CoinRepository coinRepository;
 
@@ -196,12 +190,9 @@ public class PaymentService {
                 return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
             }
 
-            ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
-
-            ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, targetMarket, targetCoin);
-
-            Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
-            return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, targetMarket, targetCoinName, result.executedPrice(), result.executedVolume());
+            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
+            Long eventId = savedEvent != null ? savedEvent.getId() : null;
+            return new PaymentScrapingResponse(eventId, PaymentActionType.WAITING_APPROVAL, keyword, request.amount(), spareChange, targetMarket, targetCoinName, null, null);
         }
 
         // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
@@ -243,13 +234,9 @@ public class PaymentService {
             return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
         }
 
-        ExecutionMode executionMode = getExecutionModeFromCacheOrDb(userSettings, request.userId());
-
-        // 💡 4. 정상 파이프라인
-        ExecutionResult result = executeTradeOrAwaitApproval(request, keyword, spareChange, category, executionMode, targetMarket, targetCoin);
-
-        Long eventId = result.savedEvent() != null ? result.savedEvent().getId() : null;
-        return new PaymentScrapingResponse(eventId, result.actionType(), keyword, request.amount(), spareChange, targetMarket, targetCoinName, result.executedPrice(), result.executedVolume());
+        PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
+        Long eventId = savedEvent != null ? savedEvent.getId() : null;
+        return new PaymentScrapingResponse(eventId, PaymentActionType.WAITING_APPROVAL, keyword, request.amount(), spareChange, targetMarket, targetCoinName, null, null);
     }
 
 
@@ -268,21 +255,18 @@ public class PaymentService {
         log.warn("유저(ID:{})의 Redis 캐시가 증발했습니다. DB에서 조회하여 복구합니다.", userId);
 
         var accountOpt = linkedAccountRepository.findByUserId(userId);
-        var settingsOpt = investmentSettingsRepository.findByUserId(userId);
 
         // DB에도 정보가 없다면 온보딩을 안 한 유저 (빈 Map 반환하여 Fail-Fast 되도록 유도)
-        if (accountOpt.isEmpty() || settingsOpt.isEmpty()) {
+        if (accountOpt.isEmpty()) {
             return new HashMap<>();
         }
 
         var account = accountOpt.get();
-        var investSettings = settingsOpt.get();
         List<CategorySpareChangeRule> rules = categorySpareChangeRuleRepository.findByUserId(userId);
 
         Map<String, String> cacheData = new HashMap<>();
         cacheData.put("targetCardCompany", account.getTargetCardCompany());
         cacheData.put("targetCardLast4", account.getTargetCardLast4());
-        cacheData.put("executionMode", investSettings.getExecutionMode().name());
         rules.forEach(rule -> {
             if (rule.getCategory() == null) {
                 cacheData.put("DEFAULT_RULE", rule.getRuleType().name());
@@ -297,15 +281,7 @@ public class PaymentService {
         return new HashMap<>(cacheData);
     }
 
-    private ExecutionMode getExecutionModeFromCacheOrDb(Map<Object, Object> userSettings, Long userId) {
-        String executionModeStr = (String) userSettings.get("executionMode");
-        if (executionModeStr != null) {
-            return ExecutionMode.valueOf(executionModeStr);
-        }
-        return investmentSettingsRepository.findByUserId(userId)
-                .map(com.tikkle.investment.entity.InvestmentSettings::getExecutionMode)
-                .orElse(ExecutionMode.MANUAL);
-    }
+
 
     private RuleType getRuleTypeFromCacheOrDb(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
         String ruleTypeStr = (String) userSettings.get(category.name());
@@ -351,26 +327,5 @@ public class PaymentService {
         }
     }
 
-    private record ExecutionResult(PaymentStatus status, PaymentActionType actionType, BigDecimal executedPrice, BigDecimal executedVolume, String reason, PaymentEvent savedEvent) {}
 
-    private ExecutionResult executeTradeOrAwaitApproval(PaymentScrapingRequest request, String keyword, int spareChange, PaymentCategory category, ExecutionMode executionMode, String targetMarket, Coin targetCoin) {
-        if (executionMode == ExecutionMode.MANUAL) {
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
-            return new ExecutionResult(PaymentStatus.WAITING_APPROVAL, PaymentActionType.WAITING_APPROVAL, null, null, null, savedEvent);
-        } else {
-            // 외부 호출 전 ORDERING 상태로 선 저장 (원장 불일치 방어)
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.ORDERING, null, category, targetCoin);
-            try {
-                UpbitTradeService.TradeResult tradeResult = upbitTradeService.executeTrade(request.userId(), targetMarket, spareChange);
-                // 성공 시 상태 업데이트
-                savedEvent.completeInvestment();
-                return new ExecutionResult(PaymentStatus.INVESTED, PaymentActionType.ORDER_REQUESTED, tradeResult.executedPrice(), tradeResult.executedVolume(), null, savedEvent);
-            } catch (Exception e) {
-                log.error("업비트 자동 매수 실패", e);
-                // 실패 시 상태 업데이트
-                savedEvent.failInvestment(e.getMessage());
-                return new ExecutionResult(PaymentStatus.FAILED, PaymentActionType.UPBIT_ORDER_FAILED, null, null, e.getMessage(), savedEvent);
-            }
-        }
-    }
 }
