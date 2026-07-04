@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import com.tikkle.payment.exception.DuplicatePaymentException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -74,7 +73,15 @@ public class PaymentService {
      */
     public PaymentScrapingResponse processPayment(PaymentScrapingRequest request) {
         // ── [1단계] 결제 검증 ────────────────────────────────────────────
-        String redisTxKey = validatePayment(request);
+        String redisTxKey = "payment:tx:" + request.transactionId();
+        Boolean isFirstRequest = redisTemplate.opsForValue()
+                .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
+
+        if (Boolean.FALSE.equals(isFirstRequest)) {
+            log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
+                    request.merchant(), request.amount(), 0, null, null);
+        }
 
         try {
             // Redis에서 유저 설정 통째로 가져오기
@@ -119,33 +126,10 @@ public class PaymentService {
                     classification.keyword(), request.amount(), spareChange,
                     recommendation.market(), recommendation.coinName());
         } catch (Exception e) {
-            if (!(e instanceof DuplicatePaymentException)) {
-                log.error("결제 처리 중 오류 발생, Redis 캐시 정리", e);
-                redisTemplate.delete(redisTxKey);
-            }
+            log.error("결제 처리 중 오류 발생, Redis 캐시 정리", e);
+            redisTemplate.delete(redisTxKey);
             throw e;
         }
-    }
-
-    // ── [1단계] 결제 검증 ────────────────────────────────────────────────
-
-    /**
-     * Redis SETNX 검증으로 중복 결제를 차단한다.
-     * @return redisTxKey (트랜잭션 실패 시 롤백용)
-     */
-    private String validatePayment(PaymentScrapingRequest request) {
-        String redisTxKey = "payment:tx:" + request.transactionId();
-        Boolean isFirstRequest = redisTemplate.opsForValue()
-                .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
-
-        if (Boolean.FALSE.equals(isFirstRequest)) {
-            log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            throw new DuplicatePaymentException(request);
-        }
-
-        // 2차 DB 검증(existsByTransactionId) 제거: 마지막 INSERT 시 유니크 제약조건 예외 처리로 갈음함
-
-        return redisTxKey;
     }
 
     /**
