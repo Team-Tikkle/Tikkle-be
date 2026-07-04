@@ -1,5 +1,6 @@
 package com.tikkle.payment.entity;
 
+import com.tikkle.investment.entity.Coin;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
@@ -10,8 +11,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
-
-import com.tikkle.investment.entity.Coin;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -75,16 +74,6 @@ public class PaymentEvent {
         this.status = status;
         this.reason = reason;
         this.targetCoin = targetCoin;
-    }
-
-    public void startClassifying() {
-        this.status = PaymentStatus.CLASSIFYING;
-    }
-
-    public void updateAfterClassification(PaymentStatus status, int spareChange, PaymentCategory category) {
-        this.status = status;
-        this.spareChange = spareChange;
-        this.category = category;
     }
 
     public void completeInvestment() {
