@@ -11,7 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -32,7 +34,7 @@ public class UpbitOrderClient {
 
     public UpbitOrderResponse placeMarketBuyOrder(String market, int krwAmount, String accessKey, String secretKey) {
         try {
-            Map<String, Object> params = new java.util.LinkedHashMap<>();
+            Map<String, Object> params = new LinkedHashMap<>();
             params.put("market", market);
             params.put("side", "bid");
             params.put("price", String.valueOf(krwAmount));
@@ -53,7 +55,7 @@ public class UpbitOrderClient {
                     .body(params)
                     .retrieve()
                     .body(UpbitOrderResponse.class);
-        } catch (org.springframework.web.client.RestClientResponseException e) {
+        } catch (RestClientResponseException e) {
             log.error("업비트 매수 주문 실패 - Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
             throw new UpbitOrderFailedException();
         } catch (Exception e) {

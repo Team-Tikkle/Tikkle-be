@@ -59,7 +59,7 @@ public class InvestmentProfile {
         this.user = user;
         this.riskTolerance = riskTolerance;
         this.trendSensitivity = trendSensitivity;
-        this.cryptoThemes = cryptoThemes != null ? new java.util.HashSet<>(cryptoThemes) : new java.util.HashSet<>();
+        this.cryptoThemes = cryptoThemes != null ? new HashSet<>(cryptoThemes) : new HashSet<>();
         this.diversificationType = diversificationType;
         this.memeAcceptance = memeAcceptance;
     }
