@@ -32,7 +32,7 @@ public class OrderApprovalService {
 
     @Transactional
     public void approveOrder(Long userId, Long eventId) {
-        PaymentEvent event = paymentEventRepository.findByIdAndUserId(eventId, userId)
+        PaymentEvent event = paymentEventRepository.findByIdAndUserIdForUpdate(eventId, userId)
                 .orElseThrow(PaymentEventNotFoundException::new);
 
         if (event.getStatus() != PaymentStatus.PENDING_PURCHASE) {
