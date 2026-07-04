@@ -6,6 +6,8 @@ import com.tikkle.upbit.client.UpbitMarketClient;
 import com.tikkle.upbit.dto.response.UpbitMarketResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +24,7 @@ public class CoinSyncScheduler {
     private final CoinRepository coinRepository;
 
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul") // 매일 새벽 4시 실행
-    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void syncCoinMetadata() {
         log.info("업비트 마켓 리스트 동기화 스케줄러 시작");

@@ -2,38 +2,46 @@ package com.tikkle.payment.repository;
 
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long> {
-    boolean existsByTransactionId(String transactionId);
-    java.util.Optional<PaymentEvent> findByIdAndUserId(Long id, Long userId);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.Query("SELECT p FROM PaymentEvent p WHERE p.id = :id AND p.userId = :userId")
-    java.util.Optional<PaymentEvent> findByIdAndUserIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("userId") Long userId);
-    List<PaymentEvent> findByStatus(PaymentStatus status);
-    List<PaymentEvent> findByIdIn(List<Long> ids);
-    List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, java.time.LocalDateTime dateTime);
+    Optional<PaymentEvent> findByIdAndUserId(Long id, Long userId);
 
-    List<PaymentEvent> findByUserIdAndCreatedAtBetween(Long userId, java.time.LocalDateTime start, java.time.LocalDateTime end);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PaymentEvent p WHERE p.id = :id AND p.userId = :userId")
+    Optional<PaymentEvent> findByIdAndUserIdForUpdate(@Param("id") Long id, @Param("userId") Long userId);
+
+    List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, LocalDateTime dateTime);
+
+    List<PaymentEvent> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end);
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
-    @org.springframework.data.jpa.repository.Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = 'INVESTED' ORDER BY p.createdAt DESC")
-    List<String> findRecentPurchasedMarkets(@org.springframework.data.repository.query.Param("userId") Long userId, org.springframework.data.domain.Pageable pageable);
+    @Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = 'INVESTED' ORDER BY p.createdAt DESC")
+    List<String> findRecentPurchasedMarkets(@Param("userId") Long userId, Pageable pageable);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"targetCoin"})
-    @org.springframework.data.jpa.repository.Query("SELECT p FROM PaymentEvent p " +
+    @EntityGraph(attributePaths = {"targetCoin"})
+    @Query("SELECT p FROM PaymentEvent p " +
             "WHERE p.userId = :userId " +
             "AND p.createdAt >= :startDate AND p.createdAt <= :endDate " +
             "AND p.status IN :statuses " +
             "ORDER BY p.createdAt DESC, p.id DESC")
-    org.springframework.data.domain.Slice<PaymentEvent> findHistoryFeed(
-            @org.springframework.data.repository.query.Param("userId") Long userId,
-            @org.springframework.data.repository.query.Param("startDate") java.time.LocalDateTime startDate,
-            @org.springframework.data.repository.query.Param("endDate") java.time.LocalDateTime endDate,
-            @org.springframework.data.repository.query.Param("statuses") List<PaymentStatus> statuses,
-            org.springframework.data.domain.Pageable pageable);
+    Slice<PaymentEvent> findHistoryFeed(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("statuses") List<PaymentStatus> statuses,
+            Pageable pageable);
 }
