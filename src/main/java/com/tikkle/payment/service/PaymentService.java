@@ -1,304 +1,221 @@
 package com.tikkle.payment.service;
 
-import com.tikkle.investment.dto.response.AiCandidateResponse;
-import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.Coin;
-import com.tikkle.investment.entity.InvestmentProfile;
-import com.tikkle.investment.repository.CoinRepository;
-import com.tikkle.investment.repository.InvestmentProfileRepository;
-import com.tikkle.investment.service.AiPortfolioService;
-import com.tikkle.investment.service.PortfolioScoringEngine;
+import com.tikkle.investment.service.TargetCoinRecommendationService;
+import com.tikkle.investment.service.TargetCoinRecommendationService.CoinRecommendation;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
+import com.tikkle.payment.dto.response.AiClassificationResponse;
 import com.tikkle.payment.dto.response.PaymentActionType;
 import com.tikkle.payment.dto.response.PaymentScrapingResponse;
-import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.PaymentCategoryMapping;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
-import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
-import com.tikkle.upbit.client.UpbitTickerClient;
-import com.tikkle.upbit.dto.response.UpbitTickerResponse;
-import com.tikkle.user.repository.LinkedAccountRepository;
-import lombok.RequiredArgsConstructor;
+import com.tikkle.user.service.UserSettingsCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import com.tikkle.payment.exception.DuplicatePaymentException;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import tools.jackson.databind.json.JsonMapper;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PaymentService {
     private final PaymentEventRepository paymentEventRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final PaymentCategoryMappingRepository paymentCategoryMappingRepository;
-    private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
-    private final LinkedAccountRepository linkedAccountRepository;
     private final SpareChangeCalculator spareChangeCalculator;
     private final AiClassificationService aiClassificationService;
-    private final CoinRepository coinRepository;
+    private final TargetCoinRecommendationService targetCoinRecommendationService;
+    private final UserSettingsCacheService userSettingsCacheService;
+    private final PaymentService self;
 
-    private final InvestmentProfileRepository investmentProfileRepository;
-    private final AiPortfolioService aiPortfolioService;
-    private final PortfolioScoringEngine portfolioScoringEngine;
-    private final UpbitTickerClient upbitTickerClient;
-    private final JsonMapper objectMapper;
+    public PaymentService(
+            PaymentEventRepository paymentEventRepository,
+            RedisTemplate<String, String> redisTemplate,
+            PaymentCategoryMappingRepository paymentCategoryMappingRepository,
+            SpareChangeCalculator spareChangeCalculator,
+            AiClassificationService aiClassificationService,
+            TargetCoinRecommendationService targetCoinRecommendationService,
+            UserSettingsCacheService userSettingsCacheService,
+            @Lazy PaymentService self) {
+        this.paymentEventRepository = paymentEventRepository;
+        this.redisTemplate = redisTemplate;
+        this.paymentCategoryMappingRepository = paymentCategoryMappingRepository;
+        this.spareChangeCalculator = spareChangeCalculator;
+        this.aiClassificationService = aiClassificationService;
+        this.targetCoinRecommendationService = targetCoinRecommendationService;
+        this.userSettingsCacheService = userSettingsCacheService;
+        this.self = self;
+    }
 
-    @Transactional
-    public PaymentScrapingResponse processPaymentScraping(PaymentScrapingRequest request) {
-        // [1단계 Fail-Fast: Redis SETNX 중복 검증]
+    // ── 내부 전달용 record
+    private record ClassificationResult(String keyword, PaymentCategory category) {}
+
+    /**
+     * 결제 처리 메인 파이프라인
+     *
+     * 1단계: 결제 검증 (중복, 카드 매칭)
+     * 2단계: 카테고리 분류 (DB 캐시 → AI 폴백)
+     * 3단계: 잔돈 계산
+     * 4단계: 잔액과 잔돈 비교
+     * 5단계: 코인 추천 후 응답
+     */
+    public PaymentScrapingResponse processPayment(PaymentScrapingRequest request) {
+        // ── [1단계] 결제 검증 ────────────────────────────────────────────
+        String redisTxKey = validatePayment(request);
+
+        try {
+            // Redis에서 유저 설정 통째로 가져오기
+            Map<Object, Object> userSettings = userSettingsCacheService.getUserSettings(request.userId());
+
+            // 타겟 카드 매칭 검증
+            PaymentScrapingResponse cardMismatchResponse = validateTargetCard(request, userSettings, redisTxKey);
+            if (cardMismatchResponse != null) {
+                return cardMismatchResponse;
+            }
+
+            // ── [2단계] 카테고리 분류 ──────────────────────────────────────────
+            ClassificationResult classification = classifyMerchant(request.merchant());
+
+            // ── [3단계] 잔돈 계산 ─────────────────────────────────────────────
+            RuleType ruleType = userSettingsCacheService.getRuleType(request.userId(), classification.category(), userSettings);
+            int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
+
+            // 잔돈 0원 → 조기 차단
+            if (spareChange == 0) {
+                return handleNotInvested(request, classification, 0, "잔돈 0원", PaymentActionType.IGNORE_NO_SPARE_CHANGE);
+            }
+
+            // 최소 투자 금액(5,000원) 미달 → 조기 차단
+            if (spareChange < 5000) {
+                return handleNotInvested(request, classification, spareChange, "최소 투자 금액(5,000원) 미달", PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET);
+            }
+
+            // ── [4단계] 코인 추천 후 응답 ─────────────────────────────────────
+            CoinRecommendation recommendation = targetCoinRecommendationService.recommendCoin(request.userId());
+
+            PaymentEvent savedEvent = self.saveEvent(request, classification.keyword(), spareChange,
+                    PaymentStatus.PENDING_PURCHASE, null, classification.category(), recommendation.coin());
+
+            Long eventId = savedEvent != null ? savedEvent.getId() : null;
+            return new PaymentScrapingResponse(eventId, PaymentActionType.PENDING_PURCHASE,
+                    classification.keyword(), request.amount(), spareChange,
+                    recommendation.market(), recommendation.coinName());
+        } catch (Exception e) {
+            if (!(e instanceof DuplicatePaymentException)) {
+                log.error("결제 처리 중 오류 발생, Redis 캐시 정리", e);
+                redisTemplate.delete(redisTxKey);
+            }
+            throw e;
+        }
+    }
+
+    // ── [1단계] 결제 검증 ────────────────────────────────────────────────
+
+    /**
+     * Redis SETNX 검증으로 중복 결제를 차단한다.
+     * @return redisTxKey (트랜잭션 실패 시 롤백용)
+     */
+    private String validatePayment(PaymentScrapingRequest request) {
         String redisTxKey = "payment:tx:" + request.transactionId();
         Boolean isFirstRequest = redisTemplate.opsForValue()
                 .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
 
         if (Boolean.FALSE.equals(isFirstRequest)) {
             log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
+            throw new DuplicatePaymentException(request);
         }
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status != STATUS_COMMITTED) {
-                    redisTemplate.delete(redisTxKey);
-                }
-            }
-        });
+        // 2차 DB 검증(existsByTransactionId) 제거: 마지막 INSERT 시 유니크 제약조건 예외 처리로 갈음함
 
-        // [JPA 롤백 방지] DB 2차 검증
-        if (paymentEventRepository.existsByTransactionId(request.transactionId())) {
-            log.info("중복 결제 요청 조기 종료 (DB Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE, request.merchant(), request.amount(), 0, null, null, null, null);
-        }
+        return redisTxKey;
+    }
 
-        // Redis에서 유저 설정 통째로 가져오기
-        Map<Object, Object> userSettings = getUserSettingsCacheOrDb(request.userId());
-
+    /**
+     * 타겟 카드 매칭 검증. 불일치 시 응답 반환, 일치 시 null 반환.
+     */
+    private PaymentScrapingResponse validateTargetCard(PaymentScrapingRequest request, Map<Object, Object> userSettings, String redisTxKey) {
         String targetCardCompany = (String) userSettings.get("targetCardCompany");
         String targetCardLast4 = (String) userSettings.get("targetCardLast4");
 
-        // [2단계 Fail-Fast: 타겟 카드 매칭 검증]
-        // 이제 캐시 증발로 인한 null 확률은 해결됨. 오직 '진짜 다른 카드'이거나 '온보딩 미완료 유저'일 때만 스킵.
         if (targetCardCompany == null || targetCardLast4 == null ||
                 !request.cardCompany().equals(targetCardCompany) ||
                 !request.cardNumberLast4().equals(targetCardLast4)) {
             log.info("타겟 카드가 아니거나 온보딩 정보가 없어 조기 종료 (userId: {}, requestCard: {} {})",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
             redisTemplate.delete(redisTxKey);
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CARD_MISMATCH, request.merchant(), request.amount(), 0, null, null, null, null);
+            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CARD_MISMATCH,
+                    request.merchant(), request.amount(), 0, null, null);
         }
+        return null;
+    }
 
-        // [Stage 2: 실시간 퀀트 스코어링 결합]
-        InvestmentProfile profile = investmentProfileRepository.findByUserId(request.userId()).orElse(null);
-        String targetMarket = "KRW-BTC";
-        String targetCoinName = "비트코인";
 
-        if (profile != null) {
-            String hashKey = aiPortfolioService.generateProfileHashKey(profile);
-            String redisKey = "ai:candidates:" + hashKey;
-            String jsonCandidates = redisTemplate.opsForValue().get(redisKey);
+    // ── [2단계] 카테고리 분류 ────────────────────────────────────────────
 
-            if (jsonCandidates != null) {
-                try {
-                    AiCandidateResponse candidateResponse = objectMapper.readValue(jsonCandidates, AiCandidateResponse.class);
-                    List<AiRecommendationDto> macroCandidates = candidateResponse.candidates();
-
-                    if (macroCandidates != null && !macroCandidates.isEmpty()) {
-                        // DB(Coin 테이블)에 등록된 유효한 마켓(KRW-BTC 등)만 필터링 (AI 환각 방어)
-                        List<String> validMarkets = coinRepository.findAll().stream().map(Coin::getMarket).toList();
-                        
-                        List<AiRecommendationDto> validCandidates = macroCandidates.stream()
-                                .filter(dto -> validMarkets.contains(dto.market()))
-                                .toList();
-
-                        if (!validCandidates.isEmpty()) {
-                            String marketsParam = validCandidates.stream()
-                                    .map(AiRecommendationDto::market)
-                                    .collect(Collectors.joining(","));
-                            
-                            List<UpbitTickerResponse> tickers = upbitTickerClient.getTickers(marketsParam);
-                            
-                            List<String> pastPurchasedMarkets = paymentEventRepository.findRecentPurchasedMarkets(
-                                    request.userId(),
-                                    org.springframework.data.domain.PageRequest.of(0, 10)
-                            );
-
-                            List<AiRecommendationDto> finalTargets = portfolioScoringEngine.selectRealtimeTargets(
-                                    validCandidates, 
-                                    tickers, 
-                                    profile,
-                                    pastPurchasedMarkets
-                            );
-
-                        if (!finalTargets.isEmpty()) {
-                            log.info("📊 실시간 퀀트 스코어링 완료! 상위 3개 후보군: {}", 
-                                    finalTargets.stream().limit(3).map(dto -> dto.coinName() + "(" + dto.market() + ")").toList());
-
-                            // 현재 MVP 버전에서는 1순위 타겟 종목에 전액 매수하도록 처리
-                            targetMarket = finalTargets.get(0).market();
-                            targetCoinName = finalTargets.get(0).coinName();
-                            log.info("🎯 최종 매수 타겟 코인 확정: {} ({})", targetCoinName, targetMarket);
-                        } else {
-                            log.warn("⚠️ 퀀트 스코어링 후 유효한 후보군이 없습니다. Fallback으로 기본 코인(BTC)을 매수합니다.");
-                        }
-                        }
-                    }
-                } catch (Exception e) {
-                    log.error("AI 후보군 Redis 파싱 및 실시간 퀀트 스코어링 실패. Fallback으로 BTC를 매수합니다.", e);
-                }
-            }
-        }
-
-        final String finalTargetMarket = targetMarket;
-        Coin targetCoin = coinRepository.findById(targetMarket)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("기본 마켓 코인이 설정되지 않았습니다: " + finalTargetMarket));
-
-        // [Phase 1: DB HIT - 가맹점 1차 분류]
-        List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(request.merchant());
+    /**
+     * DB 캐시(PaymentCategoryMapping) 우선 조회 → 미스 시 AI 분류 폴백
+     */
+    private ClassificationResult classifyMerchant(String merchant) {
+        // Phase 1: DB HIT
+        List<PaymentCategoryMapping> mappings = paymentCategoryMappingRepository.findByKeywordContaining(merchant);
         if (!mappings.isEmpty()) {
-            PaymentCategoryMapping mapping = mappings.get(0); // 가장 긴 키워드 매칭
-            PaymentCategory category = mapping.getCategory();
-            String keyword = mapping.getKeyword();
-
-            // 💡 잔돈 룰 조회 (최적화: 이미 가져온 userSettings 맵 사용)
-            RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, userSettings);
-            int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
-
-            if (spareChange == 0) {
-                saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category, targetCoin);
-                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
-            }
-
-            if (spareChange < 5000) {
-                saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category, targetCoin);
-                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
-            }
-
-            PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
-            Long eventId = savedEvent != null ? savedEvent.getId() : null;
-            return new PaymentScrapingResponse(eventId, PaymentActionType.WAITING_APPROVAL, keyword, request.amount(), spareChange, targetMarket, targetCoinName, null, null);
+            PaymentCategoryMapping mapping = mappings.get(0);
+            return new ClassificationResult(mapping.getKeyword(), mapping.getCategory());
         }
 
-        // [Phase 2: DB MISS - 동기식(Sync) AI 분류기로 이관]
-        com.tikkle.payment.dto.response.AiClassificationResponse aiResponse;
+        // Phase 2: AI 분류
+        AiClassificationResponse aiResponse;
         try {
-            aiResponse = aiClassificationService.classify(request.merchant());
+            aiResponse = aiClassificationService.classify(merchant);
         } catch (Exception e) {
-            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={} -> ETC 카테고리로 폴백(Fallback) 처리합니다.", request.merchant());
-            aiResponse = new com.tikkle.payment.dto.response.AiClassificationResponse(request.merchant(), PaymentCategory.ETC);
+            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={} -> ETC 카테고리로 폴백(Fallback) 처리합니다.", merchant);
+            aiResponse = new AiClassificationResponse(merchant, PaymentCategory.ETC);
         }
 
-        String keyword = aiResponse.keyword();
-        PaymentCategory category = aiResponse.category();
-
-        // 💡 1. 분류된 결과 캐싱 (다음 캐시 히트를 위함)
+        // 분류 결과 저장
         try {
             paymentCategoryMappingRepository.save(
                     PaymentCategoryMapping.builder()
-                            .keyword(keyword)
-                            .category(category)
+                            .keyword(aiResponse.keyword())
+                            .category(aiResponse.category())
                             .build()
             );
         } catch (DataIntegrityViolationException e) {
-            log.info("이미 다른 요청에서 매핑 데이터를 저장했습니다. keyword={}", keyword);
+            log.info("이미 다른 요청에서 매핑 데이터를 저장했습니다. keyword={}", aiResponse.keyword());
         }
 
-        // 💡 2. 잔돈 룰 조회 (최적화: 이미 가져온 userSettings 맵 사용)
-        RuleType ruleType = getRuleTypeFromCacheOrDb(request.userId(), category, userSettings);
-        int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
-
-        // 💡 3. 조기 차단(Fail-Fast) 방어선
-        if (spareChange == 0) {
-            saveEvent(request, keyword, 0, PaymentStatus.NOT_INVESTED, "잔돈 0원", category, targetCoin);
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_NO_SPARE_CHANGE, keyword, request.amount(), 0, null, null, null, null);
-        }
-
-        if (spareChange < 5000) {
-            saveEvent(request, keyword, spareChange, PaymentStatus.NOT_INVESTED, "최소 투자 금액(5,000원) 미달", category, targetCoin);
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET, keyword, request.amount(), spareChange, null, null, null, null);
-        }
-
-        PaymentEvent savedEvent = saveEvent(request, keyword, spareChange, PaymentStatus.WAITING_APPROVAL, null, category, targetCoin);
-        Long eventId = savedEvent != null ? savedEvent.getId() : null;
-        return new PaymentScrapingResponse(eventId, PaymentActionType.WAITING_APPROVAL, keyword, request.amount(), spareChange, targetMarket, targetCoinName, null, null);
+        return new ClassificationResult(aiResponse.keyword(), aiResponse.category());
     }
 
 
+    // ── 공통 유틸 메서드 ─────────────────────────────────────────────────
 
-    // 💡 [새로 추가된 캐시 복구(Re-warming) 메서드]
-    private Map<Object, Object> getUserSettingsCacheOrDb(Long userId) {
-        String redisKey = "user:settings:" + userId;
-        Map<Object, Object> settings = redisTemplate.opsForHash().entries(redisKey);
-
-        // 1. 캐시가 살아있으면 초고속 반환 (Zero-DB)
-        if (settings != null && !settings.isEmpty() && settings.containsKey("targetCardCompany")) {
-            return settings;
-        }
-
-        // 2. 캐시가 죽었으면 DB에서 조회 (Cache Miss)
-        log.warn("유저(ID:{})의 Redis 캐시가 증발했습니다. DB에서 조회하여 복구합니다.", userId);
-
-        var accountOpt = linkedAccountRepository.findByUserId(userId);
-
-        // DB에도 정보가 없다면 온보딩을 안 한 유저 (빈 Map 반환하여 Fail-Fast 되도록 유도)
-        if (accountOpt.isEmpty()) {
-            return new HashMap<>();
-        }
-
-        var account = accountOpt.get();
-        List<CategorySpareChangeRule> rules = categorySpareChangeRuleRepository.findByUserId(userId);
-
-        Map<String, String> cacheData = new HashMap<>();
-        cacheData.put("targetCardCompany", account.getTargetCardCompany());
-        cacheData.put("targetCardLast4", account.getTargetCardLast4());
-        rules.forEach(rule -> {
-            if (rule.getCategory() == null) {
-                cacheData.put("DEFAULT_RULE", rule.getRuleType().name());
-            } else {
-                cacheData.put(rule.getCategory().name(), rule.getRuleType().name());
-            }
-        });
-
-        // 3. 찾은 데이터를 Redis에 다시 적재 (Re-warming)
-        redisTemplate.opsForHash().putAll(redisKey, cacheData);
-
-        return new HashMap<>(cacheData);
+    /**
+     * NOT_INVESTED 상태로 원장을 저장하고 조기 차단 응답을 생성한다.
+     */
+    private PaymentScrapingResponse handleNotInvested(PaymentScrapingRequest request, ClassificationResult classification,
+                                                      int spareChange, String reason, PaymentActionType actionType) {
+        // NOT_INVESTED 이벤트도 코인 추천 없이 저장
+        self.saveEvent(request, classification.keyword(), spareChange, PaymentStatus.NOT_INVESTED, reason, classification.category(), null);
+        return new PaymentScrapingResponse(null, actionType, classification.keyword(), request.amount(), spareChange, null, null);
     }
 
-
-
-    private RuleType getRuleTypeFromCacheOrDb(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
-        String ruleTypeStr = (String) userSettings.get(category.name());
-
-        if (ruleTypeStr != null) {
-            return RuleType.valueOf(ruleTypeStr);
-        }
-
-        log.warn("유저(ID:{})의 Redis 캐시에 {} 카테고리 룰이 존재하지 않습니다. DB에서 조회합니다.", userId, category.name());
-        // 데이터 소스 단일화 처리 완료
-        return categorySpareChangeRuleRepository.findByUserIdAndCategory(userId, category)
-                .or(() -> categorySpareChangeRuleRepository.findDefaultByUserId(userId))
-                .map(CategorySpareChangeRule::getRuleType)
-                .orElse(RuleType.ROUND_UP_10000);
-    }
-
-    private PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange, PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
+    @Transactional
+    public PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange,
+                                   PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
         log.info("결제 이벤트 저장 시도. status: {}, spareChange: {}", status, spareChange);
         try {
             PaymentEvent event = PaymentEvent.builder()
@@ -326,6 +243,4 @@ public class PaymentService {
             }
         }
     }
-
-
 }
