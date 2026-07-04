@@ -21,6 +21,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.List;
+import com.tikkle.investment.entity.enums.RiskTolerance;
+import com.tikkle.investment.entity.enums.TrendSensitivity;
 
 @Slf4j
 @Service
@@ -71,8 +73,8 @@ public class AiPortfolioService {
         log.info("[Macro Context] Fetched External Data -> F&G Index: {}, BTC Dominance: {}%, Weekly Trend: {}", fngIndex, btcDom, weeklyTrend);
         
         // 모든 RiskTolerance와 TrendSensitivity의 조합 (최대 3x3 = 9개)을 생성합니다.
-        for (com.tikkle.investment.entity.enums.RiskTolerance risk : com.tikkle.investment.entity.enums.RiskTolerance.values()) {
-            for (com.tikkle.investment.entity.enums.TrendSensitivity trend : com.tikkle.investment.entity.enums.TrendSensitivity.values()) {
+        for (RiskTolerance risk : RiskTolerance.values()) {
+            for (TrendSensitivity trend : TrendSensitivity.values()) {
                 String hashKey = risk.name() + ":" + trend.name();
                 try {
                     List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(risk, trend, fngIndex, btcDom, weeklyTrend);
@@ -102,7 +104,7 @@ public class AiPortfolioService {
         log.info("Finished AI Macro Universe generation for all 9 combinations.");
     }
 
-    private List<AiRecommendationDto> fetchAiMacroCandidates(com.tikkle.investment.entity.enums.RiskTolerance risk, com.tikkle.investment.entity.enums.TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend) {
+    private List<AiRecommendationDto> fetchAiMacroCandidates(RiskTolerance risk, TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend) {
         String promptText = """
             You are a top-tier quantitative crypto portfolio manager. 
             Based on the user's Risk Tolerance, Trend Sensitivity, and current macro market context, output a 'Broad Candidate Pool' of 30 to 40 cryptocurrencies from the Upbit KRW market.

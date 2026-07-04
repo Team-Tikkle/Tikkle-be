@@ -37,9 +37,11 @@ public enum ErrorCode {
     INVALID_AI_RESPONSE(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-003", "AI 응답 데이터가 유효하지 않습니다."),
     PAYMENT_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT-004", "결제 내역을 찾을 수 없습니다."),
     UNKNOWN_PAYMENT_STATUS(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-005", "알 수 없는 결제 상태입니다."),
+    DUPLICATE_PAYMENT(HttpStatus.OK, "PAYMENT-006", "이미 처리된 결제 요청입니다."),
 
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
+    COIN_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-002", "매수 대상 코인을 찾을 수 없습니다."),
 
     // 업비트 거래소 연동
     UPBIT_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-001", "업비트 매수 주문에 실패했습니다."),

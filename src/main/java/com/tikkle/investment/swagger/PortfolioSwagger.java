@@ -1,5 +1,6 @@
 package com.tikkle.investment.swagger;
 
+import com.tikkle.auth.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.investment.dto.response.PortfolioResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,5 +16,5 @@ public interface PortfolioSwagger {
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "성공")
     })
-    ApiResponse<PortfolioResponse> getPortfolio(@AuthenticationPrincipal com.tikkle.auth.security.CustomUserDetails userDetails);
+    ApiResponse<PortfolioResponse> getPortfolio(@AuthenticationPrincipal CustomUserDetails userDetails);
 }
