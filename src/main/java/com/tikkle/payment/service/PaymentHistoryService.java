@@ -49,7 +49,7 @@ public class PaymentHistoryService {
         List<PaymentEvent> events = paymentEventRepository.findByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
 
         // 2. 전체 누적 대기 건수 카운트
-        long pendingCount = paymentEventRepository.countByUserIdAndStatus(userId, PaymentStatus.WAITING_APPROVAL);
+        long pendingCount = paymentEventRepository.countByUserIdAndStatus(userId, PaymentStatus.PENDING_PURCHASE);
 
         // 3. 메모리 집계
         long totalPayment = 0;
@@ -120,15 +120,15 @@ public class PaymentHistoryService {
     private List<PaymentStatus> mapStatusFilter(String status) {
         if (status == null || status.equalsIgnoreCase("ALL")) {
             return List.of(
-                    PaymentStatus.WAITING_APPROVAL,
+                    PaymentStatus.PENDING_PURCHASE,
                     PaymentStatus.INVESTED,
                     PaymentStatus.NOT_INVESTED,
                     PaymentStatus.FAILED
-            ); // 과도기 상태(ORDERING, CLASSIFYING) 제외
+            );
         }
 
         return switch (status.toUpperCase()) {
-            case "PENDING" -> List.of(PaymentStatus.WAITING_APPROVAL);
+            case "PENDING" -> List.of(PaymentStatus.PENDING_PURCHASE);
             case "INVESTED" -> List.of(PaymentStatus.INVESTED);
             case "CANCELED" -> List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED);
             default -> throw new InvalidInputValueException(); // 잘못된 상태 문자열
@@ -139,7 +139,7 @@ public class PaymentHistoryService {
         String statusStr;
         LocalDateTime expiredAt = null;
 
-        if (event.getStatus() == PaymentStatus.WAITING_APPROVAL) {
+        if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
             statusStr = "PENDING";
             expiredAt = event.getCreatedAt().plusHours(24);
         } else if (event.getStatus() == PaymentStatus.INVESTED) {
@@ -147,7 +147,7 @@ public class PaymentHistoryService {
         } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
             statusStr = "CANCELED";
         } else {
-            // 방어 코드: 혹시라도 과도기 상태가 들어오면 PENDING으로 매핑
+            // 혹시라도 과도기 상태가 들어오면 PENDING으로 매핑
             statusStr = "PENDING";
         }
 

@@ -15,7 +15,7 @@ public record PaymentDashboardResponse(
         @Schema(description = "이번 달 투자되지 않은 잔돈", example = "3000")
         long totalUninvested,
 
-        @Schema(description = "이번 달 수동 결제 승인 대기 건수 (월 무관 전체 대기 건수)", example = "2")
+        @Schema(description = "이번 달 매수 승인 대기 건수 (월 무관 전체 대기 건수)", example = "2")
         long pendingCount,
 
         @Schema(description = "이번 달 카테고리별 결제 금액 목록")
