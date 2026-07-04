@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Schema(description = "결제 내역 피드 조회 응답 DTO")
 public record PaymentHistoryResponse(
-        @Schema(description = "결제 이벤트 ID (수동 승인/거절 시 사용)", example = "10293")
+        @Schema(description = "결제 이벤트 ID (매수 승인/거절 시 사용)", example = "10293")
         Long id,
 
         @Schema(description = "정제된 가맹점 이름", example = "스타벅스")
@@ -24,7 +24,7 @@ public record PaymentHistoryResponse(
         @Schema(description = "상태 값 (PENDING, INVESTED, CANCELED 중 하나)", example = "PENDING")
         String status,
 
-        @Schema(description = "수동 승인 대기 만료 시간 (PENDING 상태일 때만 존재)", example = "2026-06-22T10:30:00", nullable = true)
+        @Schema(description = "매수 승인 대기 만료 시간 (PENDING 상태일 때만 존재)", example = "2026-06-22T10:30:00", nullable = true)
         LocalDateTime expiredAt,
 
         @Schema(description = "투자 대상 코인 마켓명", example = "KRW-BTC", nullable = true)

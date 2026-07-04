@@ -26,6 +26,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
     WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-002", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다."),
     LINKED_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-003", "연동된 증권사 계좌 정보를 찾을 수 없습니다."),
+    USER_SETTINGS_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-004", "사용자의 잔돈 투자 규칙 설정이 존재하지 않습니다."),
 
     // 온보딩 (Onboarding)
     ONBOARDING_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "ONBOARDING-001", "이미 온보딩을 완료한 사용자입니다."),
@@ -37,9 +38,12 @@ public enum ErrorCode {
     INVALID_AI_RESPONSE(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-003", "AI 응답 데이터가 유효하지 않습니다."),
     PAYMENT_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT-004", "결제 내역을 찾을 수 없습니다."),
     UNKNOWN_PAYMENT_STATUS(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-005", "알 수 없는 결제 상태입니다."),
+    DUPLICATE_PAYMENT(HttpStatus.OK, "PAYMENT-006", "이미 처리된 결제 요청입니다."),
+    PAYMENT_FILTER_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-007", "요청 바디 캐싱 필터가 적용되지 않았습니다."),
 
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
+    COIN_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-002", "매수 대상 코인을 찾을 수 없습니다."),
 
     // 업비트 거래소 연동
     UPBIT_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-001", "업비트 매수 주문에 실패했습니다."),
@@ -48,6 +52,7 @@ public enum ErrorCode {
     UPBIT_ORDER_EXECUTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-004", "업비트 매수 체결 내역을 확인할 수 없습니다."),
     UPBIT_MARKET_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-005", "업비트 마켓 리스트 조회에 실패했습니다."),
     UPBIT_TICKER_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-006", "업비트 실시간 시세 조회에 실패했습니다."),
+    UPBIT_AUTH_PARAM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-007", "업비트 API 호출을 위한 쿼리 파라미터가 유효하지 않습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),

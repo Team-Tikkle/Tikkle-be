@@ -1,0 +1,78 @@
+package com.tikkle.user.service;
+
+import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.payment.entity.enums.PaymentCategory;
+import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.user.repository.LinkedAccountRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import com.tikkle.user.exception.UserSettingsNotFoundException;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserSettingsCacheService {
+    private final LinkedAccountRepository linkedAccountRepository;
+    private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
+    private final RedisTemplate<String, String> redisTemplate;
+
+    /**
+     * Redis에서 유저 설정을 조회하고, 캐시 미스 시 DB에서 복구한다.
+     */
+    public Map<Object, Object> getUserSettings(Long userId) {
+        String redisKey = "user:settings:" + userId;
+        Map<Object, Object> settings = redisTemplate.opsForHash().entries(redisKey);
+
+        if (settings != null && !settings.isEmpty() && settings.containsKey("targetCardCompany")) {
+            return settings;
+        }
+
+        log.warn("유저(ID:{})의 Redis 캐시가 증발했습니다. DB에서 조회하여 복구합니다.", userId);
+
+        var accountOpt = linkedAccountRepository.findByUserId(userId);
+
+        if (accountOpt.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        var account = accountOpt.get();
+        List<CategorySpareChangeRule> rules = categorySpareChangeRuleRepository.findByUserId(userId);
+
+        Map<String, String> cacheData = new HashMap<>();
+        cacheData.put("targetCardCompany", account.getTargetCardCompany());
+        cacheData.put("targetCardLast4", account.getTargetCardLast4());
+        rules.forEach(rule -> {
+            if (rule.getCategory() == null) {
+                cacheData.put("DEFAULT_RULE", rule.getRuleType().name());
+            } else {
+                cacheData.put(rule.getCategory().name(), rule.getRuleType().name());
+            }
+        });
+
+        redisTemplate.opsForHash().putAll(redisKey, cacheData);
+
+        return new HashMap<>(cacheData);
+    }
+
+    public RuleType getRuleType(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
+        String ruleTypeStr = (String) userSettings.get(category.name());
+        if (ruleTypeStr != null) {
+            return RuleType.valueOf(ruleTypeStr);
+        }
+
+        String defaultRuleStr = (String) userSettings.get("DEFAULT_RULE");
+        if (defaultRuleStr != null) {
+            return RuleType.valueOf(defaultRuleStr);
+        }
+
+        log.error("유저(ID:{})의 투자 규칙 설정이 전혀 존재하지 않습니다.", userId);
+        throw new UserSettingsNotFoundException();
+    }
+}

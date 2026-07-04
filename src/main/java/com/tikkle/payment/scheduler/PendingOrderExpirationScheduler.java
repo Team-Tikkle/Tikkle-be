@@ -15,22 +15,21 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ManualOrderExpirationScheduler {
-
+public class PendingOrderExpirationScheduler {
     private final PaymentEventRepository paymentEventRepository;
 
     @Scheduled(cron = "0 0 * * * *") // 매시간 정각마다 실행
     @Transactional
-    public void expireOldManualOrders() {
+    public void expireOldPendingOrders() {
         LocalDateTime twentyFourHoursAgo = LocalDateTime.now().minusHours(24);
 
-        List<PaymentEvent> expiredEvents = paymentEventRepository.findByStatusAndCreatedAtBefore(PaymentStatus.WAITING_APPROVAL, twentyFourHoursAgo);
+        List<PaymentEvent> expiredEvents = paymentEventRepository.findByStatusAndCreatedAtBefore(PaymentStatus.PENDING_PURCHASE, twentyFourHoursAgo);
 
         if (!expiredEvents.isEmpty()) {
             for (PaymentEvent event : expiredEvents) {
-                event.skipInvestment("수동 매수 승인 대기 시간(24시간) 초과로 인한 자동 거절");
+                event.skipInvestment("매수 승인 대기 시간(24시간) 초과로 인한 시스템 거절");
             }
-            log.info("만료된 수동 매수 건 {}개를 NOT_INVESTED 처리했습니다.", expiredEvents.size());
+            log.info("만료된 매수 대기 건 {}개를 NOT_INVESTED 처리했습니다.", expiredEvents.size());
         }
     }
 }

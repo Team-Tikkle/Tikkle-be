@@ -1,10 +1,9 @@
 package com.tikkle.payment.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-
-import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "결제 푸시 알림 스크래핑 전송 요청")
 public record PaymentScrapingRequest(
@@ -13,7 +12,7 @@ public record PaymentScrapingRequest(
         @Positive(message = "사용자 ID는 양수여야 합니다.")
         Long userId,
 
-        @Schema(description = "결제된 카드사명", example = "신한카드")
+        @Schema(description = "결제된 카드사명", example = "케이뱅크")
         @NotBlank(message = "카드사명은 필수입니다.")
         String cardCompany,
 

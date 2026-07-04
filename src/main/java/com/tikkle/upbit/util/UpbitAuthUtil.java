@@ -3,6 +3,7 @@ package com.tikkle.upbit.util;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.tikkle.upbit.exception.UpbitTokenIssueFailedException;
+import com.tikkle.upbit.exception.UpbitAuthParamException;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -15,7 +16,7 @@ import java.util.UUID;
 public class UpbitAuthUtil {
     public static String generateToken(String accessKey, String secretKey, String queryString) {
         if (queryString == null || queryString.trim().isEmpty()) {
-            throw new IllegalArgumentException("queryString cannot be null or empty");
+            throw new UpbitAuthParamException();
         }
         try {
             Algorithm algorithm = Algorithm.HMAC256(secretKey);

@@ -1,6 +1,7 @@
 package com.tikkle.upbit.client;
 
 import com.tikkle.upbit.dto.response.UpbitMarketResponse;
+import com.tikkle.upbit.exception.UpbitMarketInquiryFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -35,7 +36,7 @@ public class UpbitMarketClient {
             return response != null ? response : java.util.Collections.emptyList();
         } catch (Exception e) {
             log.error("업비트 마켓 리스트 조회 실패", e);
-            throw new com.tikkle.upbit.exception.UpbitMarketInquiryFailedException();
+            throw new UpbitMarketInquiryFailedException();
         }
     }
 }

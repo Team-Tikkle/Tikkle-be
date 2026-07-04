@@ -121,7 +121,7 @@ class SettingsServiceTest {
     }
 
     /**
-     * 서비스의 afterCommit 콜백을 검증하기 위해 트랜잭션 동기화를 수동으로 활성화한 뒤
+     * 서비스의 afterCommit 콜백을 검증하기 위해 트랜잭션 동기화를 명시적으로 활성화한 뒤
      * 등록된 콜백을 직접 트리거한다.
      */
     private void runWithTransactionSync(Runnable action) {
