@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import com.tikkle.user.exception.UserSettingsNotFoundException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -62,15 +63,16 @@ public class UserSettingsCacheService {
 
     public RuleType getRuleType(Long userId, PaymentCategory category, Map<Object, Object> userSettings) {
         String ruleTypeStr = (String) userSettings.get(category.name());
-
         if (ruleTypeStr != null) {
             return RuleType.valueOf(ruleTypeStr);
         }
 
-        log.warn("유저(ID:{})의 Redis 캐시에 {} 카테고리 룰이 존재하지 않습니다. DB에서 조회합니다.", userId, category.name());
-        return categorySpareChangeRuleRepository.findByUserIdAndCategory(userId, category)
-                .or(() -> categorySpareChangeRuleRepository.findDefaultByUserId(userId))
-                .map(CategorySpareChangeRule::getRuleType)
-                .orElse(RuleType.ROUND_UP_10000);
+        String defaultRuleStr = (String) userSettings.get("DEFAULT_RULE");
+        if (defaultRuleStr != null) {
+            return RuleType.valueOf(defaultRuleStr);
+        }
+
+        log.error("유저(ID:{})의 투자 규칙 설정이 전혀 존재하지 않습니다.", userId);
+        throw new UserSettingsNotFoundException();
     }
 }

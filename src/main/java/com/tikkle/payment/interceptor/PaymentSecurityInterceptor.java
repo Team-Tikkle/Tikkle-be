@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import com.tikkle.payment.exception.PaymentFilterConfigurationException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +49,7 @@ public class PaymentSecurityInterceptor implements HandlerInterceptor {
         // CachedBodyHttpServletRequest로 캐스팅하여 body 조회
         // instanceof 검사 후 캐스팅하여 body 조회
         if (!(request instanceof RequestBodyCachingFilter.CachedBodyHttpServletRequest cachedRequest)) {
-            throw new IllegalStateException("RequestBodyCachingFilter가 적용되지 않았습니다.");
+            throw new PaymentFilterConfigurationException();
         }
 
         String payload = new String(cachedRequest.getCachedBody(), StandardCharsets.UTF_8);

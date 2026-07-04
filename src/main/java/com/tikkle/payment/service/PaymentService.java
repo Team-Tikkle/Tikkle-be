@@ -109,8 +109,13 @@ public class PaymentService {
             PaymentEvent savedEvent = self.saveEvent(request, classification.keyword(), spareChange,
                     PaymentStatus.PENDING_PURCHASE, null, classification.category(), recommendation.coin());
 
-            Long eventId = savedEvent != null ? savedEvent.getId() : null;
-            return new PaymentScrapingResponse(eventId, PaymentActionType.PENDING_PURCHASE,
+            if (savedEvent == null) {
+                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
+                        classification.keyword(), request.amount(), spareChange,
+                        recommendation.market(), recommendation.coinName());
+            }
+
+            return new PaymentScrapingResponse(savedEvent.getId(), PaymentActionType.PENDING_PURCHASE,
                     classification.keyword(), request.amount(), spareChange,
                     recommendation.market(), recommendation.coinName());
         } catch (Exception e) {
