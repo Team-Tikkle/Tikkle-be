@@ -74,16 +74,17 @@ public class PaymentService {
     public PaymentScrapingResponse processPayment(PaymentScrapingRequest request) {
         // ── [1단계] 결제 검증 ────────────────────────────────────────────
         String redisTxKey = "payment:tx:" + request.transactionId();
-        Boolean isFirstRequest = redisTemplate.opsForValue()
-                .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
-
-        if (Boolean.FALSE.equals(isFirstRequest)) {
-            log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
-                    request.merchant(), request.amount(), 0, null, null);
-        }
 
         try {
+            Boolean isFirstRequest = redisTemplate.opsForValue()
+                    .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
+
+            if (Boolean.FALSE.equals(isFirstRequest)) {
+                log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
+                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
+                        request.merchant(), request.amount(), 0, null, null);
+            }
+
             // Redis에서 유저 설정 통째로 가져오기
             Map<Object, Object> userSettings = userSettingsCacheService.getUserSettings(request.userId());
 
