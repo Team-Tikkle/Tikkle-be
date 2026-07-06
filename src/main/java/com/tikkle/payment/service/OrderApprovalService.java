@@ -2,8 +2,9 @@ package com.tikkle.payment.service;
 
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
+import com.tikkle.payment.exception.InvalidPaymentStatusException;
+import com.tikkle.payment.exception.UpbitTradeException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
-import com.tikkle.payment.exception.UnknownPaymentStatusException;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.upbit.service.UpbitTradeService;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 매수 승인 및 거절 비즈니스 로직을 처리하는 서비스입니다.
+ */
 @Slf4j
 @Service
 public class OrderApprovalService {
@@ -37,7 +41,7 @@ public class OrderApprovalService {
                 .orElseThrow(PaymentEventNotFoundException::new);
 
         if (event.getStatus() != PaymentStatus.PENDING_PURCHASE) {
-            throw new UnknownPaymentStatusException();
+            throw new InvalidPaymentStatusException();
         }
 
         try {
@@ -46,9 +50,10 @@ public class OrderApprovalService {
             upbitTradeService.executeTrade(event.getUserId(), targetMarket, event.getSpareChange());
             event.completeInvestment();
         } catch (Exception e) {
-            log.error("매수 승인 후 업비트 체결 실패", e);
-            self.markAsFailed(eventId, e.getMessage());
-            throw e; // Controller Advisor 등에서 처리
+            log.error("[OrderApprovalService] 매수 승인 후 업비트 체결 실패 - eventId: {}", eventId, e);
+            String reason = "업비트 매수 주문 실패: " + e.getMessage();
+            self.markAsFailed(eventId, reason);
+            throw new UpbitTradeException();
         }
     }
 
@@ -65,7 +70,7 @@ public class OrderApprovalService {
                 .orElseThrow(PaymentEventNotFoundException::new);
 
         if (event.getStatus() != PaymentStatus.PENDING_PURCHASE) {
-            throw new UnknownPaymentStatusException();
+            throw new InvalidPaymentStatusException();
         }
 
         event.skipInvestment("사용자에 의한 매수 거절");

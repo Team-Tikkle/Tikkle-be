@@ -29,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 결제 내역 피드 및 대시보드 통계 비즈니스 로직을 처리하는 서비스입니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

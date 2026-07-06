@@ -12,6 +12,9 @@ import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.payment.exception.DuplicatePaymentException;
+import com.tikkle.payment.exception.CardMismatchException;
+import com.tikkle.user.exception.NoCategoryRuleException;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
@@ -28,6 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 결제 도메인의 핵심 비즈니스 로직을 처리하는 서비스입니다.
+ */
 @Slf4j
 @Service
 public class PaymentService {
@@ -59,7 +65,7 @@ public class PaymentService {
         this.self = self;
     }
 
-    // ── 내부 전달용 record
+    // 내부 전달용 record
     private record ClassificationResult(String keyword, PaymentCategory category) {}
 
     /**
@@ -72,7 +78,7 @@ public class PaymentService {
      * 5단계: 코인 추천 후 응답
      */
     public PaymentScrapingResponse processPayment(PaymentScrapingRequest request) {
-        // ── [1단계] 결제 검증 ────────────────────────────────────────────
+        // 1단계: 결제 검증
         String redisTxKey = "payment:tx:" + request.transactionId();
 
         try {
@@ -80,25 +86,26 @@ public class PaymentService {
                     .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
 
             if (Boolean.FALSE.equals(isFirstRequest)) {
-                log.info("중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
-                        request.merchant(), request.amount(), 0, null, null);
+                log.info("[PaymentService] 중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
+                throw new DuplicatePaymentException();
             }
 
             // Redis에서 유저 설정 통째로 가져오기
             Map<Object, Object> userSettings = userSettingsCacheService.getUserSettings(request.userId());
 
             // 타겟 카드 매칭 검증
-            PaymentScrapingResponse cardMismatchResponse = validateTargetCard(request, userSettings, redisTxKey);
-            if (cardMismatchResponse != null) {
-                return cardMismatchResponse;
-            }
+            validateTargetCard(request, userSettings, redisTxKey);
 
-            // ── [2단계] 카테고리 분류 ──────────────────────────────────────────
+            // 2단계: 카테고리 분류
             ClassificationResult classification = classifyMerchant(request.merchant());
 
-            // ── [3단계] 잔돈 계산 ─────────────────────────────────────────────
-            RuleType ruleType = userSettingsCacheService.getRuleType(request.userId(), classification.category(), userSettings);
+            // 3단계: 잔돈 계산
+            String ruleTypeStr = (String) userSettings.get(classification.category().name());
+            if (ruleTypeStr == null) {
+                log.error("[PaymentService] 투자 규칙 설정 미존재 - userId: {}, category: {}", request.userId(), classification.category());
+                throw new NoCategoryRuleException();
+            }
+            RuleType ruleType = RuleType.valueOf(ruleTypeStr);
             int spareChange = spareChangeCalculator.calculate(request.amount(), ruleType);
 
             // 잔돈 0원 → 조기 차단
@@ -111,49 +118,46 @@ public class PaymentService {
                 return handleNotInvested(request, classification, spareChange, "최소 투자 금액(5,000원) 미달", PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET);
             }
 
-            // ── [4단계] 코인 추천 후 응답 ─────────────────────────────────────
+            // 4단계: 코인 추천 후 응답
             CoinRecommendation recommendation = targetCoinRecommendationService.recommendCoin(request.userId());
 
             PaymentEvent savedEvent = self.saveEvent(request, classification.keyword(), spareChange,
                     PaymentStatus.PENDING_PURCHASE, null, classification.category(), recommendation.coin());
 
             if (savedEvent == null) {
-                return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_DUPLICATE,
-                        classification.keyword(), request.amount(), spareChange,
-                        recommendation.market(), recommendation.coinName());
+                log.info("[PaymentService] 동시성 중복 결제 감지 (DB Constraint Violation) - transactionId: {}", request.transactionId());
+                throw new DuplicatePaymentException();
             }
 
             return new PaymentScrapingResponse(savedEvent.getId(), PaymentActionType.PENDING_PURCHASE,
                     classification.keyword(), request.amount(), spareChange,
                     recommendation.market(), recommendation.coinName());
         } catch (Exception e) {
-            log.error("결제 처리 중 오류 발생, Redis 캐시 정리", e);
+            log.error("[PaymentService] 결제 처리 중 오류 발생, Redis 캐시 정리 - transactionId: {}", request.transactionId(), e);
             redisTemplate.delete(redisTxKey);
             throw e;
         }
     }
 
     /**
-     * 타겟 카드 매칭 검증. 불일치 시 응답 반환, 일치 시 null 반환.
+     * 타겟 카드 매칭 검증. 불일치 시 예외 발생.
      */
-    private PaymentScrapingResponse validateTargetCard(PaymentScrapingRequest request, Map<Object, Object> userSettings, String redisTxKey) {
+    private void validateTargetCard(PaymentScrapingRequest request, Map<Object, Object> userSettings, String redisTxKey) {
         String targetCardCompany = (String) userSettings.get("targetCardCompany");
         String targetCardLast4 = (String) userSettings.get("targetCardLast4");
 
         if (targetCardCompany == null || targetCardLast4 == null ||
                 !request.cardCompany().equals(targetCardCompany) ||
                 !request.cardNumberLast4().equals(targetCardLast4)) {
-            log.info("타겟 카드가 아니거나 온보딩 정보가 없어 조기 종료 (userId: {}, requestCard: {} {})",
+            log.info("[PaymentService] 타겟 카드 불일치 또는 온보딩 정보 부재 - userId: {}, requestCard: {} {}",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
             redisTemplate.delete(redisTxKey);
-            return new PaymentScrapingResponse(null, PaymentActionType.IGNORE_CARD_MISMATCH,
-                    request.merchant(), request.amount(), 0, null, null);
+            throw new CardMismatchException();
         }
-        return null;
     }
 
 
-    // ── [2단계] 카테고리 분류 ────────────────────────────────────────────
+    // 2단계: 카테고리 분류
 
     /**
      * DB 캐시(PaymentCategoryMapping) 우선 조회 → 미스 시 AI 분류 폴백
@@ -167,13 +171,7 @@ public class PaymentService {
         }
 
         // Phase 2: AI 분류
-        AiClassificationResponse aiResponse;
-        try {
-            aiResponse = aiClassificationService.classify(merchant);
-        } catch (Exception e) {
-            log.warn("AI 분류 실패 또는 타임아웃 발생. merchant={} -> ETC 카테고리로 폴백(Fallback) 처리합니다.", merchant);
-            aiResponse = new AiClassificationResponse(merchant, PaymentCategory.ETC);
-        }
+        AiClassificationResponse aiResponse = aiClassificationService.classify(merchant);
 
         // 분류 결과 저장
         try {
@@ -184,14 +182,14 @@ public class PaymentService {
                             .build()
             );
         } catch (DataIntegrityViolationException e) {
-            log.info("이미 다른 요청에서 매핑 데이터를 저장했습니다. keyword={}", aiResponse.keyword());
+            log.info("[PaymentService] 이미 다른 요청에서 매핑 데이터를 저장했습니다 - keyword: {}", aiResponse.keyword());
         }
 
         return new ClassificationResult(aiResponse.keyword(), aiResponse.category());
     }
 
 
-    // ── 공통 유틸 메서드 ─────────────────────────────────────────────────
+    // 공통 유틸 메서드
 
     /**
      * NOT_INVESTED 상태로 원장을 저장하고 조기 차단 응답을 생성한다.
@@ -206,7 +204,7 @@ public class PaymentService {
     @Transactional
     public PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange,
                                    PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
-        log.info("결제 이벤트 저장 시도. status: {}, spareChange: {}", status, spareChange);
+        log.info("[PaymentService] 결제 이벤트 저장 시도 - status: {}, spareChange: {}", status, spareChange);
         try {
             PaymentEvent event = PaymentEvent.builder()
                     .userId(request.userId())
@@ -225,7 +223,7 @@ public class PaymentService {
             return paymentEventRepository.save(event);
         } catch (DataIntegrityViolationException e) {
             if (e.getCause() instanceof ConstraintViolationException) {
-                log.warn("DataIntegrityViolationException 발생 (ConstraintViolationException). 동시성 중복 결제 요청일 가능성이 높습니다. transactionId={}, cause={}",
+                log.warn("[PaymentService] DataIntegrityViolationException 발생. 동시성 중복 결제 가능성 - transactionId: {}, cause: {}",
                         request.transactionId(), e.getMessage());
                 return null;
             } else {

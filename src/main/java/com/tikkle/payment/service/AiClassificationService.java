@@ -1,6 +1,7 @@
 package com.tikkle.payment.service;
 
 import com.tikkle.payment.dto.response.AiClassificationResponse;
+import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.exception.InvalidAiResponseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -12,6 +13,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * 결제 가맹점명 기반으로 AI 카테고리 분류를 수행하는 서비스입니다.
+ */
 @Slf4j
 @Service
 public class AiClassificationService {
@@ -36,8 +40,8 @@ public class AiClassificationService {
                 .build();
     }
 
-    public AiClassificationResponse classify(String merchant) throws TimeoutException {
-        log.info("AI 분류 요청: {}", merchant);
+    public AiClassificationResponse classify(String merchant) {
+        log.info("[AiClassificationService] AI 분류 요청 - merchant: {}", merchant);
 
         try {
             AiClassificationResponse response = CompletableFuture.supplyAsync(() ->
@@ -47,7 +51,7 @@ public class AiClassificationService {
                             .entity(AiClassificationResponse.class)
             ).get(5, TimeUnit.SECONDS);
 
-            log.info("AI 분류 응답: {}", response);
+            log.info("[AiClassificationService] AI 분류 응답 - response: {}", response);
 
             if (response == null || response.keyword() == null || response.category() == null) {
                 throw new InvalidAiResponseException();
@@ -55,11 +59,11 @@ public class AiClassificationService {
 
             return response;
         } catch (TimeoutException e) {
-            log.error("AI 분류 타임아웃 발생 (5초 초과): {}", merchant);
-            throw e;
+            log.warn("[AiClassificationService] AI 분류 타임아웃 발생 (5초 초과), ETC 폴백 - merchant: {}", merchant);
+            return new AiClassificationResponse(merchant, PaymentCategory.ETC);
         } catch (Exception e) {
-            log.error("AI 분류 중 오류 발생: {}", e.getMessage());
-            throw new InvalidAiResponseException();
+            log.error("[AiClassificationService] AI 분류 중 오류 발생, ETC 폴백 - merchant: {}, error: {}", merchant, e.getMessage());
+            return new AiClassificationResponse(merchant, PaymentCategory.ETC);
         }
     }
 }
