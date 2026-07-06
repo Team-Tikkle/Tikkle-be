@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 24시간이 경과한 매수 대기 건을 만료 처리하는 스케줄러입니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,7 +32,7 @@ public class PendingOrderExpirationScheduler {
             for (PaymentEvent event : expiredEvents) {
                 event.skipInvestment("매수 승인 대기 시간(24시간) 초과로 인한 시스템 거절");
             }
-            log.info("만료된 매수 대기 건 {}개를 NOT_INVESTED 처리했습니다.", expiredEvents.size());
+            log.info("[PendingOrderExpirationScheduler] 만료된 매수 대기 건 NOT_INVESTED 처리 완료 - count: {}", expiredEvents.size());
         }
     }
 }
