@@ -30,9 +30,47 @@ public record PaymentHistoryResponse(
         @Schema(description = "투자 대상 코인 마켓명", example = "KRW-BTC", nullable = true)
         String targetCoinMarket,
 
-        @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
-        String targetCoinName,
+    @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
+    String targetCoinName,
 
-        @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
-        LocalDateTime createdAt
-) {}
+    @Schema(description = "실제 매수에 사용된 투자 금액 (원화 기준, 성공시에만 존재)", example = "440", nullable = true)
+    Integer investedAmount,
+
+    @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
+    LocalDateTime createdAt
+) {
+    public static PaymentHistoryResponse from(com.tikkle.payment.entity.PaymentEvent event) {
+        String statusStr;
+        LocalDateTime expiredAt = null;
+        Integer investedAmount = null;
+
+        if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.PENDING_PURCHASE) {
+            statusStr = "PENDING";
+            expiredAt = event.getCreatedAt().plusHours(24);
+        } else if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.INVESTED) {
+            statusStr = "INVESTED";
+            investedAmount = event.getSpareChange();
+        } else if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.NOT_INVESTED || event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.FAILED) {
+            statusStr = "CANCELED";
+        } else {
+            statusStr = "PENDING";
+        }
+
+        String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;
+        String targetCoinName = event.getTargetCoin() != null ? event.getTargetCoin().getKoreanName() : null;
+
+        return new PaymentHistoryResponse(
+                event.getId(),
+                event.getMerchant(),
+                event.getAmount(),
+                event.getSpareChange(),
+                event.getCategory() != null ? event.getCategory().name() : null,
+                statusStr,
+                expiredAt,
+                targetCoinMarket,
+                targetCoinName,
+                investedAmount,
+                event.getCreatedAt()
+        );
+    }
+}
