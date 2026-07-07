@@ -1,8 +1,11 @@
 package com.tikkle.payment.dto.response;
 
+import com.tikkle.payment.entity.PaymentEvent;
+import com.tikkle.payment.entity.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Schema(description = "결제 내역 피드 조회 응답 DTO")
 public record PaymentHistoryResponse(
@@ -30,9 +33,53 @@ public record PaymentHistoryResponse(
         @Schema(description = "투자 대상 코인 마켓명", example = "KRW-BTC", nullable = true)
         String targetCoinMarket,
 
-        @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
-        String targetCoinName,
+    @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
+    String targetCoinName,
 
-        @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
-        LocalDateTime createdAt
-) {}
+    @Schema(description = "실제 체결된 코인 수량", example = "0.00001", nullable = true)
+    BigDecimal investedVolume,
+
+    @Schema(description = "체결 가중평균 단가", example = "100000000", nullable = true)
+    BigDecimal investedPrice,
+
+    @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
+    LocalDateTime createdAt
+) {
+    public static PaymentHistoryResponse from(PaymentEvent event) {
+        String statusStr;
+        LocalDateTime expiredAt = null;
+        BigDecimal investedVolume = null;
+        BigDecimal investedPrice = null;
+
+        if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
+            statusStr = "PENDING";
+            expiredAt = event.getCreatedAt().plusHours(24);
+        } else if (event.getStatus() == PaymentStatus.INVESTED) {
+            statusStr = "INVESTED";
+            investedVolume = event.getInvestedVolume();
+            investedPrice = event.getInvestedPrice();
+        } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
+            statusStr = "CANCELED";
+        } else {
+            statusStr = "PENDING";
+        }
+
+        String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;
+        String targetCoinName = event.getTargetCoin() != null ? event.getTargetCoin().getKoreanName() : null;
+
+        return new PaymentHistoryResponse(
+                event.getId(),
+                event.getMerchant(),
+                event.getAmount(),
+                event.getSpareChange(),
+                event.getCategory() != null ? event.getCategory().name() : null,
+                statusStr,
+                expiredAt,
+                targetCoinMarket,
+                targetCoinName,
+                investedVolume,
+                investedPrice,
+                event.getCreatedAt()
+        );
+    }
+}

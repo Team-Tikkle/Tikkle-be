@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -61,6 +62,12 @@ public class PaymentEvent {
     @JoinColumn(name = "target_coin_market")
     private Coin targetCoin;
 
+    @Column(name = "invested_volume", precision = 30, scale = 8)
+    private BigDecimal investedVolume;
+
+    @Column(name = "invested_price", precision = 30, scale = 8)
+    private BigDecimal investedPrice;
+
     @Builder
     public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason, Coin targetCoin) {
         this.userId = userId;
@@ -76,8 +83,10 @@ public class PaymentEvent {
         this.targetCoin = targetCoin;
     }
 
-    public void completeInvestment() {
+    public void completeInvestment(BigDecimal volume, BigDecimal price) {
         this.status = PaymentStatus.INVESTED;
+        this.investedVolume = volume;
+        this.investedPrice = price;
     }
 
     public void skipInvestment(String reason) {

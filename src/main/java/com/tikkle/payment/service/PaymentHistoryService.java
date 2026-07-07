@@ -5,10 +5,9 @@ import com.tikkle.global.exception.InvalidInputValueException;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
-import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
+import com.tikkle.payment.repository.CategorySpendingProjection;
 import com.tikkle.payment.repository.PaymentEventRepository;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -21,9 +20,7 @@ import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -42,39 +39,23 @@ public class PaymentHistoryService {
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfMonth = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
 
-        // 1. 해당 월 데이터 일괄 조회
-        List<PaymentEvent> events = paymentEventRepository.findByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
-
-        // 2. 전체 누적 대기 건수 카운트
+        // 1. 전체 누적 대기 건수 카운트
         long pendingCount = paymentEventRepository.countByUserIdAndStatus(userId, PaymentStatus.PENDING_PURCHASE);
 
-        // 3. 메모리 집계
-        long totalPayment = 0;
-        long totalInvestedChange = 0;
-        long totalUninvested = 0;
-        
-        // 데이터가 없는 달에 대한 방어 코드 (빈 리스트로 처리됨)
-        Map<PaymentCategory, Long> categorySpendingMap = events.stream()
-                .filter(e -> e.getCategory() != null)
-                .collect(Collectors.groupingBy(
-                        PaymentEvent::getCategory,
-                        Collectors.summingLong(PaymentEvent::getAmount)
-                ));
+        // 2. DB 집계 쿼리를 통한 통계 도출 (메모리 집계 최적화)
+        Long sumAmount = paymentEventRepository.sumAmountByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
+        long totalPayment = sumAmount != null ? sumAmount : 0L;
 
-        for (PaymentEvent event : events) {
-            totalPayment += event.getAmount();
+        Long sumInvested = paymentEventRepository.sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(userId, List.of(PaymentStatus.INVESTED), startOfMonth, endOfMonth);
+        long totalInvestedChange = sumInvested != null ? sumInvested : 0L;
 
-            if (event.getStatus() == PaymentStatus.INVESTED) {
-                totalInvestedChange += event.getSpareChange();
-            } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
-                totalUninvested += event.getSpareChange();
-            }
-        }
+        Long sumUninvested = paymentEventRepository.sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(userId, List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED), startOfMonth, endOfMonth);
+        long totalUninvested = sumUninvested != null ? sumUninvested : 0L;
 
-        List<PaymentDashboardResponse.CategorySpending> categorySpending = new ArrayList<>();
-        for (Map.Entry<PaymentCategory, Long> entry : categorySpendingMap.entrySet()) {
-            categorySpending.add(new PaymentDashboardResponse.CategorySpending(entry.getKey().name(), entry.getValue()));
-        }
+        List<CategorySpendingProjection> categoryProjections = paymentEventRepository.findCategorySpendingByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
+        List<PaymentDashboardResponse.CategorySpending> categorySpending = categoryProjections.stream()
+                .map(p -> new PaymentDashboardResponse.CategorySpending(p.getCategory().name(), p.getAmount()))
+                .collect(Collectors.toList());
 
         return new PaymentDashboardResponse(
                 totalPayment,
@@ -96,7 +77,7 @@ public class PaymentHistoryService {
 
         Slice<PaymentEvent> events = paymentEventRepository.findHistoryFeed(userId, startOfMonth, endOfMonth, mappedStatuses, pageable);
 
-        return events.map(this::mapToResponse);
+        return events.map(PaymentHistoryResponse::from);
     }
 
 
@@ -125,38 +106,5 @@ public class PaymentHistoryService {
             case "CANCELED" -> List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED);
             default -> throw new InvalidInputValueException();
         };
-    }
-
-    private PaymentHistoryResponse mapToResponse(PaymentEvent event) {
-        String statusStr;
-        LocalDateTime expiredAt = null;
-
-        if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
-            statusStr = "PENDING";
-            expiredAt = event.getCreatedAt().plusHours(24);
-        } else if (event.getStatus() == PaymentStatus.INVESTED) {
-            statusStr = "INVESTED";
-        } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
-            statusStr = "CANCELED";
-        } else {
-            // 혹시라도 과도기 상태가 들어오면 PENDING으로 매핑
-            statusStr = "PENDING";
-        }
-
-        String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;
-        String targetCoinName = event.getTargetCoin() != null ? event.getTargetCoin().getKoreanName() : null;
-
-        return new PaymentHistoryResponse(
-                event.getId(),
-                event.getMerchant(),
-                event.getAmount(),
-                event.getSpareChange(),
-                event.getCategory() != null ? event.getCategory().name() : null,
-                statusStr,
-                expiredAt,
-                targetCoinMarket,
-                targetCoinName,
-                event.getCreatedAt()
-        );
     }
 }
