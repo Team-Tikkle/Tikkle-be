@@ -1,6 +1,6 @@
 package com.tikkle.settings.swagger;
 
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;

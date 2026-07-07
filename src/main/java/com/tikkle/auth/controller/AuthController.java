@@ -7,7 +7,7 @@ import com.tikkle.auth.service.AuthService;
 import com.tikkle.auth.service.OAuthService;
 import com.tikkle.auth.swagger.AuthSwagger;
 import com.tikkle.global.response.ApiResponse;
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

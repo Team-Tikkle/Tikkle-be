@@ -1,6 +1,6 @@
 package com.tikkle.user.swagger;
 
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.user.dto.request.UpdateUserRequest;
 import com.tikkle.user.dto.response.UserResponse;

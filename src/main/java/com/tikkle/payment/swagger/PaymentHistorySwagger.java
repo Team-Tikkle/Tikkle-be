@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(name = "Payment History", description = "결제 내역 탭 API")

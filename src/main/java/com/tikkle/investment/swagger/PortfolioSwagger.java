@@ -1,6 +1,6 @@
 package com.tikkle.investment.swagger;
 
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.investment.dto.response.PortfolioResponse;
 import io.swagger.v3.oas.annotations.Operation;

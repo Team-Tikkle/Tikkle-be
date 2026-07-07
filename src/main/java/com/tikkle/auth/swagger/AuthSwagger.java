@@ -4,7 +4,7 @@ import com.tikkle.auth.dto.request.GoogleLoginRequest;
 import com.tikkle.auth.dto.request.ReissueRequest;
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.global.response.ApiResponse;
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
