@@ -8,10 +8,7 @@ import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.repository.PaymentEventRepository;
-import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
-import com.tikkle.user.exception.UserNotFoundException;
-import com.tikkle.user.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -37,12 +34,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PaymentHistoryService {
     private final PaymentEventRepository paymentEventRepository;
-    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public PaymentDashboardResponse getDashboard(String email, String month) {
-        User user = getUserByEmail(email);
-        Long userId = user.getId();
+    public PaymentDashboardResponse getDashboard(Long userId, String month) {
 
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -92,9 +86,7 @@ public class PaymentHistoryService {
     }
 
     @Transactional(readOnly = true)
-    public Slice<PaymentHistoryResponse> getHistoryFeed(String email, String status, String month, Pageable pageable) {
-        User user = getUserByEmail(email);
-        Long userId = user.getId();
+    public Slice<PaymentHistoryResponse> getHistoryFeed(Long userId, String status, String month, Pageable pageable) {
 
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -107,10 +99,7 @@ public class PaymentHistoryService {
         return events.map(this::mapToResponse);
     }
 
-    private User getUserByEmail(String email) {
-        return userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
-                .orElseThrow(UserNotFoundException::new);
-    }
+
 
     private YearMonth parseMonth(String month) {
         try {
@@ -134,7 +123,7 @@ public class PaymentHistoryService {
             case "PENDING" -> List.of(PaymentStatus.PENDING_PURCHASE);
             case "INVESTED" -> List.of(PaymentStatus.INVESTED);
             case "CANCELED" -> List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED);
-            default -> throw new InvalidInputValueException(); // 잘못된 상태 문자열
+            default -> throw new InvalidInputValueException();
         };
     }
 
