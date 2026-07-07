@@ -1,4 +1,4 @@
-package com.tikkle.auth.jwt;
+package com.tikkle.global.security.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

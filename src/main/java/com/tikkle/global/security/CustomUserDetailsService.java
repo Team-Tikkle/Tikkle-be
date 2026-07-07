@@ -1,4 +1,4 @@
-package com.tikkle.auth.security;
+package com.tikkle.global.security;
 
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
@@ -10,6 +10,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Spring Security에서 사용자 인증을 위해 DB로부터 유저 정보를 조회하는 서비스입니다.
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {

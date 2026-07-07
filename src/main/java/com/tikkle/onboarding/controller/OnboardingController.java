@@ -1,6 +1,6 @@
 package com.tikkle.onboarding.controller;
 
-import com.tikkle.auth.security.CustomUserDetails;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.onboarding.dto.request.OnboardingRequest;
 import com.tikkle.onboarding.service.OnboardingService;

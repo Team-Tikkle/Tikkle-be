@@ -1,7 +1,7 @@
-package com.tikkle.auth.jwt;
+package com.tikkle.global.security.jwt;
 
 import tools.jackson.databind.json.JsonMapper;
-import com.tikkle.auth.security.CustomUserDetailsService;
+import com.tikkle.global.security.CustomUserDetailsService;
 import com.tikkle.global.exception.ErrorCode;
 import com.tikkle.global.response.ApiResponse;
 import jakarta.servlet.FilterChain;

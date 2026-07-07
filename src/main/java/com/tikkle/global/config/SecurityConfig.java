@@ -1,8 +1,8 @@
 package com.tikkle.global.config;
 
-import com.tikkle.auth.jwt.JwtAuthenticationFilter;
-import com.tikkle.auth.security.CustomAccessDeniedHandler;
-import com.tikkle.auth.security.CustomAuthenticationEntryPoint;
+import com.tikkle.global.security.jwt.JwtAuthenticationFilter;
+import com.tikkle.global.security.CustomAccessDeniedHandler;
+import com.tikkle.global.security.CustomAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

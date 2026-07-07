@@ -2,7 +2,7 @@ package com.tikkle.auth.service;
 
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.entity.RefreshToken;
-import com.tikkle.auth.jwt.JwtProvider;
+import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import com.tikkle.user.entity.enums.AuthProvider;
 import com.tikkle.user.entity.User;

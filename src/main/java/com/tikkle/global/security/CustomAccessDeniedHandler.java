@@ -1,4 +1,4 @@
-package com.tikkle.auth.security;
+package com.tikkle.global.security;
 
 import tools.jackson.databind.json.JsonMapper;
 import com.tikkle.global.exception.ErrorCode;
