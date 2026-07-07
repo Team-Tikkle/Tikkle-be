@@ -27,6 +27,9 @@ public class MarketTopicCollectService {
     private final NewsFetcher newsFetcher;
     private final MarketTopicPersister marketTopicPersister;
 
+    /**
+     * 정의된 키워드들을 순회하며 뉴스를 수집하고, 중복을 제거한 뒤 영속화를 위임합니다.
+     */
     public void collect() {
         // 키워드별 수집(네트워크) 후 link 기준 dedup (먼저 등장한 키워드를 유지)
         Map<String, FetchedNewsItem> deduped = new LinkedHashMap<>();
