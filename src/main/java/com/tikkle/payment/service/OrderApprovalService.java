@@ -47,8 +47,8 @@ public class OrderApprovalService {
         try {
             // 업비트 동기 매수 및 원장 업데이트 (AI가 지정한 타겟 코인 매수)
             String targetMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : DEFAULT_FALLBACK_MARKET;
-            upbitTradeService.executeTrade(event.getUserId(), targetMarket, event.getSpareChange());
-            event.completeInvestment();
+            var result = upbitTradeService.executeTrade(event.getUserId(), targetMarket, event.getSpareChange());
+            event.completeInvestment(result.executedVolume(), result.executedPrice());
         } catch (Exception e) {
             log.error("[OrderApprovalService] 매수 승인 후 업비트 체결 실패 - eventId: {}", eventId, e);
             String reason = "업비트 매수 주문 실패: " + e.getMessage();

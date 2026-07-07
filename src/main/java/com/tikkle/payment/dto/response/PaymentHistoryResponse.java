@@ -5,6 +5,7 @@ import com.tikkle.payment.entity.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Schema(description = "결제 내역 피드 조회 응답 DTO")
 public record PaymentHistoryResponse(
@@ -35,8 +36,11 @@ public record PaymentHistoryResponse(
     @Schema(description = "투자 대상 코인 이름", example = "비트코인", nullable = true)
     String targetCoinName,
 
-    @Schema(description = "실제 매수에 사용된 투자 금액 (원화 기준, 성공시에만 존재)", example = "440", nullable = true)
-    Integer investedAmount,
+    @Schema(description = "실제 체결된 코인 수량", example = "0.00001", nullable = true)
+    BigDecimal investedVolume,
+
+    @Schema(description = "체결 가중평균 단가", example = "100000000", nullable = true)
+    BigDecimal investedPrice,
 
     @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
     LocalDateTime createdAt
@@ -44,14 +48,16 @@ public record PaymentHistoryResponse(
     public static PaymentHistoryResponse from(PaymentEvent event) {
         String statusStr;
         LocalDateTime expiredAt = null;
-        Integer investedAmount = null;
+        BigDecimal investedVolume = null;
+        BigDecimal investedPrice = null;
 
         if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
             statusStr = "PENDING";
             expiredAt = event.getCreatedAt().plusHours(24);
         } else if (event.getStatus() == PaymentStatus.INVESTED) {
             statusStr = "INVESTED";
-            investedAmount = event.getSpareChange();
+            investedVolume = event.getInvestedVolume();
+            investedPrice = event.getInvestedPrice();
         } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
             statusStr = "CANCELED";
         } else {
@@ -71,7 +77,8 @@ public record PaymentHistoryResponse(
                 expiredAt,
                 targetCoinMarket,
                 targetCoinName,
-                investedAmount,
+                investedVolume,
+                investedPrice,
                 event.getCreatedAt()
         );
     }
