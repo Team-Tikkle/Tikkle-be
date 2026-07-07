@@ -24,13 +24,13 @@ public class MarketTopicScheduler {
     @Async
     @EventListener(ApplicationReadyEvent.class)
     public void collectOnStartup() {
-        log.info("기동 시 마켓 토픽 초기 수집 시작");
+        log.info("[MarketTopicScheduler] 기동 시 마켓 토픽 초기 수집 시작");
         runCollect();
     }
 
     @Scheduled(cron = "0 0 7,18 * * *", zone = "Asia/Seoul")
     public void collectMarketTopics() {
-        log.info("마켓 토픽 수집 스케줄러 시작");
+        log.info("[MarketTopicScheduler] 마켓 토픽 수집 스케줄러 시작");
         runCollect();
     }
 
@@ -38,9 +38,9 @@ public class MarketTopicScheduler {
         long start = System.currentTimeMillis();
         try {
             marketTopicCollectService.collect();
-            log.info("마켓 토픽 수집 완료. ({}ms)", System.currentTimeMillis() - start);
+            log.info("[MarketTopicScheduler] 마켓 토픽 수집 완료 - 경과시간(ms): {}", System.currentTimeMillis() - start);
         } catch (Exception e) {
-            log.error("마켓 토픽 수집 실패", e);
+            log.error("[MarketTopicScheduler] 마켓 토픽 수집 실패", e);
         }
     }
 }

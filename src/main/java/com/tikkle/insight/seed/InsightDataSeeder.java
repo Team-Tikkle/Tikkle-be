@@ -80,7 +80,7 @@ public class InsightDataSeeder implements ApplicationRunner {
                         "은행 같은 중개 기관 없이 블록체인 위에서 예치·대출·교환 등 금융 서비스를 이용하는 것입니다. 높은 이자를 내세우지만 그만큼 위험도 큽니다.", o)
         );
         investmentTermRepository.saveAll(terms);
-        log.info("[Seed] 투자 용어집 {}건 적재", terms.size());
+        log.info("[InsightDataSeeder] 투자 용어집 적재 완료 - count: {}", terms.size());
     }
 
     private void seedArticles() {
@@ -126,7 +126,7 @@ public class InsightDataSeeder implements ApplicationRunner {
                                 + "필요하면 손절 기준을 정해 두는 것이 변동성 큰 시장에서 오래 살아남는 길입니다.", o, now)
         );
         beginnerArticleRepository.saveAll(articles);
-        log.info("[Seed] 초보자 글 {}건 적재", articles.size());
+        log.info("[InsightDataSeeder] 초보자 글 적재 완료 - count: {}", articles.size());
     }
 
     private void seedVideos() {
@@ -149,7 +149,7 @@ public class InsightDataSeeder implements ApplicationRunner {
                         "허성범 Horang", o)
         );
         recommendedVideoRepository.saveAll(videos);
-        log.info("[Seed] 추천 영상 {}건 적재", videos.size());
+        log.info("[InsightDataSeeder] 추천 영상 적재 완료 - count: {}", videos.size());
     }
 
     /** 리스트 위치(1-based)를 display order로 부여한다. 항목을 추가·삭제·재정렬해도 순번을 수동으로 고칠 필요가 없다. */
