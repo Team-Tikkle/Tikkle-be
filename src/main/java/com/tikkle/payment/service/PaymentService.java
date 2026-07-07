@@ -91,7 +91,7 @@ public class PaymentService {
             }
 
             // Redis에서 유저 설정 통째로 가져오기
-            Map<Object, Object> userSettings = userSettingsCacheService.getUserSettings(request.userId());
+            Map<String, String> userSettings = userSettingsCacheService.getUserSettings(request.userId());
 
             // 타겟 카드 매칭 검증
             validateTargetCard(request, userSettings, redisTxKey);
@@ -100,7 +100,7 @@ public class PaymentService {
             ClassificationResult classification = classifyMerchant(request.merchant());
 
             // 3단계: 잔돈 계산
-            String ruleTypeStr = (String) userSettings.get(classification.category().name());
+            String ruleTypeStr = userSettings.get(classification.category().name());
             if (ruleTypeStr == null) {
                 log.error("[PaymentService] 투자 규칙 설정 미존재 - userId: {}, category: {}", request.userId(), classification.category());
                 throw new NoCategoryRuleException();
@@ -142,9 +142,9 @@ public class PaymentService {
     /**
      * 타겟 카드 매칭 검증. 불일치 시 예외 발생.
      */
-    private void validateTargetCard(PaymentScrapingRequest request, Map<Object, Object> userSettings, String redisTxKey) {
-        String targetCardCompany = (String) userSettings.get("targetCardCompany");
-        String targetCardLast4 = (String) userSettings.get("targetCardLast4");
+    private void validateTargetCard(PaymentScrapingRequest request, Map<String, String> userSettings, String redisTxKey) {
+        String targetCardCompany = userSettings.get("targetCardCompany");
+        String targetCardLast4 = userSettings.get("targetCardLast4");
 
         if (targetCardCompany == null || targetCardLast4 == null ||
                 !request.cardCompany().equals(targetCardCompany) ||
