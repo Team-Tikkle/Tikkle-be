@@ -59,6 +59,12 @@ public class GoogleNewsRssFetcher implements NewsFetcher {
             "bizwatch.co.kr", "einfomax.co.kr"
     );
 
+    /**
+     * 특정 키워드로 구글 뉴스 RSS 피드를 검색하여 기사 리스트를 수집합니다.
+     *
+     * @param keyword 검색어
+     * @return 수집된 기사 리스트
+     */
     @Override
     public List<FetchedNewsItem> fetch(String keyword) {
         String url = SEARCH_URL.formatted(URLEncoder.encode(keyword, StandardCharsets.UTF_8));
@@ -77,11 +83,11 @@ public class GoogleNewsRssFetcher implements NewsFetcher {
                     }
                     items.add(toItem(entry, keyword));
                 }
-                log.info("Google News RSS 수집 완료. keyword={}, count={}", keyword, items.size());
+                log.info("[GoogleNewsRssFetcher] Google News RSS 수집 완료 - keyword: {}, count: {}", keyword, items.size());
                 return items;
             }
         } catch (Exception e) {
-            log.warn("Google News RSS 수집 실패. keyword={}, reason={}", keyword, e.getMessage());
+            log.warn("[GoogleNewsRssFetcher] Google News RSS 수집 실패 - keyword: {}, reason: {}", keyword, e.getMessage());
             return List.of();
         }
     }

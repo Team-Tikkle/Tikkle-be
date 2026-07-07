@@ -32,6 +32,11 @@ public class MarketTopicPersister {
     private final MarketTopicRepository marketTopicRepository;
     private final RedisTemplate<String, String> redisTemplate;
 
+    /**
+     * 중복 제거된 외부 수집 뉴스를 DB에 저장하고, 오래된 데이터를 삭제한 뒤 Redis 캐시를 무효화(evict)합니다.
+     *
+     * @param deduped 중복이 제거된 기사 데이터 맵
+     */
     @Transactional
     public void persist(Map<String, FetchedNewsItem> deduped) {
         // 1. 신규 link만 저장 (existsByLink는 fast-path, save의 UNIQUE 충돌은 try-catch로 방어)
@@ -42,7 +47,7 @@ public class MarketTopicPersister {
                     marketTopicRepository.save(toEntity(item));
                     saved++;
                 } catch (DataIntegrityViolationException e) {
-                    log.debug("마켓 토픽 중복 저장 건너뜀. link={}", item.link());
+                    log.debug("[MarketTopicPersister] 마켓 토픽 중복 저장 건너뜀 - link: {}", item.link());
                 }
             }
         }
@@ -65,7 +70,7 @@ public class MarketTopicPersister {
             }
         });
 
-        log.info("마켓 토픽 저장 완료. 수집={}, 신규저장={}, 기간초과삭제={}, 건수초과삭제={}",
+        log.info("[MarketTopicPersister] 마켓 토픽 저장 완료 - 수집: {}, 신규저장: {}, 기간초과삭제: {}, 건수초과삭제: {}",
                 deduped.size(), saved, deletedByAge, deletedByLimit);
     }
 
@@ -73,7 +78,7 @@ public class MarketTopicPersister {
         try {
             redisTemplate.delete(InsightService.MARKET_TOPICS_CACHE_KEY);
         } catch (DataAccessException e) {
-            log.warn("마켓 토픽 캐시 evict 실패. reason={}", e.getMessage());
+            log.warn("[MarketTopicPersister] 마켓 토픽 캐시 evict 실패 - reason: {}", e.getMessage());
         }
     }
 
