@@ -29,6 +29,19 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
+    @Query("SELECT SUM(p.amount) FROM PaymentEvent p WHERE p.userId = :userId AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
+    Long sumAmountByUserIdAndCreatedAtBetween(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT SUM(p.spareChange) FROM PaymentEvent p WHERE p.userId = :userId AND p.status = :status AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
+    Long sumSpareChangeByUserIdAndStatusAndCreatedAtBetween(@Param("userId") Long userId, @Param("status") PaymentStatus status, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+    
+    @Query("SELECT SUM(p.spareChange) FROM PaymentEvent p WHERE p.userId = :userId AND p.status IN :statuses AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
+    Long sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(@Param("userId") Long userId, @Param("statuses") List<PaymentStatus> statuses, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT p.category as category, SUM(p.amount) as amount FROM PaymentEvent p WHERE p.userId = :userId AND p.createdAt >= :startDate AND p.createdAt <= :endDate AND p.category IS NOT NULL GROUP BY p.category")
+    List<CategorySpendingProjection> findCategorySpendingByUserIdAndCreatedAtBetween(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+
     @Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = com.tikkle.payment.entity.enums.PaymentStatus.INVESTED ORDER BY p.createdAt DESC")
     List<String> findRecentPurchasedMarkets(@Param("userId") Long userId, Pageable pageable);
 
