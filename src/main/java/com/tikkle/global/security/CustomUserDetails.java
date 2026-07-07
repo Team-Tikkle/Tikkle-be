@@ -1,4 +1,4 @@
-package com.tikkle.auth.security;
+package com.tikkle.global.security;
 
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
@@ -10,6 +10,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Spring Security 내부에서 활용되는 사용자 인증 객체(Principal) 입니다.
+ */
 @RequiredArgsConstructor
 public class CustomUserDetails implements UserDetails {
     private final User user;
