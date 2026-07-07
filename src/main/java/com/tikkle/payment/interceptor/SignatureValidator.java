@@ -11,6 +11,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
+/**
+ * HMAC SHA256 알고리즘을 사용하여 결제 스크래핑 요청의 서명 유효성을 검증하는 클래스입니다.
+ */
 @Component
 public class SignatureValidator {
     private final String secretKey;
