@@ -1,5 +1,7 @@
 package com.tikkle.global.util;
 
+import com.tikkle.global.exception.EncryptionFailedException;
+import com.tikkle.global.exception.InvalidEncryptionKeyException;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +15,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
-import com.tikkle.global.exception.EncryptionFailedException;
-import com.tikkle.global.exception.InvalidEncryptionKeyException;
+
+/**
+ * DB에 민감한 문자열을 저장할 때 AES-256 방식으로 암호화하고, 
+ * 읽어올 때 복호화하는 JPA Attribute Converter 입니다.
+ */
 @Converter
 @Component
 @Slf4j
@@ -55,7 +60,7 @@ public class AES256Converter implements AttributeConverter<String, String> {
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            log.error("Failed to encrypt data.", e);
+            log.error("[AES256Converter] 데이터 암호화 실패", e);
             throw new EncryptionFailedException();
         }
     }
@@ -81,7 +86,7 @@ public class AES256Converter implements AttributeConverter<String, String> {
             byte[] decrypted = cipher.doFinal(encrypted);
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            log.error("Failed to decrypt data.", e);
+            log.error("[AES256Converter] 데이터 복호화 실패", e);
             throw new EncryptionFailedException();
         }
     }
