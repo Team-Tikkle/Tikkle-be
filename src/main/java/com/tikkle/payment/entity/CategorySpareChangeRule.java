@@ -10,7 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "category_spare_change_rules",
+@Table(name = "CATEGORY_SPARE_CHANGE_RULES",
        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "category"})})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "payment_category_mapping")
+@Table(name = "PAYMENT_CATEGORY_MAPPING")
 public class PaymentCategoryMapping {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
