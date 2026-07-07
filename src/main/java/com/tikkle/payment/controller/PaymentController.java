@@ -31,7 +31,6 @@ public class PaymentController implements PaymentSwagger {
     @Override
     @PostMapping
     public ApiResponse<?> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
-        log.info("[PaymentController] 결제 스크래핑 요청 수신 - transactionId: {}", request.transactionId());
         
         var response = paymentService.processPayment(request);
         

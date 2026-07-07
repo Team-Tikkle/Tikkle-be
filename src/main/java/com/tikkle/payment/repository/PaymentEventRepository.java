@@ -29,7 +29,7 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
-    @Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = 'INVESTED' ORDER BY p.createdAt DESC")
+    @Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = com.tikkle.payment.entity.enums.PaymentStatus.INVESTED ORDER BY p.createdAt DESC")
     List<String> findRecentPurchasedMarkets(@Param("userId") Long userId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"targetCoin"})

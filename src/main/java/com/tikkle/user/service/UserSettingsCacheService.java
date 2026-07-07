@@ -25,11 +25,13 @@ public class UserSettingsCacheService {
     /**
      * Redis에서 유저 설정을 조회하고, 캐시 미스 시 DB에서 복구한다.
      */
-    public Map<Object, Object> getUserSettings(Long userId) {
+    public Map<String, String> getUserSettings(Long userId) {
         String redisKey = "user:settings:" + userId;
-        Map<Object, Object> settings = redisTemplate.opsForHash().entries(redisKey);
+        Map<Object, Object> rawSettings = redisTemplate.opsForHash().entries(redisKey);
 
-        if (settings != null && !settings.isEmpty() && settings.containsKey("targetCardCompany")) {
+        if (rawSettings != null && !rawSettings.isEmpty() && rawSettings.containsKey("targetCardCompany")) {
+            Map<String, String> settings = new HashMap<>();
+            rawSettings.forEach((k, v) -> settings.put(String.valueOf(k), String.valueOf(v)));
             return settings;
         }
 

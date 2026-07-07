@@ -18,6 +18,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * 결제 웹훅 요청 본문(body)을 캐싱하여 인터셉터와 컨트롤러에서 여러 번 읽을 수 있게 하는 필터입니다.
+ */
 @Component
 public class RequestBodyCachingFilter extends OncePerRequestFilter {
     private static final String PAYMENT_PATH = "/api/payments";

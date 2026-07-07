@@ -39,7 +39,7 @@ public class PaymentHistoryController implements PaymentHistorySwagger {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String month
     ) {
-        PaymentDashboardResponse response = paymentHistoryService.getDashboard(userDetails.getUsername(), month);
+        PaymentDashboardResponse response = paymentHistoryService.getDashboard(userDetails.getUserId(), month);
         return ApiResponse.success(response);
     }
 
@@ -60,7 +60,7 @@ public class PaymentHistoryController implements PaymentHistorySwagger {
             @RequestParam String month,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        Slice<PaymentHistoryResponse> response = paymentHistoryService.getHistoryFeed(userDetails.getUsername(), status, month, pageable);
+        Slice<PaymentHistoryResponse> response = paymentHistoryService.getHistoryFeed(userDetails.getUserId(), status, month, pageable);
         return ApiResponse.success(response);
     }
 }

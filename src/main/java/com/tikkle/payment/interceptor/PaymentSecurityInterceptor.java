@@ -14,6 +14,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * 결제 스크래핑 요청에 대한 서명 검증을 수행하는 인터셉터입니다.
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class PaymentSecurityInterceptor implements HandlerInterceptor {
@@ -31,6 +37,7 @@ public class PaymentSecurityInterceptor implements HandlerInterceptor {
         String timestampStr = request.getHeader("X-Tikkle-Timestamp");
 
         if (signature == null || timestampStr == null) {
+            log.warn("[PaymentSecurityInterceptor] 서명 또는 타임스탬프 헤더 누락");
             throw new InvalidSignatureException();
         }
 
@@ -38,23 +45,27 @@ public class PaymentSecurityInterceptor implements HandlerInterceptor {
         try {
             timestamp = Long.parseLong(timestampStr);
         } catch (NumberFormatException e) {
+            log.warn("[PaymentSecurityInterceptor] 타임스탬프 파싱 실패 - timestamp: {}", timestampStr);
             throw new InvalidSignatureException();
         }
 
         long currentTime = Instant.now().getEpochSecond();
         if (Math.abs(currentTime - timestamp) > TIMESTAMP_EXPIRATION_SEC) {
+            log.warn("[PaymentSecurityInterceptor] 타임스탬프 5분 만료 - requestTime: {}, currentTime: {}", timestamp, currentTime);
             throw new ExpiredTimestampException();
         }
 
         // CachedBodyHttpServletRequest로 캐스팅하여 body 조회
         // instanceof 검사 후 캐스팅하여 body 조회
         if (!(request instanceof RequestBodyCachingFilter.CachedBodyHttpServletRequest cachedRequest)) {
+            log.warn("[PaymentSecurityInterceptor] RequestBodyCachingFilter 캐스팅 실패");
             throw new PaymentFilterConfigurationException();
         }
 
         String payload = new String(cachedRequest.getCachedBody(), StandardCharsets.UTF_8);
 
         if (!signatureValidator.isValid(payload, timestampStr, signature)) {
+            log.warn("[PaymentSecurityInterceptor] 서명 검증 실패");
             throw new InvalidSignatureException();
         }
 
