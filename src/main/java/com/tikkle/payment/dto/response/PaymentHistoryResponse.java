@@ -1,5 +1,7 @@
 package com.tikkle.payment.dto.response;
 
+import com.tikkle.payment.entity.PaymentEvent;
+import com.tikkle.payment.entity.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -39,18 +41,18 @@ public record PaymentHistoryResponse(
     @Schema(description = "결제 내역 생성 시간", example = "2026-06-22T10:30:00")
     LocalDateTime createdAt
 ) {
-    public static PaymentHistoryResponse from(com.tikkle.payment.entity.PaymentEvent event) {
+    public static PaymentHistoryResponse from(PaymentEvent event) {
         String statusStr;
         LocalDateTime expiredAt = null;
         Integer investedAmount = null;
 
-        if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.PENDING_PURCHASE) {
+        if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
             statusStr = "PENDING";
             expiredAt = event.getCreatedAt().plusHours(24);
-        } else if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.INVESTED) {
+        } else if (event.getStatus() == PaymentStatus.INVESTED) {
             statusStr = "INVESTED";
             investedAmount = event.getSpareChange();
-        } else if (event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.NOT_INVESTED || event.getStatus() == com.tikkle.payment.entity.enums.PaymentStatus.FAILED) {
+        } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
             statusStr = "CANCELED";
         } else {
             statusStr = "PENDING";

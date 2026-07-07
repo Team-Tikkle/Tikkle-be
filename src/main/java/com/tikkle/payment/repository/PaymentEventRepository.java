@@ -32,9 +32,6 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
     @Query("SELECT SUM(p.amount) FROM PaymentEvent p WHERE p.userId = :userId AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
     Long sumAmountByUserIdAndCreatedAtBetween(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    @Query("SELECT SUM(p.spareChange) FROM PaymentEvent p WHERE p.userId = :userId AND p.status = :status AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
-    Long sumSpareChangeByUserIdAndStatusAndCreatedAtBetween(@Param("userId") Long userId, @Param("status") PaymentStatus status, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
-    
     @Query("SELECT SUM(p.spareChange) FROM PaymentEvent p WHERE p.userId = :userId AND p.status IN :statuses AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
     Long sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(@Param("userId") Long userId, @Param("statuses") List<PaymentStatus> statuses, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 

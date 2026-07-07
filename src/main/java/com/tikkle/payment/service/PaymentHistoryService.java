@@ -46,7 +46,7 @@ public class PaymentHistoryService {
         Long sumAmount = paymentEventRepository.sumAmountByUserIdAndCreatedAtBetween(userId, startOfMonth, endOfMonth);
         long totalPayment = sumAmount != null ? sumAmount : 0L;
 
-        Long sumInvested = paymentEventRepository.sumSpareChangeByUserIdAndStatusAndCreatedAtBetween(userId, PaymentStatus.INVESTED, startOfMonth, endOfMonth);
+        Long sumInvested = paymentEventRepository.sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(userId, List.of(PaymentStatus.INVESTED), startOfMonth, endOfMonth);
         long totalInvestedChange = sumInvested != null ? sumInvested : 0L;
 
         Long sumUninvested = paymentEventRepository.sumSpareChangeByUserIdAndStatusesAndCreatedAtBetween(userId, List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED), startOfMonth, endOfMonth);
