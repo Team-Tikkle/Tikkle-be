@@ -60,6 +60,7 @@ public enum ErrorCode {
     UPBIT_AUTH_PARAM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-007", "업비트 API 호출을 위한 쿼리 파라미터가 유효하지 않습니다."),
     UPBIT_DEPOSIT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-008", "업비트 원화 입금 요청에 실패했습니다."),
     UPBIT_DEPOSIT_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-009", "업비트 입금 내역 조회에 실패했습니다."),
+    UPBIT_CANDLE_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-010", "업비트 주봉 캔들 차트 조회에 실패했습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),

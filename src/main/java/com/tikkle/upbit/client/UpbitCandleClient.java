@@ -1,7 +1,9 @@
 package com.tikkle.upbit.client;
 
 import com.tikkle.upbit.dto.response.UpbitCandleResponse;
+import com.tikkle.upbit.exception.UpbitCandleInquiryFailedException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -19,13 +21,13 @@ public class UpbitCandleClient {
 
     private final RestClient restClient;
 
-    public UpbitCandleClient() {
+    public UpbitCandleClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10000);
         factory.setReadTimeout(10000);
         
         this.restClient = RestClient.builder()
-                .baseUrl("https://api.upbit.com/v1")
+                .baseUrl(baseUrl)
                 .requestFactory(factory)
                 .defaultHeaders(headers -> {
                     headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -38,13 +40,14 @@ public class UpbitCandleClient {
      *
      * @param market 조회할 마켓 (예: KRW-BTC)
      * @param count 조회할 캔들 개수
-     * @return 주봉 캔들 데이터 리스트 (조회 실패 시 빈 리스트 반환)
+     * @return 주봉 캔들 데이터 리스트
+     * @throws UpbitCandleInquiryFailedException 차트 조회 실패 시
      */
     public List<UpbitCandleResponse> getWeeklyCandles(String market, int count) {
         try {
             return restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/candles/weeks")
+                            .path("/v1/candles/weeks")
                             .queryParam("market", market)
                             .queryParam("count", count)
                             .build())
@@ -52,7 +55,7 @@ public class UpbitCandleClient {
                     .body(new ParameterizedTypeReference<List<UpbitCandleResponse>>() {});
         } catch (Exception e) {
             log.error("Failed to fetch weekly candle for market: {}", market, e);
-            return List.of();
+            throw new UpbitCandleInquiryFailedException();
         }
     }
 }
