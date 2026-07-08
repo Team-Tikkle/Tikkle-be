@@ -8,6 +8,7 @@ import com.tikkle.onboarding.exception.OnboardingAlreadyCompletedException;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.settings.service.SettingsCacheManager;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.TargetCardCompany;
@@ -17,15 +18,12 @@ import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -40,9 +38,7 @@ public class OnboardingService {
     private final LinkedAccountRepository linkedAccountRepository;
     private final InvestmentProfileRepository investmentProfileRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
-    private final RedisTemplate<String, String> redisTemplate;
-
-    private static final String USER_SETTINGS_CACHE_PREFIX = "user:settings:";
+    private final SettingsCacheManager settingsCacheManager;
 
     /**
      * 사용자의 온보딩 절차를 진행합니다.
@@ -57,7 +53,7 @@ public class OnboardingService {
         try {
             User user = userRepository.findByIdWithLock(userId).orElseThrow(UserNotFoundException::new);
 
-            if (linkedAccountRepository.findByUserId(userId).isPresent() || !categorySpareChangeRuleRepository.findByUserId(userId).isEmpty()) {
+            if (linkedAccountRepository.findByUserId(userId).isPresent() || categorySpareChangeRuleRepository.existsByUserId(userId)) {
                 throw new OnboardingAlreadyCompletedException();
             }
 
@@ -68,7 +64,13 @@ public class OnboardingService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    cacheUserSettings(userId, request.targetCardLast4(), rules);
+                    settingsCacheManager.initializeUserSettings(
+                            userId, 
+                            TargetCardCompany.KBANK.getCompanyName(), 
+                            request.targetCardLast4(), 
+                            true, 
+                            rules
+                    );
                 }
             });
         } catch (DataIntegrityViolationException e) {
@@ -118,28 +120,5 @@ public class OnboardingService {
                         .build())
                 .collect(Collectors.toList());
         return categorySpareChangeRuleRepository.saveAll(rules);
-    }
-
-    /**
-     * 사용자의 설정 정보를 Redis에 캐싱합니다.
-     *
-     * @param userId          사용자 ID
-     * @param targetCardLast4 타겟 카드 마지막 4자리
-     * @param rules           카테고리별 잔돈 저축 규칙 목록
-     */
-    public void cacheUserSettings(Long userId, String targetCardLast4, List<CategorySpareChangeRule> rules) {
-        log.info("[OnboardingService] 사용자 설정 캐싱 시작 - userId: {}", userId);
-        String redisKey = USER_SETTINGS_CACHE_PREFIX + userId;
-
-        Map<String, String> cacheData = new HashMap<>();
-        cacheData.put("targetCardCompany", TargetCardCompany.KBANK.getCompanyName());
-        cacheData.put("targetCardLast4", targetCardLast4);
-        cacheData.put("isInvestmentEnabled", "true");
-
-        rules.forEach(rule ->
-                cacheData.put(rule.getCategory().name(), rule.getRuleType().name())
-        );
-
-        redisTemplate.opsForHash().putAll(redisKey, cacheData);
     }
 }
