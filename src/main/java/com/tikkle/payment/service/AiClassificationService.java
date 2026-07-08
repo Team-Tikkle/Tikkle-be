@@ -40,6 +40,13 @@ public class AiClassificationService {
                 .build();
     }
 
+    /**
+     * 입력된 가맹점명을 바탕으로 핵심 키워드를 추출하고, 7가지 카테고리 중 가장 적합한 하나로 분류합니다.
+     * AI 응답 지연(Timeout) 또는 오류 발생 시 기타(ETC) 카테고리로 폴백(Fallback) 처리됩니다.
+     *
+     * @param merchant 결제 가맹점 이름
+     * @return 분류된 핵심 키워드와 카테고리 응답 DTO
+     */
     public AiClassificationResponse classify(String merchant) {
         log.info("[AiClassificationService] AI 분류 요청 - merchant: {}", merchant);
 

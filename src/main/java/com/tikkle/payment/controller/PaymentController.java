@@ -2,6 +2,7 @@ package com.tikkle.payment.controller;
 
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
+import com.tikkle.payment.dto.response.PaymentScrapingResponse;
 import com.tikkle.payment.service.PaymentService;
 import com.tikkle.payment.swagger.PaymentSwagger;
 import jakarta.validation.Valid;
@@ -31,8 +32,7 @@ public class PaymentController implements PaymentSwagger {
     @Override
     @PostMapping
     public ApiResponse<?> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
-        
-        var response = paymentService.processPayment(request);
+        PaymentScrapingResponse response = paymentService.processPayment(request);
         
         return ApiResponse.success(response);
     }
