@@ -10,8 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
+import com.tikkle.payment.dto.request.CategoryUpdateRequest;
 import com.tikkle.global.security.CustomUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 
 @Tag(name = "Payment History", description = "결제 내역 탭 API")
 public interface PaymentHistorySwagger {
@@ -29,5 +33,13 @@ public interface PaymentHistorySwagger {
             @Parameter(description = "조회할 상태 필터 (ALL, PENDING, INVESTED, CANCELED)", example = "ALL", required = false) String status,
             @Parameter(description = "조회할 월 (YYYY-MM)", example = "2026-06", required = true) String month,
             @Parameter(hidden = true) Pageable pageable
+    );
+
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "결제 카테고리 수정", description = "특정 결제 건의 카테고리를 사용자가 직접 변경합니다.")
+    ApiResponse<?> updateCategory(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "결제 이벤트 ID", example = "10293", required = true) @PathVariable Long id,
+            @Valid @RequestBody CategoryUpdateRequest request
     );
 }

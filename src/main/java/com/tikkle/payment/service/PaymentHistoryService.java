@@ -6,6 +6,8 @@ import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
+import com.tikkle.payment.entity.enums.PaymentCategory;
+import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.repository.CategorySpendingProjection;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +94,21 @@ public class PaymentHistoryService {
         Slice<PaymentEvent> events = paymentEventRepository.findHistoryFeed(userId, startOfMonth, endOfMonth, mappedStatuses, pageable);
 
         return events.map(PaymentHistoryResponse::from);
+    }
+
+    /**
+     * 특정 결제 건의 카테고리를 사용자가 직접 변경합니다.
+     *
+     * @param userId 사용자 ID
+     * @param paymentId 결제 이벤트 ID
+     * @param category 변경할 카테고리
+     */
+    @Transactional
+    public void updateCategory(Long userId, Long paymentId, PaymentCategory category) {
+        PaymentEvent event = paymentEventRepository.findByIdAndUserId(paymentId, userId)
+                .orElseThrow(PaymentEventNotFoundException::new);
+
+        event.updateCategory(category);
     }
 
     private YearMonth parseMonth(String month) {
