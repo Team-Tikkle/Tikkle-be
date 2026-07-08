@@ -9,7 +9,10 @@ import java.util.List;
 @Schema(description = "설정 조회 응답 DTO")
 public record SettingsResponse(
         @Schema(description = "등록된 카테고리 잔돈 규칙 목록")
-        List<CategoryRule> spareChangeRules
+        List<CategoryRule> spareChangeRules,
+        
+        @Schema(description = "자동 투자 서비스 활성화 여부", example = "true")
+        boolean isInvestmentEnabled
 ) {
     @Schema(description = "카테고리 잔돈 규칙 아이템")
     public record CategoryRule(

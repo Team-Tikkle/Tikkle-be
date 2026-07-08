@@ -26,6 +26,11 @@ public class SettingsCacheManager {
         );
     }
 
+    public void updateInvestmentStatus(Long userId, boolean isEnabled) {
+        String cacheKey = cacheKey(userId);
+        redisTemplate.opsForHash().put(cacheKey, "isInvestmentEnabled", String.valueOf(isEnabled));
+    }
+
     private String cacheKey(Long userId) {
         return USER_SETTINGS_CACHE_PREFIX + userId;
     }

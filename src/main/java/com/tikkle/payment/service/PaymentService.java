@@ -13,12 +13,13 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.exception.DuplicatePaymentException;
+import com.tikkle.payment.exception.InvestmentDisabledException;
 import com.tikkle.payment.exception.CardMismatchException;
 import com.tikkle.user.exception.NoCategoryRuleException;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.component.SpareChangeCalculator;
-import com.tikkle.user.service.UserSettingsCacheService;
+import com.tikkle.settings.service.SettingsCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.annotation.Lazy;
@@ -43,7 +44,7 @@ public class PaymentService {
     private final SpareChangeCalculator spareChangeCalculator;
     private final AiClassificationService aiClassificationService;
     private final TargetCoinRecommendationService targetCoinRecommendationService;
-    private final UserSettingsCacheService userSettingsCacheService;
+    private final SettingsCacheService settingsCacheService;
     private final PaymentService self;
 
     public PaymentService(
@@ -53,7 +54,7 @@ public class PaymentService {
             SpareChangeCalculator spareChangeCalculator,
             AiClassificationService aiClassificationService,
             TargetCoinRecommendationService targetCoinRecommendationService,
-            UserSettingsCacheService userSettingsCacheService,
+            SettingsCacheService settingsCacheService,
             @Lazy PaymentService self) {
         this.paymentEventRepository = paymentEventRepository;
         this.redisTemplate = redisTemplate;
@@ -61,7 +62,7 @@ public class PaymentService {
         this.spareChangeCalculator = spareChangeCalculator;
         this.aiClassificationService = aiClassificationService;
         this.targetCoinRecommendationService = targetCoinRecommendationService;
-        this.userSettingsCacheService = userSettingsCacheService;
+        this.settingsCacheService = settingsCacheService;
         this.self = self;
     }
 
@@ -89,7 +90,14 @@ public class PaymentService {
             }
 
             // Redis에서 유저 설정 통째로 가져오기
-            Map<String, String> userSettings = userSettingsCacheService.getUserSettings(request.userId());
+            Map<String, String> userSettings = settingsCacheService.getUserSettings(request.userId());
+
+            String isInvestmentEnabled = userSettings.get("isInvestmentEnabled");
+            if ("false".equals(isInvestmentEnabled)) {
+                log.info("[PaymentService] 자동 투자가 비활성화되어 결제 처리 조기 종료 - userId: {}", request.userId());
+                redisTemplate.delete(redisTxKey);
+                throw new InvestmentDisabledException();
+            }
 
             // 타겟 카드 매칭 검증
             validateTargetCard(request, userSettings, redisTxKey);

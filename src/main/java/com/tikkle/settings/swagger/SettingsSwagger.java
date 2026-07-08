@@ -2,6 +2,7 @@ package com.tikkle.settings.swagger;
 
 import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
+import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
@@ -27,4 +28,9 @@ public interface SettingsSwagger {
     @Operation(summary = "거래소 계정 및 API 키 수정", description = "Upbit Access Key/Secret Key를 전체 교체합니다. 보안상 기존 값은 조회로 노출하지 않습니다.")
     ApiResponse<?> updateLinkedAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                        UpdateLinkedAccountRequest request);
+
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "자동 투자 서비스 활성화/비활성화", description = "사용자가 결제 시 투자를 진행할지 여부를 설정합니다.")
+    ApiResponse<?> updateInvestmentStatus(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+                                          UpdateInvestmentStatusRequest request);
 }

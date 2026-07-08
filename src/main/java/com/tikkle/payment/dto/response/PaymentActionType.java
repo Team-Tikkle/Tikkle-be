@@ -10,6 +10,6 @@ public enum PaymentActionType {
     @Schema(description = "잔돈이 0원이라 무시됨")
     IGNORE_NO_SPARE_CHANGE,
 
-    @Schema(description = "최소 투자 금액(5,000원)을 충족하지 못해 무시됨")
+    @Schema(description = "최소 투자 금액(5,100원)을 충족하지 못해 무시됨")
     IGNORE_MINIMUM_AMOUNT_UNMET
 }
