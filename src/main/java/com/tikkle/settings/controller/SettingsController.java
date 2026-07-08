@@ -2,6 +2,7 @@ package com.tikkle.settings.controller;
 
 import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
+import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
@@ -38,6 +39,14 @@ public class SettingsController implements SettingsSwagger {
     public ApiResponse<?> updateLinkedAccount(@AuthenticationPrincipal CustomUserDetails userDetails,
                                               @RequestBody @Valid UpdateLinkedAccountRequest request) {
         settingsService.updateLinkedAccount(userDetails.getUsername(), request);
+        return ApiResponse.successWithNoData();
+    }
+
+    @Override
+    @PatchMapping("/investment")
+    public ApiResponse<?> updateInvestmentStatus(@AuthenticationPrincipal CustomUserDetails userDetails,
+                                                 @RequestBody @Valid UpdateInvestmentStatusRequest request) {
+        settingsService.updateInvestmentStatus(userDetails.getUsername(), request);
         return ApiResponse.successWithNoData();
     }
 }
