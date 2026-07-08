@@ -1,5 +1,6 @@
 package com.tikkle.onboarding.dto.request;
 
+import com.tikkle.user.entity.enums.TwoFactorProvider;
 import com.tikkle.investment.entity.enums.*;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
@@ -29,6 +30,10 @@ public record OnboardingRequest(
         @Size(min = 4, max = 4, message = "카드 번호 마지막 4자리를 입력해주세요.")
         @Pattern(regexp = "^[0-9]{4}$", message = "카드 번호 마지막 4자리는 숫자 4자리여야 합니다.")
         String targetCardLast4,
+
+        @Schema(description = "업비트 원화 입금 2차 인증 수단", example = "KAKAO", allowableValues = {"KAKAO", "NAVER", "HANA"})
+        @NotNull(message = "2차 인증 수단을 선택해주세요.")
+        TwoFactorProvider twoFactorProvider,
 
         // 5대 투자 성향
         @Schema(description = "하락장 방어 심리", example = "HOLD", allowableValues = {"SELL_IMMEDIATELY", "HOLD", "BUY_MORE"})
