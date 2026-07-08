@@ -12,9 +12,14 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+import com.tikkle.payment.dto.request.CategoryUpdateRequest;
 
 /**
  * 결제 내역 조회 및 대시보드 관련 API 엔드포인트를 제공하는 컨트롤러입니다.
@@ -62,5 +67,24 @@ public class PaymentHistoryController implements PaymentHistorySwagger {
     ) {
         Slice<PaymentHistoryResponse> response = paymentHistoryService.getHistoryFeed(userDetails.getUserId(), status, month, pageable);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 특정 결제 건의 카테고리를 변경합니다.
+     *
+     * @param userDetails 인증된 사용자 정보
+     * @param id 결제 이벤트 ID
+     * @param request 변경할 카테고리 정보
+     * @return 성공 응답
+     */
+    @Override
+    @PatchMapping("/{id}/category")
+    public ApiResponse<?> updateCategory(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id,
+            @Valid @RequestBody CategoryUpdateRequest request
+    ) {
+        paymentHistoryService.updateCategory(userDetails.getUserId(), id, request.category());
+        return ApiResponse.successWithNoData();
     }
 }

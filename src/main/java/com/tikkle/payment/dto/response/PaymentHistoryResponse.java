@@ -12,7 +12,7 @@ public record PaymentHistoryResponse(
         @Schema(description = "결제 이벤트 ID (매수 승인/거절 시 사용)", example = "10293")
         Long id,
 
-        @Schema(description = "정제된 가맹점 이름", example = "스타벅스")
+        @Schema(description = "정제되지 않은 원본 가맹점 이름", example = "스타벅스")
         String merchant,
 
         @Schema(description = "원본 결제 금액", example = "4560")
@@ -69,7 +69,7 @@ public record PaymentHistoryResponse(
 
         return new PaymentHistoryResponse(
                 event.getId(),
-                event.getMerchant(),
+                event.getRawMerchant(),
                 event.getAmount(),
                 event.getSpareChange(),
                 event.getCategory() != null ? event.getCategory().name() : null,

@@ -203,6 +203,7 @@ public class PaymentService {
                     .cardCompany(request.cardCompany())
                     .cardNumberLast4(request.cardNumberLast4())
                     .merchant(keyword != null ? keyword : request.merchant())
+                    .rawMerchant(request.merchant())
                     .amount(request.amount())
                     .spareChange(spareChange)
                     .category(category)
