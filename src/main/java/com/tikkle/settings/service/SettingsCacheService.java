@@ -1,4 +1,4 @@
-package com.tikkle.user.service;
+package com.tikkle.settings.service;
 
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
@@ -14,10 +14,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Redis에서 사용자 설정을 조회하고, 캐시 미스 시 DB에서 복구하는 서비스입니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class UserSettingsCacheService {
+public class SettingsCacheService {
     private final LinkedAccountRepository linkedAccountRepository;
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final RedisTemplate<String, String> redisTemplate;
