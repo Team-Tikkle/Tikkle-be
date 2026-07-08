@@ -34,6 +34,9 @@ public class PaymentEvent {
     @Column(name = "merchant", nullable = false, length = 100)
     private String merchant;
 
+    @Column(name = "raw_merchant", nullable = false, length = 100)
+    private String rawMerchant;
+
     @Column(name = "amount", nullable = false)
     private Integer amount;
 
@@ -69,11 +72,12 @@ public class PaymentEvent {
     private BigDecimal investedPrice;
 
     @Builder
-    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason, Coin targetCoin) {
+    public PaymentEvent(Long userId, String cardCompany, String cardNumberLast4, String merchant, String rawMerchant, Integer amount, Integer spareChange, PaymentCategory category, String transactionId, PaymentStatus status, String reason, Coin targetCoin) {
         this.userId = userId;
         this.cardCompany = cardCompany;
         this.cardNumberLast4 = cardNumberLast4;
         this.merchant = merchant;
+        this.rawMerchant = rawMerchant;
         this.amount = amount;
         this.spareChange = spareChange;
         this.category = category;
@@ -97,5 +101,9 @@ public class PaymentEvent {
     public void failInvestment(String reason) {
         this.status = PaymentStatus.FAILED;
         this.reason = reason;
+    }
+
+    public void updateCategory(PaymentCategory category) {
+        this.category = category;
     }
 }
