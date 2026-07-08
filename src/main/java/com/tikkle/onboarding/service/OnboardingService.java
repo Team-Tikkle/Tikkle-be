@@ -70,6 +70,7 @@ public class OnboardingService {
                 .upbitSecretKey(dto.upbitSecretKey())
                 .targetCardCompany(TargetCardCompany.KBANK.getCompanyName())
                 .targetCardLast4(dto.targetCardLast4())
+                .twoFactorProvider(dto.twoFactorProvider())
                 .build();
         linkedAccountRepository.save(account);
     }

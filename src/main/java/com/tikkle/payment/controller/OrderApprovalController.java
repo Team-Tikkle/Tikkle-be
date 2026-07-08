@@ -4,10 +4,14 @@ import com.tikkle.global.response.ApiResponse;
 import com.tikkle.payment.service.OrderApprovalService;
 import com.tikkle.payment.swagger.OrderApprovalSwagger;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
+import com.tikkle.payment.sse.SseConnectionManager;
 
 import com.tikkle.global.security.CustomUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 @RequestMapping("/api/payments/{eventId}")
 public class OrderApprovalController implements OrderApprovalSwagger {
     private final OrderApprovalService orderApprovalService;
+    private final SseConnectionManager sseConnectionManager;
 
     /**
      * 대기 중인 결제 건에 대해 매수를 승인합니다.
@@ -36,6 +41,17 @@ public class OrderApprovalController implements OrderApprovalSwagger {
     ) {
         orderApprovalService.approveOrder(userDetails.getUserId(), eventId);
         return ApiResponse.successWithNoData();
+    }
+
+    /**
+     * 입금 상태 모니터링을 위한 SSE 연결
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamOrderApproval(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long eventId
+    ) {
+        return sseConnectionManager.createEmitter(eventId);
     }
 
     /**

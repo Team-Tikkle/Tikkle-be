@@ -23,9 +23,9 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
     @Query("SELECT p FROM PaymentEvent p WHERE p.id = :id AND p.userId = :userId")
     Optional<PaymentEvent> findByIdAndUserIdForUpdate(@Param("id") Long id, @Param("userId") Long userId);
 
-    List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, LocalDateTime dateTime);
+    List<PaymentEvent> findByStatus(PaymentStatus status);
 
-    List<PaymentEvent> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end);
+    List<PaymentEvent> findByStatusAndCreatedAtBefore(PaymentStatus status, LocalDateTime dateTime);
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
@@ -39,7 +39,7 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
     List<CategorySpendingProjection> findCategorySpendingByUserIdAndCreatedAtBetween(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
 
-    @Query("SELECT p.targetCoin.id FROM PaymentEvent p WHERE p.userId = :userId AND p.status = com.tikkle.payment.entity.enums.PaymentStatus.INVESTED ORDER BY p.createdAt DESC")
+    @Query("SELECT p.targetCoin.market FROM PaymentEvent p WHERE p.userId = :userId AND p.status = com.tikkle.payment.entity.enums.PaymentStatus.INVESTED ORDER BY p.createdAt DESC")
     List<String> findRecentPurchasedMarkets(@Param("userId") Long userId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"targetCoin"})

@@ -54,6 +54,11 @@ public record PaymentHistoryResponse(
         if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
             statusStr = "PENDING";
             expiredAt = event.getCreatedAt().plusHours(24);
+        } else if (event.getStatus() == PaymentStatus.PENDING_DEPOSIT) {
+            // 업비트 2차 인증 입금 요청 시 유효시간 3.5분으로 설정 (SSE 타임아웃과 동일하게)
+            statusStr = "PENDING";
+            expiredAt = event.getDepositRequestedAt() != null 
+                    ? event.getDepositRequestedAt().plusSeconds(210) : null;
         } else if (event.getStatus() == PaymentStatus.INVESTED) {
             statusStr = "INVESTED";
             investedVolume = event.getInvestedVolume();
