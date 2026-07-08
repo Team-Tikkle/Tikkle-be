@@ -1,7 +1,7 @@
 package com.tikkle.settings.controller;
 
-import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
@@ -22,7 +22,7 @@ public class SettingsController implements SettingsSwagger {
     @Override
     @GetMapping
     public ApiResponse<SettingsResponse> getSettings(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ApiResponse.success(settingsService.getSettings(userDetails.getUsername()));
+        return ApiResponse.success(settingsService.getSettings(userDetails.getUserId()));
     }
 
 
@@ -30,7 +30,7 @@ public class SettingsController implements SettingsSwagger {
     @PatchMapping("/spare-change-rules")
     public ApiResponse<?> updateSpareChangeRules(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                  @RequestBody @Valid UpdateSpareChangeRulesRequest request) {
-        settingsService.updateSpareChangeRules(userDetails.getUsername(), request);
+        settingsService.updateSpareChangeRules(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
     }
 
@@ -38,7 +38,7 @@ public class SettingsController implements SettingsSwagger {
     @PatchMapping("/linked-account")
     public ApiResponse<?> updateLinkedAccount(@AuthenticationPrincipal CustomUserDetails userDetails,
                                               @RequestBody @Valid UpdateLinkedAccountRequest request) {
-        settingsService.updateLinkedAccount(userDetails.getUsername(), request);
+        settingsService.updateLinkedAccount(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
     }
 
@@ -46,7 +46,7 @@ public class SettingsController implements SettingsSwagger {
     @PatchMapping("/investment")
     public ApiResponse<?> updateInvestmentStatus(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                  @RequestBody @Valid UpdateInvestmentStatusRequest request) {
-        settingsService.updateInvestmentStatus(userDetails.getUsername(), request);
+        settingsService.updateInvestmentStatus(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
     }
 }

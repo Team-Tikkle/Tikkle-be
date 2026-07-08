@@ -8,10 +8,7 @@ import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
 import com.tikkle.user.entity.LinkedAccount;
-import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
-import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +24,9 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 사용자 설정(잔돈 규칙, 투자 활성화 여부, 연동 계좌 등)을 관리하는 비즈니스 로직 서비스입니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,10 +37,7 @@ public class SettingsService {
     private final LinkedAccountRepository linkedAccountRepository;
     private final SettingsCacheManager settingsCacheManager;
 
-    public SettingsResponse getSettings(String email) {
-        User user = findActiveUserByEmail(email);
-        Long userId = user.getId();
-
+    public SettingsResponse getSettings(Long userId) {
         List<SettingsResponse.CategoryRule> spareChangeRules = categorySpareChangeRuleRepository.findByUserId(userId).stream()
                 .map(rule -> new SettingsResponse.CategoryRule(rule.getCategory(), rule.getRuleType()))
                 .toList();
@@ -53,10 +50,8 @@ public class SettingsService {
 
 
     @Transactional
-    public void updateSpareChangeRules(String email, UpdateSpareChangeRulesRequest request) {
-        User user = findActiveUserByEmail(email);
-        Long userId = user.getId();
-
+    public void updateSpareChangeRules(Long userId, UpdateSpareChangeRulesRequest request) {
+        log.info("[SettingsService] 카테고리 잔돈 규칙 변경 처리 - userId: {}", userId);
         Map<PaymentCategory, CategorySpareChangeRule> existing = categorySpareChangeRuleRepository.findByUserId(userId).stream()
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, Function.identity()));
 
@@ -67,7 +62,7 @@ public class SettingsService {
                 rule.change(item.ruleType());
             } else {
                 rule = categorySpareChangeRuleRepository.save(CategorySpareChangeRule.builder()
-                        .user(user)
+                        .user(userRepository.getReferenceById(userId))
                         .category(item.category())
                         .ruleType(item.ruleType())
                         .build());
@@ -79,31 +74,23 @@ public class SettingsService {
     }
 
     @Transactional
-    public void updateLinkedAccount(String email, UpdateLinkedAccountRequest request) {
-        User user = findActiveUserByEmail(email);
-
-        LinkedAccount account = linkedAccountRepository.findByUserId(user.getId())
+    public void updateLinkedAccount(Long userId, UpdateLinkedAccountRequest request) {
+        log.info("[SettingsService] 업비트 계정 연동 정보 변경 처리 - userId: {}", userId);
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         account.updateUpbitCredentials(request.upbitAccessKey(), request.upbitSecretKey());
     }
 
     @Transactional
-    public void updateInvestmentStatus(String email, UpdateInvestmentStatusRequest request) {
-        User user = findActiveUserByEmail(email);
-        Long userId = user.getId();
-
+    public void updateInvestmentStatus(Long userId, UpdateInvestmentStatusRequest request) {
+        log.info("[SettingsService] 자동 투자 활성화 상태 변경 처리 - userId: {}, isInvestmentEnabled: {}", userId, request.isInvestmentEnabled());
         LinkedAccount account = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         account.updateInvestmentStatus(request.isInvestmentEnabled());
 
         syncAfterCommit(() -> settingsCacheManager.updateInvestmentStatus(userId, request.isInvestmentEnabled()));
-    }
-
-    private User findActiveUserByEmail(String email) {
-        return userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
-                .orElseThrow(UserNotFoundException::new);
     }
 
     private void syncAfterCommit(Runnable action) {
