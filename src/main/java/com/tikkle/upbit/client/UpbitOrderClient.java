@@ -16,6 +16,10 @@ import org.springframework.web.client.RestClientResponseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 업비트 주문 관련 API를 호출하는 외부 연동 클라이언트입니다.
+ * 시장가 매수 주문 요청과 개별 주문 상세 내역 조회를 수행합니다.
+ */
 @Slf4j
 @Component
 public class UpbitOrderClient {
@@ -32,6 +36,17 @@ public class UpbitOrderClient {
                 .build();
     }
 
+    /**
+     * 업비트에 시장가 매수 주문(price 방식)을 요청합니다.
+     * 지정한 원화 금액(krwAmount)만큼 전액 매수합니다.
+     *
+     * @param market 매수할 코인 마켓 (예: KRW-BTC)
+     * @param krwAmount 매수할 총 금액
+     * @param accessKey 업비트 API Access Key
+     * @param secretKey 업비트 API Secret Key
+     * @return 주문 요청 결과
+     * @throws UpbitOrderFailedException 매수 주문이 실패한 경우
+     */
     public UpbitOrderResponse placeMarketBuyOrder(String market, int krwAmount, String accessKey, String secretKey) {
         try {
             Map<String, Object> params = new LinkedHashMap<>();
@@ -64,6 +79,15 @@ public class UpbitOrderClient {
         }
     }
 
+    /**
+     * 생성된 주문의 상세 내역(체결 상태, 거래 내역 등)을 UUID로 조회합니다.
+     *
+     * @param uuid 조회할 주문 UUID
+     * @param accessKey 업비트 API Access Key
+     * @param secretKey 업비트 API Secret Key
+     * @return 주문 상세 내역 및 체결 정보
+     * @throws UpbitOrderInquiryFailedException 조회 실패 시
+     */
     public UpbitOrderResponse getOrderDetails(String uuid, String accessKey, String secretKey) {
         try {
             String queryString = "uuid=" + uuid;

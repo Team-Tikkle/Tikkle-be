@@ -22,6 +22,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+/**
+ * 사용자의 증권 계좌 정보를 이용하여 업비트 시장가 매수를 수행하는 서비스입니다.
+ * 외부 트레이딩 호출과 포트폴리오 원장 동기화를 담당합니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,8 +37,22 @@ public class UpbitTradeService {
     private final PortfolioRepository portfolioRepository;
     private final ObjectProvider<UpbitTradeService> selfProvider;
 
+    /**
+     * 트레이딩 체결 결과를 담는 레코드
+     */
     public record TradeResult(BigDecimal executedPrice, BigDecimal executedVolume) {}
 
+    /**
+     * 사용자의 업비트 계좌 정보를 조회한 뒤 지정된 코인(마켓)에 대해 시장가 매수를 수행합니다.
+     * 체결이 완료될 때까지 일정 횟수 폴링하며, 완료 후 사용자의 포트폴리오 원장을 업데이트합니다.
+     *
+     * @param userId 매수를 수행할 사용자 ID
+     * @param market 매수할 마켓 (예: KRW-BTC)
+     * @param krwAmount 매수할 원화 금액
+     * @return 체결 결과 (평균 단가, 체결 수량)
+     * @throws LinkedAccountNotFoundException 연동된 계좌가 없는 경우
+     * @throws UpbitOrderExecutionFailedException 체결 폴링 대기 시간 초과 또는 실패 시
+     */
     public TradeResult executeTrade(Long userId, String market, int krwAmount) {
         // 1. 사전 데이터 로드 (I/O 발생 전, 별도 트랜잭션 불필요)
         LinkedAccount linkedAccount = linkedAccountRepository.findByUserId(userId)
@@ -102,6 +120,13 @@ public class UpbitTradeService {
         return result;
     }
 
+    /**
+     * 트레이딩 결과(매수 체결 내역)를 사용자의 투자 포트폴리오 원장에 반영합니다.
+     *
+     * @param userId 사용자 ID
+     * @param market 체결된 마켓 (코인)
+     * @param result 체결 내역 (가격 및 수량)
+     */
     @Transactional
     public void updatePortfolio(Long userId, String market, TradeResult result) {
         User user = userRepository.findById(userId)
