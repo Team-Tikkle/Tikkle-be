@@ -13,6 +13,7 @@ import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.payment.exception.DuplicatePaymentException;
+import com.tikkle.payment.exception.InvestmentDisabledException;
 import com.tikkle.payment.exception.CardMismatchException;
 import com.tikkle.user.exception.NoCategoryRuleException;
 import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
@@ -90,6 +91,13 @@ public class PaymentService {
 
             // Redis에서 유저 설정 통째로 가져오기
             Map<String, String> userSettings = userSettingsCacheService.getUserSettings(request.userId());
+
+            String isInvestmentEnabled = userSettings.get("isInvestmentEnabled");
+            if ("false".equals(isInvestmentEnabled)) {
+                log.info("[PaymentService] 자동 투자가 비활성화되어 결제 처리 조기 종료 - userId: {}", request.userId());
+                redisTemplate.delete(redisTxKey);
+                throw new InvestmentDisabledException();
+            }
 
             // 타겟 카드 매칭 검증
             validateTargetCard(request, userSettings, redisTxKey);

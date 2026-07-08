@@ -43,6 +43,7 @@ public enum ErrorCode {
     CARD_MISMATCH(HttpStatus.CONFLICT, "PAYMENT-008", "타겟 카드 결제 건이 아닙니다."),
     DUPLICATE_PAYMENT(HttpStatus.CONFLICT, "PAYMENT-009", "이미 처리된 결제 요청입니다."),
     PAYMENT_FILTER_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "PAYMENT-010", "요청 바디 캐싱 필터가 적용되지 않았습니다."),
+    INVESTMENT_DISABLED(HttpStatus.CONFLICT, "PAYMENT-011", "자동 투자 서비스가 비활성화되어 결제가 무시되었습니다."),
 
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
