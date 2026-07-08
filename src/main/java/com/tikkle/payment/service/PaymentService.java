@@ -69,13 +69,11 @@ public class PaymentService {
     private record ClassificationResult(String keyword, PaymentCategory category) {}
 
     /**
-     * 결제 처리 메인 파이프라인
-     *
-     * 1단계: 결제 검증 (중복, 카드 매칭)
-     * 2단계: 카테고리 분류 (DB 캐시 → AI 폴백)
-     * 3단계: 잔돈 계산
-     * 4단계: 잔액과 잔돈 비교
-     * 5단계: 코인 추천 후 응답
+     * 결제 스크래핑 요청을 처리하는 메인 파이프라인 메서드입니다.
+     * 중복 결제 검증, AI 카테고리 분류, 잔돈 규칙 적용, 타겟 코인 추천 후 결제 이벤트를 영속화합니다.
+     * 
+     * @param request 안드로이드에서 수신된 결제 정보 DTO
+     * @return 결제 처리 결과 및 추천 코인 정보 DTO
      */
     public PaymentScrapingResponse processPayment(PaymentScrapingRequest request) {
         // 1단계: 결제 검증
@@ -156,9 +154,6 @@ public class PaymentService {
         }
     }
 
-
-    // 2단계: 카테고리 분류
-
     /**
      * DB 캐시(PaymentCategoryMapping) 우선 조회 → 미스 시 AI 분류 폴백
      */
@@ -187,9 +182,6 @@ public class PaymentService {
 
         return new ClassificationResult(aiResponse.keyword(), aiResponse.category());
     }
-
-
-    // 공통 유틸 메서드
 
     /**
      * NOT_INVESTED 상태로 원장을 저장하고 조기 차단 응답을 생성한다.

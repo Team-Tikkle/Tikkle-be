@@ -32,9 +32,15 @@ import java.util.stream.Collectors;
 public class PaymentHistoryService {
     private final PaymentEventRepository paymentEventRepository;
 
+    /**
+     * 특정 월의 결제 대시보드 통계(누적 결제액, 누적 투자액, 카테고리별 소비 등)를 집계하여 반환합니다.
+     *
+     * @param userId 사용자 ID
+     * @param month 조회할 월(yyyy-MM 형식)
+     * @return 대시보드 통계 결과 DTO
+     */
     @Transactional(readOnly = true)
     public PaymentDashboardResponse getDashboard(Long userId, String month) {
-
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfMonth = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
@@ -66,9 +72,17 @@ public class PaymentHistoryService {
         );
     }
 
+    /**
+     * 결제 내역 및 투자 상태를 포함한 피드를 무한 스크롤 페이징 형태로 조회합니다.
+     *
+     * @param userId 사용자 ID
+     * @param status 필터링할 결제 상태 (ALL, PENDING, INVESTED, CANCELED)
+     * @param month 조회할 월(yyyy-MM 형식)
+     * @param pageable 페이징 정보
+     * @return 결제 내역 피드 결과(Slice)
+     */
     @Transactional(readOnly = true)
     public Slice<PaymentHistoryResponse> getHistoryFeed(Long userId, String status, String month, Pageable pageable) {
-
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfMonth = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
@@ -79,8 +93,6 @@ public class PaymentHistoryService {
 
         return events.map(PaymentHistoryResponse::from);
     }
-
-
 
     private YearMonth parseMonth(String month) {
         try {
