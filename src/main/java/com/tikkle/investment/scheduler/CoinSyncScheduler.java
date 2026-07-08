@@ -16,6 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 매일 새벽 업비트 API를 호출하여 최신 마켓(코인) 리스트를 DB와 동기화하는 스케줄러 컴포넌트입니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -23,11 +26,14 @@ public class CoinSyncScheduler {
     private final UpbitMarketClient upbitMarketClient;
     private final CoinRepository coinRepository;
 
+    /**
+     * 매일 새벽 4시 및 서버 기동 시 업비트 마켓 리스트를 가져와 DB에 코인 메타데이터(한글/영문명 등)를 갱신합니다.
+     */
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul") // 매일 새벽 4시 실행
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void syncCoinMetadata() {
-        log.info("업비트 마켓 리스트 동기화 스케줄러 시작");
+        log.info("[CoinSyncScheduler] 업비트 마켓 리스트 동기화 스케줄러 시작");
         try {
             List<UpbitMarketResponse> markets = upbitMarketClient.getAllMarkets();
             
@@ -59,9 +65,9 @@ public class CoinSyncScheduler {
                 }
             }
 
-            log.info("업비트 마켓 리스트 동기화 완료 - 신규: {}건, 업데이트: {}건", insertCount, updateCount);
+            log.info("[CoinSyncScheduler] 업비트 마켓 리스트 동기화 완료 - 신규: {}, 업데이트: {}", insertCount, updateCount);
         } catch (Exception e) {
-            log.error("업비트 마켓 리스트 동기화 실패", e);
+            log.error("[CoinSyncScheduler] 업비트 마켓 리스트 동기화 실패", e);
         }
     }
 }

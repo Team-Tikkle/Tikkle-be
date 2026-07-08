@@ -19,7 +19,7 @@ public class TestController {
 
     @PostMapping("/scheduler/portfolio")
     public ApiResponse<?> triggerPortfolioScheduler() {
-        log.info("[Test API] triggerPortfolioScheduler called");
+        log.info("[TestController] 포트폴리오 스케줄러 수동 실행 API 호출됨");
         aiPortfolioScheduler.scheduleDailyTargets();
         return ApiResponse.successWithNoData();
     }
