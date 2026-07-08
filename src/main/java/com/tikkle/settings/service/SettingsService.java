@@ -3,6 +3,7 @@ package com.tikkle.settings.service;
 import com.tikkle.payment.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
@@ -44,7 +45,10 @@ public class SettingsService {
                 .map(rule -> new SettingsResponse.CategoryRule(rule.getCategory(), rule.getRuleType()))
                 .toList();
 
-        return new SettingsResponse(spareChangeRules);
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId)
+                .orElseThrow(LinkedAccountNotFoundException::new);
+
+        return new SettingsResponse(spareChangeRules, account.isInvestmentEnabled());
     }
 
 
@@ -82,6 +86,19 @@ public class SettingsService {
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         account.updateUpbitCredentials(request.upbitAccessKey(), request.upbitSecretKey());
+    }
+
+    @Transactional
+    public void updateInvestmentStatus(String email, UpdateInvestmentStatusRequest request) {
+        User user = findActiveUserByEmail(email);
+        Long userId = user.getId();
+
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId)
+                .orElseThrow(LinkedAccountNotFoundException::new);
+
+        account.updateInvestmentStatus(request.isInvestmentEnabled());
+
+        syncAfterCommit(() -> settingsCacheManager.updateInvestmentStatus(userId, request.isInvestmentEnabled()));
     }
 
     private User findActiveUserByEmail(String email) {

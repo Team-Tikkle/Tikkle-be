@@ -53,6 +53,7 @@ public class UserSettingsCacheService {
         Map<String, String> cacheData = new HashMap<>();
         cacheData.put("targetCardCompany", account.getTargetCardCompany());
         cacheData.put("targetCardLast4", account.getTargetCardLast4());
+        cacheData.put("isInvestmentEnabled", String.valueOf(account.isInvestmentEnabled()));
         rules.forEach(rule -> {
             if (rule.getCategory() != null) {
                 cacheData.put(rule.getCategory().name(), rule.getRuleType().name());

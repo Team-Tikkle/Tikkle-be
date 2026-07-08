@@ -40,6 +40,9 @@ public class LinkedAccount {
     @Column(nullable = false, length = 20)
     private TwoFactorProvider twoFactorProvider;
 
+    @Column(name = "is_investment_enabled", nullable = false)
+    private boolean isInvestmentEnabled = true;
+
     @Builder
     private LinkedAccount(User user, String upbitAccessKey, String upbitSecretKey, String targetCardCompany, String targetCardLast4, TwoFactorProvider twoFactorProvider) {
         this.user = user;
@@ -53,5 +56,9 @@ public class LinkedAccount {
     public void updateUpbitCredentials(String upbitAccessKey, String upbitSecretKey) {
         this.upbitAccessKey = upbitAccessKey;
         this.upbitSecretKey = upbitSecretKey;
+    }
+
+    public void updateInvestmentStatus(boolean isEnabled) {
+        this.isInvestmentEnabled = isEnabled;
     }
 }

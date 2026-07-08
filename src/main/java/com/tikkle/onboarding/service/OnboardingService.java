@@ -112,6 +112,7 @@ public class OnboardingService {
         Map<String, String> cacheData = new HashMap<>();
         cacheData.put("targetCardCompany", TargetCardCompany.KBANK.getCompanyName());
         cacheData.put("targetCardLast4", targetCardLast4);
+        cacheData.put("isInvestmentEnabled", "true");
 
         rules.forEach(rule ->
                 cacheData.put(rule.getCategory().name(), rule.getRuleType().name())
