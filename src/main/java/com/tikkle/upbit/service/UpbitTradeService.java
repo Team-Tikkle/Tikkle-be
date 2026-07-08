@@ -4,9 +4,10 @@ import com.tikkle.investment.entity.Portfolio;
 import com.tikkle.investment.repository.PortfolioRepository;
 import com.tikkle.upbit.client.UpbitOrderClient;
 import com.tikkle.upbit.dto.response.UpbitOrderResponse;
+import com.tikkle.upbit.exception.UpbitOrderExecutionFailedException;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
-import com.tikkle.user.exception.UserNotFoundException;
+import com.tikkle.user.exception.LinkedAccountNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.tikkle.upbit.exception.UpbitOrderExecutionFailedException;
-import com.tikkle.user.exception.LinkedAccountNotFoundException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -54,6 +52,7 @@ public class UpbitTradeService {
      * @throws UpbitOrderExecutionFailedException 체결 폴링 대기 시간 초과 또는 실패 시
      */
     public TradeResult executeTrade(Long userId, String market, int krwAmount) {
+        log.info("[UpbitTradeService] 시장가 매수 주문 시작 - userId: {}, market: {}, krwAmount: {}", userId, market, krwAmount);
         // 1. 사전 데이터 로드 (I/O 발생 전, 별도 트랜잭션 불필요)
         LinkedAccount linkedAccount = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
@@ -129,8 +128,8 @@ public class UpbitTradeService {
      */
     @Transactional
     public void updatePortfolio(Long userId, String market, TradeResult result) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        log.info("[UpbitTradeService] 트레이딩 결과 포트폴리오(원장) 반영 시작 - userId: {}, market: {}", userId, market);
+        User user = userRepository.getReferenceById(userId);
 
         Portfolio portfolio = portfolioRepository.findByUserIdAndMarket(userId, market)
                 .orElseGet(() -> portfolioRepository.save(Portfolio.builder()
@@ -141,5 +140,6 @@ public class UpbitTradeService {
                         .build()));
 
         portfolio.updateHolding(result.executedPrice(), result.executedVolume());
+        log.info("[UpbitTradeService] 포트폴리오(원장) 반영 완료 - userId: {}, market: {}", userId, market);
     }
 }
