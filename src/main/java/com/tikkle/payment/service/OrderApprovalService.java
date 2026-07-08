@@ -6,9 +6,11 @@ import com.tikkle.payment.exception.InvalidPaymentStatusException;
 import com.tikkle.payment.exception.UpbitTradeException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.repository.PaymentEventRepository;
-import com.tikkle.upbit.service.UpbitTradeService;
+import com.tikkle.upbit.client.UpbitDepositClient;
+import com.tikkle.user.entity.LinkedAccount;
+import com.tikkle.user.exception.LinkedAccountNotFoundException;
+import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,21 +24,25 @@ public class OrderApprovalService {
     private static final String DEFAULT_FALLBACK_MARKET = "KRW-BTC";
 
     private final PaymentEventRepository paymentEventRepository;
-    private final UpbitTradeService upbitTradeService;
+    private final LinkedAccountRepository linkedAccountRepository;
+    private final UpbitDepositClient upbitDepositClient;
     private final OrderApprovalService self;
 
     public OrderApprovalService(
             PaymentEventRepository paymentEventRepository,
-            UpbitTradeService upbitTradeService,
-            @Lazy OrderApprovalService self
+            LinkedAccountRepository linkedAccountRepository,
+            UpbitDepositClient upbitDepositClient,
+            @org.springframework.context.annotation.Lazy OrderApprovalService self
     ) {
         this.paymentEventRepository = paymentEventRepository;
-        this.upbitTradeService = upbitTradeService;
+        this.linkedAccountRepository = linkedAccountRepository;
+        this.upbitDepositClient = upbitDepositClient;
         this.self = self;
     }
 
     /**
-     * 대기 중인 결제 건에 대해 매수를 승인하고, 업비트 API를 통해 동기적으로 매수 주문을 체결합니다.
+     * 대기 중인 결제 건에 대해 매수를 승인하고, 업비트 API를 통해 원화 입금을 요청(2차 인증 발송)합니다.
+     * 성공 시 결제 이벤트 상태를 PENDING_DEPOSIT으로 변경합니다.
      *
      * @param userId 사용자 ID
      * @param eventId 매수를 승인할 결제 이벤트 ID
@@ -51,13 +57,25 @@ public class OrderApprovalService {
         }
 
         try {
-            // 업비트 동기 매수 및 원장 업데이트 (AI가 지정한 타겟 코인 매수)
-            String targetMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : DEFAULT_FALLBACK_MARKET;
-            var result = upbitTradeService.executeTrade(event.getUserId(), targetMarket, event.getSpareChange());
-            event.completeInvestment(result.executedVolume(), result.executedPrice());
+            LinkedAccount account = linkedAccountRepository.findByUserId(userId)
+                    .orElseThrow(LinkedAccountNotFoundException::new);
+
+            String twoFactorType = account.getTwoFactorProvider().getUpbitProviderType();
+
+            // 업비트 원화 입금 요청 (2차 인증 발송)
+            var depositResponse = upbitDepositClient.requestKrwDeposit(
+                    event.getSpareChange().intValue(),
+                    twoFactorType,
+                    account.getUpbitAccessKey(),
+                    account.getUpbitSecretKey()
+            );
+
+            // 상태를 PENDING_DEPOSIT으로 변경하고 uuid 저장
+            event.updateToPendingDeposit(depositResponse.uuid());
+            log.info("[OrderApprovalService] 업비트 입금 요청 성공 - eventId: {}, uuid: {}", eventId, depositResponse.uuid());
         } catch (Exception e) {
-            log.error("[OrderApprovalService] 매수 승인 후 업비트 체결 실패 - eventId: {}", eventId, e);
-            String reason = "업비트 매수 주문 실패: " + e.getMessage();
+            log.error("[OrderApprovalService] 매수 승인(입금 요청) 실패 - eventId: {}", eventId, e);
+            String reason = "업비트 입금 요청 실패: " + e.getMessage();
             self.markAsFailed(eventId, reason);
             throw new UpbitTradeException();
         }

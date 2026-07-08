@@ -61,6 +61,12 @@ public class PaymentEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "deposit_uuid", unique = true)
+    private String depositUuid;
+
+    @Column(name = "deposit_requested_at")
+    private LocalDateTime depositRequestedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_coin_market")
     private Coin targetCoin;
@@ -105,5 +111,11 @@ public class PaymentEvent {
 
     public void updateCategory(PaymentCategory category) {
         this.category = category;
+    }
+
+    public void updateToPendingDeposit(String depositUuid) {
+        this.status = PaymentStatus.PENDING_DEPOSIT;
+        this.depositUuid = depositUuid;
+        this.depositRequestedAt = LocalDateTime.now();
     }
 }

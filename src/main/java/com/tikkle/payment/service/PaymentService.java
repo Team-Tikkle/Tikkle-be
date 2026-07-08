@@ -111,9 +111,9 @@ public class PaymentService {
                 return handleNotInvested(request, classification, 0, "잔돈 0원", PaymentActionType.IGNORE_NO_SPARE_CHANGE);
             }
 
-            // 최소 투자 금액(5,000원) 미달 → 조기 차단
-            if (spareChange < 5000) {
-                return handleNotInvested(request, classification, spareChange, "최소 투자 금액(5,000원) 미달", PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET);
+            // 최소 투자 금액(5,100원) 미달 → 조기 차단
+            if (spareChange < 5100) {
+                return handleNotInvested(request, classification, spareChange, "최소 투자 금액(5,100원) 미달", PaymentActionType.IGNORE_MINIMUM_AMOUNT_UNMET);
             }
 
             // 4단계: 코인 추천 후 응답
