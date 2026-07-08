@@ -4,6 +4,7 @@ import com.tikkle.investment.dto.response.AiCandidateResponse;
 import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.Coin;
 import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.exception.CoinNotFoundException;
 import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
@@ -14,12 +15,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import com.tikkle.investment.exception.CoinNotFoundException;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * AI가 생성해둔 후보군 캐시를 조회하여, 퀀트 엔진을 거친 뒤 사용자가 잔돈으로 매수할
+ * 최종 타겟 코인 1개를 결정하는 오케스트레이션 서비스입니다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -83,19 +87,19 @@ public class TargetCoinRecommendationService {
                             );
 
                             if (!finalTargets.isEmpty()) {
-                                log.info("실시간 퀀트 스코어링 완료! 상위 3개 후보군: {}",
+                                log.info("[TargetCoinRecommendationService] 실시간 퀀트 스코어링 완료! 상위 3개 후보군: {}",
                                         finalTargets.stream().limit(3).map(dto -> dto.coinName() + "(" + dto.market() + ")").toList());
 
                                 targetMarket = finalTargets.get(0).market();
                                 targetCoinName = finalTargets.get(0).coinName();
-                                log.info("최종 매수 타겟 코인 확정: {} ({})", targetCoinName, targetMarket);
+                                log.info("[TargetCoinRecommendationService] 최종 매수 타겟 코인 확정: {} ({})", targetCoinName, targetMarket);
                             } else {
-                                log.warn("퀀트 스코어링 후 유효한 후보군이 없습니다. Fallback으로 기본 코인(BTC)을 매수합니다.");
+                                log.warn("[TargetCoinRecommendationService] 퀀트 스코어링 후 유효한 후보군이 없습니다. Fallback으로 기본 코인(BTC)을 매수합니다.");
                             }
                         }
                     }
                 } catch (Exception e) {
-                    log.error("AI 후보군 Redis 파싱 및 실시간 퀀트 스코어링 실패. Fallback으로 BTC를 매수합니다.", e);
+                    log.error("[TargetCoinRecommendationService] AI 후보군 Redis 파싱 및 실시간 퀀트 스코어링 실패. Fallback으로 BTC를 매수합니다 - errorMessage: {}", e.getMessage(), e);
                 }
             }
         }

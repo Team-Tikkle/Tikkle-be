@@ -6,6 +6,8 @@ import com.tikkle.investment.dto.response.AiCandidateResponse;
 import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.AiRecommendationHistory;
 import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.entity.enums.RiskTolerance;
+import com.tikkle.investment.entity.enums.TrendSensitivity;
 import com.tikkle.investment.exception.AiRecommendationFailedException;
 import com.tikkle.investment.repository.AiRecommendationHistoryRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
@@ -21,9 +23,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.List;
-import com.tikkle.investment.entity.enums.RiskTolerance;
-import com.tikkle.investment.entity.enums.TrendSensitivity;
 
+/**
+ * 12시간마다 동작하여 거시경제 지표와 사용자의 성향을 조합해 LLM에게 전달하고,
+ * 1차 후보군 풀(15개 코인)을 생성하여 Redis에 캐싱하는 AI 포트폴리오 서비스입니다.
+ */
 @Slf4j
 @Service
 public class AiPortfolioService {
@@ -55,8 +59,13 @@ public class AiPortfolioService {
         this.historyRepository = historyRepository;
     }
 
+    /**
+     * 외부 매크로 데이터(F&G 인덱스, BTC 도미넌스, 주간 변동률)를 조회하고,
+     * 위험 감수성(Risk)과 트렌드 민감도(Trend)의 9가지 조합별로 
+     * AI 모델을 호출하여 각각 15개의 후보군을 도출한 후 Redis에 저장합니다.
+     */
     public void generateMacroUniverses() {
-        log.info("Starting AI Macro Universe generation (Stage 1).");
+        log.info("[AiPortfolioService] AI 매크로 유니버스 생성 시작 (Stage 1)");
         
         // 1. Context Data 수집
         String fngIndex = fearAndGreedClient.getFearAndGreedIndex();
@@ -70,7 +79,7 @@ public class AiPortfolioService {
         String ethWeekly = ethCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", ethCandles.get(0).getChangeRate() * 100);
         String weeklyTrend = String.format("BTC 1W Change: %s, ETH 1W Change: %s", btcWeekly, ethWeekly);
         
-        log.info("[Macro Context] Fetched External Data -> F&G Index: {}, BTC Dominance: {}%, Weekly Trend: {}", fngIndex, btcDom, weeklyTrend);
+        log.info("[AiPortfolioService] 외부 데이터 조회 완료 - fngIndex: {}, btcDominance: {}%, weeklyTrend: {}", fngIndex, btcDom, weeklyTrend);
         
         // 모든 RiskTolerance와 TrendSensitivity의 조합 (최대 3x3 = 9개)을 생성합니다.
         for (RiskTolerance risk : RiskTolerance.values()) {
@@ -83,7 +92,7 @@ public class AiPortfolioService {
                     String redisKey = "ai:candidates:" + hashKey;
                     String jsonValue = objectMapper.writeValueAsString(new AiCandidateResponse(aiCandidates));
                     redisTemplate.opsForValue().set(redisKey, jsonValue, Duration.ofHours(12));
-                    log.info("Successfully cached 15 candidates in Redis for hash: {}", hashKey);
+                    log.info("[AiPortfolioService] 레디스에 15개 후보군 캐싱 완료 - hashKey: {}", hashKey);
 
                     // DB에 히스토리 저장 (Analytics 및 백테스팅 용도)
                     AiRecommendationHistory history = AiRecommendationHistory.builder()
@@ -94,16 +103,26 @@ public class AiPortfolioService {
                             .candidatesJson(jsonValue)
                             .build();
                     historyRepository.save(history);
-                    log.info("Successfully saved AI recommendation history to DB for hash: {}", hashKey);
+                    log.info("[AiPortfolioService] DB에 AI 추천 히스토리 저장 완료 - hashKey: {}", hashKey);
                     
                 } catch (Exception e) {
-                    log.error("Failed to fetch/cache macro candidates for group: {}", hashKey, e);
+                    log.error("[AiPortfolioService] 매크로 후보군 조회 및 캐싱 실패 - hashKey: {}", hashKey, e);
                 }
             }
         }
-        log.info("Finished AI Macro Universe generation for all 9 combinations.");
+        log.info("[AiPortfolioService] 9개 조합에 대한 AI 매크로 유니버스 생성 완료");
     }
 
+    /**
+     * AI 챗 모델(Anthropic)에 프롬프트를 전송하여 시장 상황에 맞는 가상자산 15종을 추천받습니다.
+     *
+     * @param risk 사용자 위험 감수성
+     * @param trend 사용자 트렌드 민감도
+     * @param fngIndex 공포 탐욕 지수
+     * @param btcDom 비트코인 도미넌스
+     * @param weeklyTrend 주간 비트코인/이더리움 변동 추세
+     * @return 추천된 코인 후보군 리스트 (정확히 15개)
+     */
     private List<AiRecommendationDto> fetchAiMacroCandidates(RiskTolerance risk, TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend) {
         String promptText = """
             You are a top-tier quantitative crypto portfolio manager. 
@@ -157,15 +176,21 @@ public class AiPortfolioService {
 
             AiCandidateResponse response = objectMapper.readValue(responseText, AiCandidateResponse.class);
                     
-            log.info("AI generated {} candidates for Risk: {}, Trend: {}", 
+            log.info("[AiPortfolioService] AI 후보군 생성 완료 - candidatesSize: {}, risk: {}, trend: {}", 
                     response.candidates().size(), risk.name(), trend.name());
             return response.candidates();
         } catch (Exception e) {
-            log.error("AI Recommendation API call failed", e);
+            log.error("[AiPortfolioService] AI 추천 API 호출 실패", e);
             throw new AiRecommendationFailedException();
         }
     }
 
+    /**
+     * 사용자 투자 성향 프로필을 기반으로 AI 후보군 캐시 조회를 위한 해시 키를 생성합니다.
+     *
+     * @param profile 사용자 투자 성향 프로필
+     * @return Risk:Trend 조합의 해시 키
+     */
     public String generateProfileHashKey(InvestmentProfile profile) {
         String risk = profile.getRiskTolerance().name();
         String trend = profile.getTrendSensitivity().name();
