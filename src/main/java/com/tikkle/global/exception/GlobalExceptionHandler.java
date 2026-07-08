@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * 애플리케이션 전역에서 발생하는 예외를 가로채어, ApiResponse 규격에 맞춰 통일된 형태의 
+ * 에러 응답(JSON)을 클라이언트에게 반환하는 글로벌 예외 핸들러입니다.
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
