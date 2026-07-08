@@ -3,8 +3,8 @@ package com.tikkle.payment.service;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.exception.InvalidPaymentStatusException;
-import com.tikkle.payment.exception.UpbitTradeException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
+import com.tikkle.payment.exception.UpbitTradeException;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.user.entity.LinkedAccount;
@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 public class OrderApprovalService {
-    private static final String DEFAULT_FALLBACK_MARKET = "KRW-BTC";
-
     private final PaymentEventRepository paymentEventRepository;
     private final LinkedAccountRepository linkedAccountRepository;
     private final UpbitDepositClient upbitDepositClient;
