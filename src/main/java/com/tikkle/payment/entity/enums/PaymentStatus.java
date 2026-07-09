@@ -9,6 +9,7 @@ public enum PaymentStatus {
     PENDING_DEPOSIT,    // 사용자가 승인하여 업비트 입금(2차 인증) 대기 중
 
     // [매수 결과]
+    PENDING_TRADE,      // 매수 주문 접수 완료 및 체결 대기 중
     INVESTED,           // 업비트 매수 체결 완료 (최종 성공)
     FAILED              // 매수 실패 (잔액 부족, 거래소 에러 등)
 }
