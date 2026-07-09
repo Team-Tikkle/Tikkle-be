@@ -20,6 +20,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 업비트 원화 입금 내역을 폴링하여 매수 승인 상태를 업데이트하고 코인 매수를 체결하는 스케줄러입니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

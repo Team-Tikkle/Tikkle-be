@@ -1,9 +1,8 @@
 package com.tikkle.global.security.jwt;
 
-import tools.jackson.databind.json.JsonMapper;
-import com.tikkle.global.security.CustomUserDetailsService;
 import com.tikkle.global.exception.ErrorCode;
 import com.tikkle.global.response.ApiResponse;
+import com.tikkle.global.security.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,10 +17,15 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * HTTP 요청이 들어올 때마다 헤더에서 JWT 토큰을 추출하고 유효성을 검증하여,
+ * 유효한 토큰일 경우 SecurityContext에 인증 정보를 등록하는 필터입니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,6 +34,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
     private final JsonMapper objectMapper;
 
+    /**
+     * 필터 핵심 로직을 수행합니다. 토큰을 파싱 및 검증하고, 결과에 따라 인증하거나 에러 응답을 반환합니다.
+     *
+     * @param request  HTTP 요청 객체
+     * @param response HTTP 응답 객체
+     * @param filterChain 필터 체인
+     * @throws ServletException 서블릿 예외
+     * @throws IOException 입출력 예외
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {

@@ -46,7 +46,7 @@ public class UpbitTickerClient {
                     .body(new ParameterizedTypeReference<List<UpbitTickerResponse>>() {});
             return response != null ? response : java.util.Collections.emptyList();
         } catch (Exception e) {
-            log.error("업비트 시세 조회 실패 (markets: {})", markets, e);
+            log.error("[UpbitTickerClient] 업비트 시세 조회 실패 - markets: {}", markets, e);
             throw new UpbitTickerInquiryFailedException();
         }
     }

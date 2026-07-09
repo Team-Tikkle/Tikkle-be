@@ -1,4 +1,4 @@
-package com.tikkle.payment.entity;
+package com.tikkle.settings.entity;
 
 import com.tikkle.user.entity.User;
 import com.tikkle.payment.entity.enums.PaymentCategory;

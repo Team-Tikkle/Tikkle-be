@@ -1,9 +1,9 @@
 package com.tikkle.onboarding.dto.request;
 
-import com.tikkle.user.entity.enums.TwoFactorProvider;
 import com.tikkle.investment.entity.enums.*;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.user.entity.enums.TwoFactorProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -11,9 +11,6 @@ import jakarta.validation.constraints.*;
 import java.util.List;
 import java.util.Set;
 
-/**
- * 온보딩 시 클라이언트로부터 수신하는 통합 Request DTO
- */
 @Schema(description = "온보딩 통합 요청 정보")
 public record OnboardingRequest(
         // 금융 연동 정보

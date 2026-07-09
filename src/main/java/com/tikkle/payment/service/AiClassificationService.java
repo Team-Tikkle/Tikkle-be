@@ -2,7 +2,6 @@ package com.tikkle.payment.service;
 
 import com.tikkle.payment.dto.response.AiClassificationResponse;
 import com.tikkle.payment.entity.enums.PaymentCategory;
-import com.tikkle.payment.exception.InvalidAiResponseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -61,7 +60,8 @@ public class AiClassificationService {
             log.info("[AiClassificationService] AI 분류 응답 - response: {}", response);
 
             if (response == null || response.keyword() == null || response.category() == null) {
-                throw new InvalidAiResponseException();
+                log.warn("[AiClassificationService] AI 응답 데이터 누락, ETC 폴백 - merchant: {}", merchant);
+                return new AiClassificationResponse(merchant, PaymentCategory.ETC);
             }
 
             return response;

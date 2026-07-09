@@ -6,6 +6,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+/**
+ * CoinGecko Open API를 호출하여 암호화폐 시장의 글로벌 매크로 지표를 수집하는 클라이언트입니다.
+ */
 @Slf4j
 @Component
 public class CoinGeckoClient {
@@ -22,6 +25,12 @@ public class CoinGeckoClient {
                 .build();
     }
 
+    /**
+     * CoinGecko 글로벌 엔드포인트를 호출하여 현재 비트코인 도미넌스(BTC 시가총액 비중)를 가져옵니다.
+     * 외부 통신 실패 시에는 기본값(50.0)을 반환하여 시스템 장애를 방지합니다.
+     *
+     * @return 비트코인 도미넌스 퍼센트 (ex: "52.4")
+     */
     public String getBtcDominance() {
         try {
             CoinGeckoGlobalResponse response = restClient.get()
@@ -38,7 +47,7 @@ public class CoinGeckoClient {
             }
             return "50.0"; // default
         } catch (Exception e) {
-            log.warn("Failed to fetch BTC Dominance from CoinGecko, using default value: {}", e.getMessage());
+            log.warn("[CoinGeckoClient] 코인게코 비트코인 도미넌스 조회 실패. 기본값 사용 - errorMessage: {}", e.getMessage());
             return "50.0"; // default on failure
         }
     }

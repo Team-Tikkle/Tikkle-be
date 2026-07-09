@@ -5,8 +5,8 @@ import com.tikkle.global.exception.InvalidInputValueException;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
-import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.entity.enums.PaymentCategory;
+import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.repository.CategorySpendingProjection;
 import com.tikkle.payment.repository.PaymentEventRepository;
@@ -105,6 +105,7 @@ public class PaymentHistoryService {
      */
     @Transactional
     public void updateCategory(Long userId, Long paymentId, PaymentCategory category) {
+        log.info("[PaymentHistoryService] 결제 카테고리 변경 처리 - userId: {}, paymentId: {}, category: {}", userId, paymentId, category);
         PaymentEvent event = paymentEventRepository.findByIdAndUserId(paymentId, userId)
                 .orElseThrow(PaymentEventNotFoundException::new);
 

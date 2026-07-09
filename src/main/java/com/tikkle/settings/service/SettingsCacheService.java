@@ -1,7 +1,7 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.payment.entity.CategorySpareChangeRule;
-import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
+import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
 import com.tikkle.user.exception.NoCategoryRuleException;

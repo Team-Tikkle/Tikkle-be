@@ -1,22 +1,27 @@
 package com.tikkle.investment.dto.response;
 
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-@Getter
-@Setter
-public class FearAndGreedResponse {
-    private String name;
-    private List<FearAndGreedData> data;
+public record FearAndGreedResponse(String name, List<FearAndGreedData> data) {
+    public List<FearAndGreedData> getData() {
+        return data;
+    }
 
-    @Getter
-    @Setter
-    public static class FearAndGreedData {
-        private String value;
-        private String value_classification;
-        private String timestamp;
-        private String time_until_update;
+    public record FearAndGreedData(
+            String value,
+            
+            @JsonProperty("value_classification")
+            String valueClassification,
+            
+            String timestamp,
+            
+            @JsonProperty("time_until_update")
+            String timeUntilUpdate
+    ) {
+        public String getValue() {
+            return value;
+        }
     }
 }

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "ai_recommendation_history")
+@Table(name = "AI_RECOMMENDATION_HISTORY")
 public class AiRecommendationHistory {
 
     @Id
