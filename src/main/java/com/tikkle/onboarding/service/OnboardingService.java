@@ -5,9 +5,9 @@ import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.onboarding.dto.request.OnboardingRequest;
 import com.tikkle.onboarding.exception.DuplicateCategoryRuleException;
 import com.tikkle.onboarding.exception.OnboardingAlreadyCompletedException;
-import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
-import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.service.SettingsCacheManager;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
@@ -53,7 +53,7 @@ public class OnboardingService {
         try {
             User user = userRepository.findByIdWithLock(userId).orElseThrow(UserNotFoundException::new);
 
-            if (linkedAccountRepository.findByUserId(userId).isPresent() || categorySpareChangeRuleRepository.existsByUserId(userId)) {
+            if (linkedAccountRepository.existsByUserId(userId) || categorySpareChangeRuleRepository.existsByUserId(userId)) {
                 throw new OnboardingAlreadyCompletedException();
             }
 
@@ -64,13 +64,17 @@ public class OnboardingService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    settingsCacheManager.initializeUserSettings(
-                            userId, 
-                            TargetCardCompany.KBANK.getCompanyName(), 
-                            request.targetCardLast4(), 
-                            true, 
-                            rules
-                    );
+                    try {
+                        settingsCacheManager.initializeUserSettings(
+                                userId, 
+                                TargetCardCompany.KBANK.getCompanyName(), 
+                                request.targetCardLast4(), 
+                                true, 
+                                rules
+                        );
+                    } catch (Exception e) {
+                        log.error("[OnboardingService] 유저 셋팅 캐시 초기화 실패 - userId: {}", userId, e);
+                    }
                 }
             });
         } catch (DataIntegrityViolationException e) {

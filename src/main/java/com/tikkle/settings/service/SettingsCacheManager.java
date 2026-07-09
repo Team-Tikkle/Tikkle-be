@@ -1,6 +1,6 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;

@@ -1,8 +1,8 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.payment.entity.CategorySpareChangeRule;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
 import com.tikkle.payment.entity.enums.PaymentCategory;
-import com.tikkle.payment.repository.CategorySpareChangeRuleRepository;
+import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
 import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
