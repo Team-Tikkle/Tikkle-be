@@ -69,10 +69,10 @@ public class UpbitDepositClient {
                     .retrieve()
                     .body(UpbitDepositResponse.class);
         } catch (RestClientResponseException e) {
-            log.error("업비트 원화 입금 요청 실패 - Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            log.error("[UpbitDepositClient] 업비트 원화 입금 요청 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
             throw new UpbitDepositFailedException();
         } catch (Exception e) {
-            log.error("업비트 원화 입금 요청 실패", e);
+            log.error("[UpbitDepositClient] 업비트 원화 입금 요청 실패", e);
             throw new UpbitDepositFailedException();
         }
     }
@@ -97,7 +97,7 @@ public class UpbitDepositClient {
                     .retrieve()
                     .body(UpbitDepositResponse.class);
         } catch (Exception e) {
-            log.error("업비트 개별 입금 내역 조회 실패", e);
+            log.error("[UpbitDepositClient] 업비트 개별 입금 내역 조회 실패", e);
             throw new UpbitDepositInquiryFailedException();
         }
     }

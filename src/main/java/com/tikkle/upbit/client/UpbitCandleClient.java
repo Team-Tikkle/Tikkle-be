@@ -54,7 +54,7 @@ public class UpbitCandleClient {
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<UpbitCandleResponse>>() {});
         } catch (Exception e) {
-            log.error("Failed to fetch weekly candle for market: {}", market, e);
+            log.error("[UpbitCandleClient] 업비트 주봉 캔들 조회 실패 - market: {}", market, e);
             throw new UpbitCandleInquiryFailedException();
         }
     }

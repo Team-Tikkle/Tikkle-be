@@ -45,8 +45,13 @@ public class GoogleOAuthClient {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (request, response) -> {
-                    log.error("[GoogleOAuthClient] 구글 사용자 정보 요청 실패 - Status: {}, Response: {}", 
-                            response.getStatusCode(), new String(response.getBody().readAllBytes()));
+                    try {
+                        String errorBody = new String(response.getBody().readAllBytes());
+                        log.error("[GoogleOAuthClient] 구글 사용자 정보 요청 실패 - Status: {}, Response: {}", 
+                                response.getStatusCode(), errorBody);
+                    } catch (Exception e) {
+                        log.error("[GoogleOAuthClient] 구글 사용자 정보 요청 실패 (에러 바디 읽기 실패) - Status: {}", response.getStatusCode(), e);
+                    }
                     throw new InvalidSocialTokenException();
                 })
                 .body(GoogleUserInfo.class);

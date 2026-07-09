@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface LinkedAccountRepository extends JpaRepository<LinkedAccount, Long> {
     Optional<LinkedAccount> findByUserId(Long userId);
+    boolean existsByUserId(Long userId);
 }

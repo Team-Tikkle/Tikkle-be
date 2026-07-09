@@ -7,7 +7,7 @@ import com.tikkle.payment.service.PaymentService;
 import com.tikkle.payment.swagger.PaymentSwagger;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 결제 푸시 알림 스크래핑 관련 API 엔드포인트를 제공하는 컨트롤러입니다.
  */
-@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/payments")

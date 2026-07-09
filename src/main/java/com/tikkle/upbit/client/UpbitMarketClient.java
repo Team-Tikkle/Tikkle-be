@@ -46,7 +46,7 @@ public class UpbitMarketClient {
                     .body(new ParameterizedTypeReference<List<UpbitMarketResponse>>() {});
             return response != null ? response : java.util.Collections.emptyList();
         } catch (Exception e) {
-            log.error("업비트 마켓 리스트 조회 실패", e);
+            log.error("[UpbitMarketClient] 업비트 마켓 리스트 조회 실패", e);
             throw new UpbitMarketInquiryFailedException();
         }
     }

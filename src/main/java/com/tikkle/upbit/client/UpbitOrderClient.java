@@ -71,10 +71,10 @@ public class UpbitOrderClient {
                     .retrieve()
                     .body(UpbitOrderResponse.class);
         } catch (RestClientResponseException e) {
-            log.error("업비트 매수 주문 실패 - Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
             throw new UpbitOrderFailedException();
         } catch (Exception e) {
-            log.error("업비트 매수 주문 실패", e);
+            log.error("[UpbitOrderClient] 업비트 매수 주문 실패", e);
             throw new UpbitOrderFailedException();
         }
     }
@@ -99,7 +99,7 @@ public class UpbitOrderClient {
                     .retrieve()
                     .body(UpbitOrderResponse.class);
         } catch (Exception e) {
-            log.error("업비트 주문 내역 조회 실패", e);
+            log.error("[UpbitOrderClient] 업비트 주문 내역 조회 실패", e);
             throw new UpbitOrderInquiryFailedException();
         }
     }

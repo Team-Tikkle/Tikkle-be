@@ -11,6 +11,7 @@ import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,7 @@ public class OrderApprovalService {
             PaymentEventRepository paymentEventRepository,
             LinkedAccountRepository linkedAccountRepository,
             UpbitDepositClient upbitDepositClient,
-            @org.springframework.context.annotation.Lazy OrderApprovalService self
+            @Lazy OrderApprovalService self
     ) {
         this.paymentEventRepository = paymentEventRepository;
         this.linkedAccountRepository = linkedAccountRepository;

@@ -24,8 +24,8 @@ public record PaymentHistoryResponse(
         @Schema(description = "가맹점 카테고리 Enum Name", example = "CAFE")
         String category,
 
-        @Schema(description = "상태 값 (PENDING, INVESTED, CANCELED 중 하나)", example = "PENDING")
-        String status,
+        @Schema(description = "상태 값", example = "PENDING")
+        PaymentViewStatus status,
 
         @Schema(description = "매수 승인 대기 만료 시간 (PENDING 상태일 때만 존재)", example = "2026-06-22T10:30:00", nullable = true)
         LocalDateTime expiredAt,
@@ -46,27 +46,27 @@ public record PaymentHistoryResponse(
     LocalDateTime createdAt
 ) {
     public static PaymentHistoryResponse from(PaymentEvent event) {
-        String statusStr;
+        PaymentViewStatus viewStatus;
         LocalDateTime expiredAt = null;
         BigDecimal investedVolume = null;
         BigDecimal investedPrice = null;
 
         if (event.getStatus() == PaymentStatus.PENDING_PURCHASE) {
-            statusStr = "PENDING";
+            viewStatus = PaymentViewStatus.PENDING;
             expiredAt = event.getCreatedAt().plusHours(24);
         } else if (event.getStatus() == PaymentStatus.PENDING_DEPOSIT) {
             // 업비트 2차 인증 입금 요청 시 유효시간 3.5분으로 설정 (SSE 타임아웃과 동일하게)
-            statusStr = "PENDING";
+            viewStatus = PaymentViewStatus.PENDING;
             expiredAt = event.getDepositRequestedAt() != null 
                     ? event.getDepositRequestedAt().plusSeconds(210) : null;
         } else if (event.getStatus() == PaymentStatus.INVESTED) {
-            statusStr = "INVESTED";
+            viewStatus = PaymentViewStatus.INVESTED;
             investedVolume = event.getInvestedVolume();
             investedPrice = event.getInvestedPrice();
         } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
-            statusStr = "CANCELED";
+            viewStatus = PaymentViewStatus.CANCELED;
         } else {
-            statusStr = "PENDING";
+            viewStatus = PaymentViewStatus.PENDING;
         }
 
         String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;
@@ -78,7 +78,7 @@ public record PaymentHistoryResponse(
                 event.getAmount(),
                 event.getSpareChange(),
                 event.getCategory() != null ? event.getCategory().name() : null,
-                statusStr,
+                viewStatus,
                 expiredAt,
                 targetCoinMarket,
                 targetCoinName,

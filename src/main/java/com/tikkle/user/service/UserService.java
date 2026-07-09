@@ -58,6 +58,6 @@ public class UserService {
 
     // 온보딩 미완료 시 신규 유저로 간주한다. 온보딩은 단일 트랜잭션으로 처리되므로 LinkedAccount 존재 여부로 판단한다.
     private boolean isNewUser(Long userId) {
-        return linkedAccountRepository.findByUserId(userId).isEmpty();
+        return !linkedAccountRepository.existsByUserId(userId);
     }
 }
