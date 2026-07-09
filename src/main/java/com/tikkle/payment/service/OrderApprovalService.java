@@ -46,7 +46,7 @@ public class OrderApprovalService {
      * @param userId 사용자 ID
      * @param eventId 매수를 승인할 결제 이벤트 ID
      */
-    @Transactional
+    @Transactional(noRollbackFor = UpbitTradeException.class)
     public void approveOrder(Long userId, Long eventId) {
         PaymentEvent event = paymentEventRepository.findByIdAndUserIdForUpdate(eventId, userId)
                 .orElseThrow(PaymentEventNotFoundException::new);
@@ -75,7 +75,9 @@ public class OrderApprovalService {
         } catch (Exception e) {
             log.error("[OrderApprovalService] 매수 승인(입금 요청) 실패 - eventId: {}", eventId, e);
             String reason = "업비트 입금 요청 실패: " + e.getMessage();
-            self.markAsFailed(eventId, reason);
+            
+            // 데드락 방지: REQUIRES_NEW 트랜잭션(self.markAsFailed)을 타지 않고 현재 영속성 컨텍스트에서 바로 변경 후 커밋 유도
+            event.failInvestment(reason);
             throw new UpbitTradeException();
         }
     }
