@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "investment_profile")
+@Table(name = "INVESTMENT_PROFILE")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InvestmentProfile {
@@ -34,7 +34,7 @@ public class InvestmentProfile {
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-            name = "investment_profile_themes",
+            name = "INVESTMENT_PROFILE_THEMES",
             joinColumns = @JoinColumn(name = "investment_profile_id")
     )
     @Column(name = "theme", nullable = false)

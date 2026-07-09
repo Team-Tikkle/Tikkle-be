@@ -8,6 +8,8 @@ import com.tikkle.investment.exception.CoinNotFoundException;
 import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.investment.entity.AiRecommendationHistory;
+import com.tikkle.investment.repository.AiRecommendationHistoryRepository;
 import com.tikkle.upbit.client.UpbitTickerClient;
 import com.tikkle.upbit.dto.response.UpbitTickerResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.Duration;
 
 /**
  * AI가 생성해둔 후보군 캐시를 조회하여, 퀀트 엔진을 거친 뒤 사용자가 잔돈으로 매수할
@@ -35,6 +38,7 @@ public class TargetCoinRecommendationService {
     private final UpbitTickerClient upbitTickerClient;
     private final CoinRepository coinRepository;
     private final PaymentEventRepository paymentEventRepository;
+    private final AiRecommendationHistoryRepository aiRecommendationHistoryRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final JsonMapper objectMapper;
 
@@ -57,6 +61,16 @@ public class TargetCoinRecommendationService {
             String hashKey = aiPortfolioService.generateProfileHashKey(profile);
             String redisKey = "ai:candidates:" + hashKey;
             String jsonCandidates = redisTemplate.opsForValue().get(redisKey);
+
+            if (jsonCandidates == null) {
+                log.warn("[TargetCoinRecommendationService] Redis 캐시 미스 - DB에서 최근 내역(Fallback) 조회 시도 (hashKey: {})", hashKey);
+                AiRecommendationHistory history = aiRecommendationHistoryRepository.findTopByProfileHashKeyOrderByIdDesc(hashKey).orElse(null);
+                if (history != null) {
+                    jsonCandidates = history.getCandidatesJson();
+                    redisTemplate.opsForValue().set(redisKey, jsonCandidates, Duration.ofHours(12));
+                    log.info("[TargetCoinRecommendationService] DB 조회 성공 및 Redis 적재 완료 (hashKey: {})", hashKey);
+                }
+            }
 
             if (jsonCandidates != null) {
                 try {

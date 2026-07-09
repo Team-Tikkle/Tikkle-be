@@ -1,6 +1,7 @@
 package com.tikkle.investment.scheduler;
 
 import com.tikkle.investment.entity.Coin;
+import com.tikkle.investment.exception.CoinSyncFailedException;
 import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.upbit.client.UpbitMarketClient;
 import com.tikkle.upbit.dto.response.UpbitMarketResponse;
@@ -68,6 +69,7 @@ public class CoinSyncScheduler {
             log.info("[CoinSyncScheduler] 업비트 마켓 리스트 동기화 완료 - 신규: {}, 업데이트: {}", insertCount, updateCount);
         } catch (Exception e) {
             log.error("[CoinSyncScheduler] 업비트 마켓 리스트 동기화 실패", e);
+            throw new CoinSyncFailedException();
         }
     }
 }

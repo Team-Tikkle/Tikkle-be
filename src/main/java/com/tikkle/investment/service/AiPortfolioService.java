@@ -10,7 +10,6 @@ import com.tikkle.investment.entity.enums.RiskTolerance;
 import com.tikkle.investment.entity.enums.TrendSensitivity;
 import com.tikkle.investment.exception.AiRecommendationFailedException;
 import com.tikkle.investment.repository.AiRecommendationHistoryRepository;
-import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.upbit.client.UpbitCandleClient;
 import com.tikkle.upbit.dto.response.UpbitCandleResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +31,6 @@ import java.util.List;
 @Service
 public class AiPortfolioService {
     private final ChatClient chatClient;
-    private final InvestmentProfileRepository investmentProfileRepository;
     private final FearAndGreedClient fearAndGreedClient;
     private final CoinGeckoClient coinGeckoClient;
     private final UpbitCandleClient upbitCandleClient;
@@ -42,7 +40,6 @@ public class AiPortfolioService {
 
     public AiPortfolioService(
             @Qualifier("anthropicChatModel") ChatModel anthropicChatModel,
-            InvestmentProfileRepository investmentProfileRepository,
             FearAndGreedClient fearAndGreedClient,
             CoinGeckoClient coinGeckoClient,
             UpbitCandleClient upbitCandleClient,
@@ -50,7 +47,6 @@ public class AiPortfolioService {
             JsonMapper objectMapper,
             AiRecommendationHistoryRepository historyRepository) {
         this.chatClient = ChatClient.builder(anthropicChatModel).build();
-        this.investmentProfileRepository = investmentProfileRepository;
         this.fearAndGreedClient = fearAndGreedClient;
         this.coinGeckoClient = coinGeckoClient;
         this.upbitCandleClient = upbitCandleClient;
@@ -81,6 +77,9 @@ public class AiPortfolioService {
         
         log.info("[AiPortfolioService] 외부 데이터 조회 완료 - fngIndex: {}, btcDominance: {}%, weeklyTrend: {}", fngIndex, btcDom, weeklyTrend);
         
+        int successCount = 0;
+        int failCount = 0;
+
         // 모든 RiskTolerance와 TrendSensitivity의 조합 (최대 3x3 = 9개)을 생성합니다.
         for (RiskTolerance risk : RiskTolerance.values()) {
             for (TrendSensitivity trend : TrendSensitivity.values()) {
@@ -105,12 +104,19 @@ public class AiPortfolioService {
                     historyRepository.save(history);
                     log.info("[AiPortfolioService] DB에 AI 추천 히스토리 저장 완료 - hashKey: {}", hashKey);
                     
+                    successCount++;
                 } catch (Exception e) {
+                    failCount++;
                     log.error("[AiPortfolioService] 매크로 후보군 조회 및 캐싱 실패 - hashKey: {}", hashKey, e);
                 }
             }
         }
-        log.info("[AiPortfolioService] 9개 조합에 대한 AI 매크로 유니버스 생성 완료");
+        
+        if (failCount == 0) {
+            log.info("[AiPortfolioService] 9개 조합에 대한 AI 매크로 유니버스 생성 전체 완료 (성공: {}건)", successCount);
+        } else {
+            log.warn("[AiPortfolioService] AI 매크로 유니버스 생성 부분 실패 (성공: {}건, 실패: {}건)", successCount, failCount);
+        }
     }
 
     /**

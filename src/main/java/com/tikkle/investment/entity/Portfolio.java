@@ -48,10 +48,8 @@ public class Portfolio {
         this.averagePrice = averagePrice != null ? averagePrice : BigDecimal.ZERO;
     }
 
-    /**
-     * 매수 체결 시 기존 보유 수량과 평균 매수 단가를 갱신합니다.
-     * 가중 평균 공식: newAvg = (기존총액 + 신규총액) / (기존수량 + 신규수량)
-     */
+    // 매수 체결 시 기존 보유 수량과 평균 매수 단가를 갱신합니다.
+    // 가중 평균 공식: newAvg = (기존총액 + 신규총액) / (기존수량 + 신규수량)
     public void updateHolding(BigDecimal executedPrice, BigDecimal executedQuantity) {
         BigDecimal existingTotal = this.averagePrice.multiply(this.quantity);
         BigDecimal newTotal = executedPrice.multiply(executedQuantity);
@@ -59,6 +57,17 @@ public class Portfolio {
         if (this.quantity.compareTo(BigDecimal.ZERO) > 0) {
             this.averagePrice = existingTotal.add(newTotal)
                     .divide(this.quantity, 4, RoundingMode.HALF_UP);
+        }
+    }
+
+    // 매도 체결 시 기존 보유 수량을 차감합니다.
+    public void sellHolding(BigDecimal executedQuantity) {
+        if (this.quantity.compareTo(executedQuantity) < 0) {
+            throw new IllegalArgumentException("매도 수량이 보유 수량을 초과할 수 없습니다.");
+        }
+        this.quantity = this.quantity.subtract(executedQuantity);
+        if (this.quantity.compareTo(BigDecimal.ZERO) == 0) {
+            this.averagePrice = BigDecimal.ZERO;
         }
     }
 }
