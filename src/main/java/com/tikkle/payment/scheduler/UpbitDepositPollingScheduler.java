@@ -7,6 +7,7 @@ import com.tikkle.payment.service.OrderApprovalService;
 import com.tikkle.payment.sse.SseConnectionManager;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.upbit.dto.response.UpbitDepositResponse;
+import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.service.UpbitTradeService;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
@@ -104,13 +105,24 @@ public class UpbitDepositPollingScheduler {
                     orderApprovalService.markAsFailed(event.getId(), "업비트 입금 거절 또는 취소");
                     
                     Map<String, Object> failData = Map.of(
-                            "status", "FAILED",
+                            "status", "DEPOSIT_FAILED",
                             "message", "업비트 입금이 거절되거나 취소되었습니다."
                     );
-                    sseConnectionManager.send(event.getId(), "FAILED", failData);
+                    sseConnectionManager.send(event.getId(), "DEPOSIT_FAILED", failData);
                     sseConnectionManager.complete(event.getId());
                 }
 
+            } catch (UpbitOrderFailedException e) {
+                log.error("[UpbitDepositPollingScheduler] 업비트 매수 주문 실패 - eventId: {}", event.getId(), e);
+                String errorMessage = e.getMessage() != null ? e.getMessage() : "업비트 매수 주문이 거절되거나 취소되었습니다.";
+                orderApprovalService.markAsFailed(event.getId(), "매수 체결 실패: " + errorMessage);
+                
+                Map<String, Object> errorData = Map.of(
+                        "status", "TRADE_FAILED",
+                        "message", "업비트 매수 주문이 거절되거나 취소되었습니다."
+                );
+                sseConnectionManager.send(event.getId(), "TRADE_FAILED", errorData);
+                sseConnectionManager.complete(event.getId());
             } catch (Exception e) {
                 log.error("[UpbitDepositPollingScheduler] 폴링 중 에러 발생 - eventId: {}", event.getId(), e);
                 String errorMessage = e.getMessage() != null ? e.getMessage() : "자동 매수 중 알 수 없는 에러가 발생했습니다.";
@@ -118,7 +130,7 @@ public class UpbitDepositPollingScheduler {
                 
                 Map<String, Object> errorData = Map.of(
                         "status", "FAILED",
-                        "message", "업비트 매수 주문이 거절되거나 취소되었습니다."
+                        "message", "자동 매수 중 알 수 없는 에러가 발생했습니다."
                 );
                 sseConnectionManager.send(event.getId(), "FAILED", errorData);
                 sseConnectionManager.complete(event.getId());

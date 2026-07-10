@@ -74,7 +74,7 @@ public class UpbitOrderClient {
                     .body(UpbitOrderResponse.class);
         } catch (RestClientResponseException e) {
             String responseBody = e.getResponseBodyAsString();
-            log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}", e.getStatusCode(), responseBody, e);
+            log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}, error: {}", e.getStatusCode(), responseBody, e.getMessage(), e);
             
             String errorMessage = "업비트 매수 주문에 실패했습니다.";
             try {

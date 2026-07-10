@@ -103,6 +103,7 @@ public class PaymentEvent {
         this.status = PaymentStatus.INVESTED;
         this.investedVolume = volume;
         this.investedPrice = price;
+        this.reason = null;
     }
 
     public void skipInvestment(String reason) {
@@ -136,5 +137,6 @@ public class PaymentEvent {
         this.status = PaymentStatus.PENDING_TRADE;
         this.tradeUuid = tradeUuid;
         this.tradeRequestedAt = LocalDateTime.now();
+        this.reason = null;
     }
 }
