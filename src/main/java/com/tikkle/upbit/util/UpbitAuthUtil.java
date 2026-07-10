@@ -22,6 +22,28 @@ import java.util.UUID;
 public class UpbitAuthUtil {
     
     /**
+     * 쿼리 파라미터가 없는 요청에 사용할 JWT 토큰을 생성합니다.
+     *
+     * @param accessKey 업비트 API Access Key
+     * @param secretKey 업비트 API Secret Key
+     * @return 생성된 Bearer 토큰 문자열
+     * @throws UpbitTokenIssueFailedException 토큰 생성 중 오류 발생 시
+     */
+    public static String generateToken(String accessKey, String secretKey) {
+        try {
+            Algorithm algorithm = Algorithm.HMAC256(secretKey);
+            String jwtToken = JWT.create()
+                    .withClaim("access_key", accessKey)
+                    .withClaim("nonce", UUID.randomUUID().toString())
+                    .sign(algorithm);
+            return "Bearer " + jwtToken;
+        } catch (Exception e) {
+            log.error("[UpbitAuthUtil] 토큰 발급 실패 - error: {}", e.getMessage(), e);
+            throw new UpbitTokenIssueFailedException();
+        }
+    }
+
+    /**
      * 쿼리 파라미터가 포함된 요청에 사용할 JWT 토큰을 생성합니다.
      * 쿼리 파라미터를 SHA-512로 해싱하여 토큰 클레임에 포함시킵니다.
      *

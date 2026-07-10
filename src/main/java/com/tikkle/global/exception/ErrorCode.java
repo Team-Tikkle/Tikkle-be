@@ -26,11 +26,8 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
     WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-002", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다."),
     LINKED_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-003", "연동된 증권사 계좌 정보를 찾을 수 없습니다."),
+    INVALID_TWO_FACTOR_PROVIDER(HttpStatus.BAD_REQUEST, "USER-004", "업비트 2차 인증 수단(카카오톡/네이버/하나은행)이 설정되지 않았거나 올바르지 않습니다."),
     NO_CATEGORY_RULE(HttpStatus.NOT_FOUND, "USER-005", "해당 카테고리에 대한 투자 규칙이 설정되어 있지 않습니다."),
-
-    // 온보딩 (Onboarding)
-    ONBOARDING_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "ONBOARDING-001", "이미 온보딩을 완료한 사용자입니다."),
-    DUPLICATE_CATEGORY_RULE(HttpStatus.BAD_REQUEST, "ONBOARDING-002", "카테고리별 잔돈 규칙에 중복된 카테고리가 존재합니다."),
 
     // 결제 (Payment)
     INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "PAYMENT-001", "유효하지 않은 서명입니다."),
@@ -50,6 +47,7 @@ public enum ErrorCode {
     MARKET_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-002", "시장 데이터를 찾을 수 없습니다."),
     COIN_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-003", "매수 대상 코인을 찾을 수 없습니다."),
     COIN_SYNC_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-004", "코인 메타데이터 동기화에 실패했습니다."),
+    INVESTMENT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-005", "투자 성향 정보를 찾을 수 없습니다."),
 
     // 업비트 거래소 연동
     UPBIT_ORDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-001", "업비트 매수 주문에 실패했습니다."),
@@ -61,7 +59,8 @@ public enum ErrorCode {
     UPBIT_AUTH_PARAM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-007", "업비트 API 호출을 위한 쿼리 파라미터가 유효하지 않습니다."),
     UPBIT_DEPOSIT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-008", "업비트 원화 입금 요청에 실패했습니다."),
     UPBIT_DEPOSIT_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-009", "업비트 입금 내역 조회에 실패했습니다."),
-    UPBIT_CANDLE_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-010", "업비트 주봉 캔들 차트 조회에 실패했습니다."),
+    UPBIT_INVALID_KEY(HttpStatus.UNAUTHORIZED, "UPBIT-010", "유효하지 않거나 권한이 부족한 업비트 API 키입니다."),
+    UPBIT_CANDLE_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-011", "업비트 주봉 캔들 차트 조회에 실패했습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),

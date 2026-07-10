@@ -3,9 +3,9 @@ package com.tikkle.upbit.client;
 import com.tikkle.upbit.dto.response.UpbitCandleResponse;
 import com.tikkle.upbit.exception.UpbitCandleInquiryFailedException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.MediaType;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -21,18 +21,8 @@ public class UpbitCandleClient {
 
     private final RestClient restClient;
 
-    public UpbitCandleClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(10000);
-        factory.setReadTimeout(10000);
-        
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .defaultHeaders(headers -> {
-                    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-                })
-                .build();
+    public UpbitCandleClient(RestClient upbitRestClient) {
+        this.restClient = upbitRestClient;
     }
 
     /**

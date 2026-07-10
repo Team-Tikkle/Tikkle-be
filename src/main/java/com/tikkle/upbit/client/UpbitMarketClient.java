@@ -3,9 +3,7 @@ package com.tikkle.upbit.client;
 import com.tikkle.upbit.dto.response.UpbitMarketResponse;
 import com.tikkle.upbit.exception.UpbitMarketInquiryFailedException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -20,15 +18,8 @@ import java.util.List;
 public class UpbitMarketClient {
     private final RestClient restClient;
 
-    public UpbitMarketClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(3000);
-
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .build();
+    public UpbitMarketClient(RestClient upbitRestClient) {
+        this.restClient = upbitRestClient;
     }
 
     /**
