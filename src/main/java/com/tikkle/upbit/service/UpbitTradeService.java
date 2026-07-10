@@ -32,7 +32,7 @@ public class UpbitTradeService {
     /**
      * 트레이딩 체결 결과를 담는 레코드
      */
-    public record TradeResult(BigDecimal executedPrice, BigDecimal executedVolume) {}
+    public record TradeResult(BigDecimal executedPrice, BigDecimal executedVolume, String tradeUuid, boolean isPending) {}
 
     /**
      * 사용자의 업비트 계좌 정보를 조회한 뒤 지정된 코인(마켓)에 대해 시장가 매수를 수행합니다.
@@ -41,9 +41,8 @@ public class UpbitTradeService {
      * @param userId 매수를 수행할 사용자 ID
      * @param market 매수할 마켓 (예: KRW-BTC)
      * @param krwAmount 매수할 원화 금액
-     * @return 체결 결과 (평균 단가, 체결 수량)
+     * @return 체결 결과 (평단가, 수량, 주문UUID, 지연여부)
      * @throws LinkedAccountNotFoundException 연동된 계좌가 없는 경우
-     * @throws UpbitOrderExecutionFailedException 체결 폴링 대기 시간 초과 또는 실패 시
      */
     public TradeResult executeTrade(Long userId, String market, int krwAmount) {
         log.info("[UpbitTradeService] 시장가 매수 주문 시작 - userId: {}, market: {}, krwAmount: {}", userId, market, krwAmount);
@@ -70,12 +69,12 @@ public class UpbitTradeService {
             Thread.currentThread().interrupt();
         }
 
-        // 5. 체결 확인 및 가중 평균 계산 (최대 3회 폴링)
+        // 5. 체결 확인 및 가중 평균 계산 (최대 10회 폴링, 약 5초)
         BigDecimal totalVolume = BigDecimal.ZERO;
         BigDecimal totalFunds = BigDecimal.ZERO;
         boolean isExecuted = false;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 10; i++) {
             UpbitOrderResponse orderDetails = upbitOrderClient.getOrderDetails(uuid, accessKey, secretKey);
             List<UpbitOrderResponse.UpbitTrade> trades = orderDetails.trades();
             String state = orderDetails.state();
@@ -100,12 +99,13 @@ public class UpbitTradeService {
         }
 
         if (!isExecuted || totalVolume.compareTo(BigDecimal.ZERO) == 0) {
-            throw new UpbitOrderExecutionFailedException();
+            log.info("[UpbitTradeService] 5초 내 체결 실패, 비동기 추적으로 전환 - uuid: {}", uuid);
+            return new TradeResult(null, null, uuid, true);
         }
 
         // 6. 가중 평균 평단가 산출 = 총 체결 금액 / 총 체결 수량
         BigDecimal averagePrice = totalFunds.divide(totalVolume, 4, RoundingMode.HALF_UP);
-        TradeResult result = new TradeResult(averagePrice, totalVolume);
+        TradeResult result = new TradeResult(averagePrice, totalVolume, uuid, false);
 
         // 7. 트랜잭션 분리된 컴포넌트를 통해 원장 업데이트 호출
         portfolioUpdater.updatePortfolio(userId, market, result);

@@ -67,6 +67,12 @@ public class PaymentEvent {
     @Column(name = "deposit_requested_at")
     private LocalDateTime depositRequestedAt;
 
+    @Column(name = "trade_uuid", unique = true)
+    private String tradeUuid;
+
+    @Column(name = "trade_requested_at")
+    private LocalDateTime tradeRequestedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_coin_market")
     private Coin targetCoin;
@@ -97,6 +103,7 @@ public class PaymentEvent {
         this.status = PaymentStatus.INVESTED;
         this.investedVolume = volume;
         this.investedPrice = price;
+        this.reason = null;
     }
 
     public void skipInvestment(String reason) {
@@ -109,6 +116,13 @@ public class PaymentEvent {
         this.reason = reason;
     }
 
+    public void revertToPendingPurchase(String reason) {
+        this.status = PaymentStatus.PENDING_PURCHASE;
+        this.reason = reason;
+        this.depositUuid = null;
+        this.depositRequestedAt = null;
+    }
+
     public void updateCategory(PaymentCategory category) {
         this.category = category;
     }
@@ -117,5 +131,12 @@ public class PaymentEvent {
         this.status = PaymentStatus.PENDING_DEPOSIT;
         this.depositUuid = depositUuid;
         this.depositRequestedAt = LocalDateTime.now();
+    }
+
+    public void updateToPendingTrade(String tradeUuid) {
+        this.status = PaymentStatus.PENDING_TRADE;
+        this.tradeUuid = tradeUuid;
+        this.tradeRequestedAt = LocalDateTime.now();
+        this.reason = null;
     }
 }

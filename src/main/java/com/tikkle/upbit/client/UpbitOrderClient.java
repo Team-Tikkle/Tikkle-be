@@ -3,6 +3,7 @@ package com.tikkle.upbit.client;
 import com.tikkle.upbit.dto.response.UpbitOrderResponse;
 import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.exception.UpbitOrderInquiryFailedException;
+import com.tikkle.upbit.exception.UpbitOrderCancelFailedException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +26,7 @@ import java.util.Map;
 @Slf4j
 @Component
 public class UpbitOrderClient {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
 
     public UpbitOrderClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
@@ -71,8 +75,19 @@ public class UpbitOrderClient {
                     .retrieve()
                     .body(UpbitOrderResponse.class);
         } catch (RestClientResponseException e) {
-            log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
-            throw new UpbitOrderFailedException();
+            String responseBody = e.getResponseBodyAsString();
+            log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}, error: {}", e.getStatusCode(), responseBody, e.getMessage(), e);
+            
+            String errorMessage = "업비트 매수 주문에 실패했습니다.";
+            try {
+                JsonNode root = objectMapper.readTree(responseBody);
+                if (root.has("error") && root.get("error").has("message")) {
+                    errorMessage = root.get("error").get("message").asText();
+                }
+            } catch (Exception parseEx) {
+                // 파싱 실패 시 기본 메시지 유지
+            }
+            throw new UpbitOrderFailedException(errorMessage);
         } catch (Exception e) {
             log.error("[UpbitOrderClient] 업비트 매수 주문 실패", e);
             throw new UpbitOrderFailedException();
@@ -101,6 +116,31 @@ public class UpbitOrderClient {
         } catch (Exception e) {
             log.error("[UpbitOrderClient] 업비트 주문 내역 조회 실패", e);
             throw new UpbitOrderInquiryFailedException();
+        }
+    }
+
+    /**
+     * 미체결된 주문을 강제 취소합니다.
+     *
+     * @param uuid 취소할 주문 UUID
+     * @param accessKey 업비트 API Access Key
+     * @param secretKey 업비트 API Secret Key
+     * @return 취소된 주문 내역
+     * @throws UpbitOrderCancelFailedException 취소 실패 시
+     */
+    public UpbitOrderResponse cancelOrder(String uuid, String accessKey, String secretKey) {
+        try {
+            String queryString = "uuid=" + uuid;
+            String token = UpbitAuthUtil.generateToken(accessKey, secretKey, queryString);
+
+            return restClient.delete()
+                    .uri("/v1/order?uuid=" + uuid)
+                    .header(HttpHeaders.AUTHORIZATION, token)
+                    .retrieve()
+                    .body(UpbitOrderResponse.class);
+        } catch (Exception e) {
+            log.error("[UpbitOrderClient] 업비트 주문 취소 실패 - uuid: {}", uuid, e);
+            throw new UpbitOrderCancelFailedException("주문 취소 실패");
         }
     }
 }
