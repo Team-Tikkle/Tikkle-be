@@ -38,18 +38,18 @@ public class SettingsCacheService {
             return settings;
         }
 
-        log.warn("유저(ID:{})의 Redis 캐시가 증발했습니다. DB에서 조회하여 복구합니다.", userId);
+        log.warn("[SettingsCacheService] Redis 캐시 미스 발생 (DB 복구 진행) - userId: {}", userId);
 
         var accountOpt = linkedAccountRepository.findByUserId(userId);
         if (accountOpt.isEmpty()) {
-            log.error("유저(ID:{})의 연동된 계좌(카드) 정보가 DB에 존재하지 않습니다.", userId);
+            log.error("[SettingsCacheService] 연동 계좌(카드) 정보 미존재 - userId: {}", userId);
             throw new LinkedAccountNotFoundException();
         }
 
         var account = accountOpt.get();
         List<CategorySpareChangeRule> rules = categorySpareChangeRuleRepository.findByUserId(userId);
         if (rules == null || rules.isEmpty()) {
-            log.error("유저(ID:{})의 카테고리 잔돈 규칙이 DB에 존재하지 않습니다.", userId);
+            log.error("[SettingsCacheService] 카테고리 잔돈 규칙 미존재 - userId: {}", userId);
             throw new NoCategoryRuleException();
         }
 

@@ -25,11 +25,11 @@ public class InvestmentProfile {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(length = 30)
     private RiskTolerance riskTolerance;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(length = 30)
     private TrendSensitivity trendSensitivity;
 
     @ElementCollection(fetch = FetchType.LAZY)
@@ -37,16 +37,16 @@ public class InvestmentProfile {
             name = "INVESTMENT_PROFILE_THEMES",
             joinColumns = @JoinColumn(name = "investment_profile_id")
     )
-    @Column(name = "theme", nullable = false)
+    @Column(name = "theme")
     @Enumerated(EnumType.STRING)
     private Set<CryptoTheme> cryptoThemes = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(length = 30)
     private DiversificationType diversificationType;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(length = 30)
     private MemeAcceptance memeAcceptance;
 
     @Builder
@@ -60,6 +60,21 @@ public class InvestmentProfile {
         this.riskTolerance = riskTolerance;
         this.trendSensitivity = trendSensitivity;
         this.cryptoThemes = cryptoThemes != null ? new HashSet<>(cryptoThemes) : new HashSet<>();
+        this.diversificationType = diversificationType;
+        this.memeAcceptance = memeAcceptance;
+    }
+
+    public void updateProfile(RiskTolerance riskTolerance,
+                              TrendSensitivity trendSensitivity,
+                              java.util.List<CryptoTheme> cryptoThemes,
+                              DiversificationType diversificationType,
+                              MemeAcceptance memeAcceptance) {
+        this.riskTolerance = riskTolerance;
+        this.trendSensitivity = trendSensitivity;
+        this.cryptoThemes.clear();
+        if (cryptoThemes != null) {
+            this.cryptoThemes.addAll(cryptoThemes);
+        }
         this.diversificationType = diversificationType;
         this.memeAcceptance = memeAcceptance;
     }

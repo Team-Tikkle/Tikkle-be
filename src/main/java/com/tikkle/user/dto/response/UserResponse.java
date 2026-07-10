@@ -13,16 +13,20 @@ public record UserResponse(
         @Schema(description = "이메일", example = "hong@example.com") String email,
         @Schema(description = "계정 상태", example = "ACTIVE") UserStatus status,
         @Schema(description = "가입일시", example = "2024-01-01T00:00:00") LocalDateTime createdAt,
-        @Schema(description = "신규 유저 여부 (true: 온보딩 미완료)", example = "false") boolean isNewUser
+        @Schema(description = "투자 성향 설정 여부", example = "true") boolean hasInvestmentProfile,
+        @Schema(description = "케이뱅크 연동 여부", example = "true") boolean hasKbankAccount,
+        @Schema(description = "업비트 키 연동 여부", example = "true") boolean hasUpbitKey
 ) {
-    public static UserResponse from(User user, boolean isNewUser) {
+    public static UserResponse from(User user, boolean hasInvestmentProfile, boolean hasKbankAccount, boolean hasUpbitKey) {
         return new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getStatus(),
                 user.getCreatedAt(),
-                isNewUser
+                hasInvestmentProfile,
+                hasKbankAccount,
+                hasUpbitKey
         );
     }
 }

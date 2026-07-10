@@ -3,12 +3,13 @@ package com.tikkle.upbit.client;
 import com.tikkle.upbit.dto.response.UpbitDepositResponse;
 import com.tikkle.upbit.exception.UpbitDepositFailedException;
 import com.tikkle.upbit.exception.UpbitDepositInquiryFailedException;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -25,15 +26,8 @@ import java.util.Map;
 public class UpbitDepositClient {
     private final RestClient restClient;
 
-    public UpbitDepositClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(5000);
-        
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .build();
+    public UpbitDepositClient(RestClient upbitRestClient) {
+        this.restClient = upbitRestClient;
     }
 
     /**
@@ -70,6 +64,12 @@ public class UpbitDepositClient {
                     .body(UpbitDepositResponse.class);
         } catch (RestClientResponseException e) {
             log.error("[UpbitDepositClient] 업비트 원화 입금 요청 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            if (e.getStatusCode().value() == 401) {
+                throw new UpbitInvalidKeyException();
+            }
+            if (e.getStatusCode().value() == 400 && e.getResponseBodyAsString() != null && e.getResponseBodyAsString().contains("two_factor_auth_required")) {
+                throw new com.tikkle.user.exception.InvalidTwoFactorProviderException();
+            }
             throw new UpbitDepositFailedException();
         } catch (Exception e) {
             log.error("[UpbitDepositClient] 업비트 원화 입금 요청 실패", e);
@@ -96,6 +96,12 @@ public class UpbitDepositClient {
                     .header(HttpHeaders.AUTHORIZATION, token)
                     .retrieve()
                     .body(UpbitDepositResponse.class);
+        } catch (RestClientResponseException e) {
+            log.error("[UpbitDepositClient] 업비트 개별 입금 내역 조회 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            if (e.getStatusCode().value() == 401) {
+                throw new UpbitInvalidKeyException();
+            }
+            throw new UpbitDepositInquiryFailedException();
         } catch (Exception e) {
             log.error("[UpbitDepositClient] 업비트 개별 입금 내역 조회 실패", e);
             throw new UpbitDepositInquiryFailedException();

@@ -9,6 +9,10 @@ import com.tikkle.user.entity.enums.AuthProvider;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
+import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.repository.InvestmentProfileRepository;
+import com.tikkle.user.entity.LinkedAccount;
+import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,8 @@ public class TestTokenService {
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
+    private final InvestmentProfileRepository investmentProfileRepository;
+    private final LinkedAccountRepository linkedAccountRepository;
 
     /**
      * 기존에 가입된 회원의 이메일을 이용해 강제로 JWT 토큰을 발급합니다.
@@ -50,13 +56,17 @@ public class TestTokenService {
     public TokenResponse generateTestSignupAndToken(String email, String name) {
         final Optional<User> existingUser = userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE);
         final boolean isNewUser = existingUser.isEmpty();
-        final User user = existingUser
-                .orElseGet(() -> userRepository.save(User.builder()
-                        .email(email)
-                        .name(name)
-                        .provider(AuthProvider.GOOGLE)
-                        .status(UserStatus.ACTIVE)
-                        .build()));
+        final User user = existingUser.orElseGet(() -> {
+            User newUser = userRepository.save(User.builder()
+                    .email(email)
+                    .name(name)
+                    .provider(AuthProvider.GOOGLE)
+                    .status(UserStatus.ACTIVE)
+                    .build());
+            investmentProfileRepository.save(InvestmentProfile.builder().user(newUser).build());
+            linkedAccountRepository.save(LinkedAccount.builder().user(newUser).build());
+            return newUser;
+        });
         return issueToken(user.getEmail(), isNewUser);
     }
 

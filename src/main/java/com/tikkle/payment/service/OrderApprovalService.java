@@ -5,11 +5,14 @@ import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.exception.InvalidPaymentStatusException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.exception.UpbitTradeException;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
+import com.tikkle.user.exception.InvalidTwoFactorProviderException;
 import com.tikkle.user.repository.LinkedAccountRepository;
+import com.tikkle.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -55,6 +58,10 @@ public class OrderApprovalService {
             LinkedAccount account = linkedAccountRepository.findByUserId(userId)
                     .orElseThrow(LinkedAccountNotFoundException::new);
 
+            if (account.getTwoFactorProvider() == null) {
+                throw new InvalidTwoFactorProviderException();
+            }
+
             String twoFactorType = account.getTwoFactorProvider().getUpbitProviderType();
 
             // 업비트 원화 입금 요청 (2차 인증 발송)
@@ -68,6 +75,20 @@ public class OrderApprovalService {
             // 상태를 PENDING_DEPOSIT으로 변경하고 uuid 저장
             event.updateToPendingDeposit(depositResponse.uuid());
             log.info("[OrderApprovalService] 업비트 입금 요청 성공 - eventId: {}, uuid: {}", eventId, depositResponse.uuid());
+        } catch (UpbitInvalidKeyException e) {
+            log.error("[OrderApprovalService] 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
+            
+            // 계정 키 무효화
+            LinkedAccount account = linkedAccountRepository.findByUserId(userId)
+                    .orElseThrow(LinkedAccountNotFoundException::new);
+            account.invalidateUpbitKey();
+            
+            event.failInvestment("업비트 인증 키가 만료되거나 권한이 없습니다.");
+            throw e; // 예외 다시 던져서 컨트롤러/핸들러가 401 응답하게 함
+        } catch (CustomException e) {
+            log.error("[OrderApprovalService] 매수 승인 실패 (도메인 예외) - eventId: {}", eventId, e);
+            event.failInvestment(e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("[OrderApprovalService] 매수 승인(입금 요청) 실패 - eventId: {}", eventId, e);
             String reason = "업비트 입금 요청 실패: " + e.getMessage();

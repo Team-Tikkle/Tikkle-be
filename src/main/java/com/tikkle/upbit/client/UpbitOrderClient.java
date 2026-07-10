@@ -4,12 +4,13 @@ import com.tikkle.upbit.dto.response.UpbitOrderResponse;
 import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.exception.UpbitOrderInquiryFailedException;
 import com.tikkle.upbit.exception.UpbitOrderCancelFailedException;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -29,15 +30,8 @@ public class UpbitOrderClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
 
-    public UpbitOrderClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000); // 5초
-        factory.setReadTimeout(5000);    // 5초
-        
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .build();
+    public UpbitOrderClient(RestClient upbitRestClient) {
+        this.restClient = upbitRestClient;
     }
 
     /**
@@ -78,6 +72,10 @@ public class UpbitOrderClient {
             String responseBody = e.getResponseBodyAsString();
             log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}, error: {}", e.getStatusCode(), responseBody, e.getMessage(), e);
             
+            if (e.getStatusCode().value() == 401) {
+                throw new UpbitInvalidKeyException();
+            }
+
             String errorMessage = "업비트 매수 주문에 실패했습니다.";
             try {
                 JsonNode root = objectMapper.readTree(responseBody);
@@ -113,6 +111,12 @@ public class UpbitOrderClient {
                     .header(HttpHeaders.AUTHORIZATION, token)
                     .retrieve()
                     .body(UpbitOrderResponse.class);
+        } catch (RestClientResponseException e) {
+            log.error("[UpbitOrderClient] 업비트 주문 내역 조회 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            if (e.getStatusCode().value() == 401) {
+                throw new UpbitInvalidKeyException();
+            }
+            throw new UpbitOrderInquiryFailedException();
         } catch (Exception e) {
             log.error("[UpbitOrderClient] 업비트 주문 내역 조회 실패", e);
             throw new UpbitOrderInquiryFailedException();
@@ -138,6 +142,12 @@ public class UpbitOrderClient {
                     .header(HttpHeaders.AUTHORIZATION, token)
                     .retrieve()
                     .body(UpbitOrderResponse.class);
+        } catch (RestClientResponseException e) {
+            log.error("[UpbitOrderClient] 업비트 주문 취소 실패 - uuid: {}, status: {}", uuid, e.getStatusCode(), e);
+            if (e.getStatusCode().value() == 401) {
+                throw new UpbitInvalidKeyException();
+            }
+            throw new UpbitOrderCancelFailedException("주문 취소 실패");
         } catch (Exception e) {
             log.error("[UpbitOrderClient] 업비트 주문 취소 실패 - uuid: {}", uuid, e);
             throw new UpbitOrderCancelFailedException("주문 취소 실패");

@@ -1,7 +1,8 @@
 package com.tikkle.user.service;
 
-import com.tikkle.user.dto.request.UpdateUserRequest;
+import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.user.dto.response.UserResponse;
+import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
@@ -19,25 +20,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
     private final LinkedAccountRepository linkedAccountRepository;
+    private final InvestmentProfileRepository investmentProfileRepository;
 
     public UserResponse getMe(Long userId) {
         final User user = findActiveUserById(userId);
-        return UserResponse.from(user, isNewUser(user.getId()));
-    }
+        
+        boolean hasInvestmentProfile = false;
+        boolean hasKbankAccount = false;
+        boolean hasUpbitKey = false;
 
-    /**
-     * 유저 정보를 수정합니다.
-     * @param userId 수정할 유저 ID
-     * @param request 수정 요청 정보
-     * @return 수정된 유저 정보
-     */
-    @Transactional
-    public UserResponse updateMe(Long userId, UpdateUserRequest request) {
-        log.info("[UserService] 회원 정보 수정 시작 - userId: {}", userId);
-        final User user = findActiveUserById(userId);
-        user.update(request.name());
-        log.info("[UserService] 회원 정보 수정 완료 - userId: {}", userId);
-        return UserResponse.from(user, isNewUser(user.getId()));
+        hasInvestmentProfile = investmentProfileRepository.findByUserId(userId)
+                .map(profile -> profile.getRiskTolerance() != null) // 하나라도 설정되었는지 확인
+                .orElse(false);
+
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
+        if (account != null) {
+            hasKbankAccount = account.getTargetCardCompany() != null;
+            hasUpbitKey = account.getUpbitAccessKey() != null && account.isUpbitKeyValid();
+        }
+
+        return UserResponse.from(user, hasInvestmentProfile, hasKbankAccount, hasUpbitKey);
     }
 
     /**
@@ -46,18 +48,11 @@ public class UserService {
      */
     @Transactional
     public void withdrawMe(Long userId) {
-        log.info("[UserService] 회원 탈퇴 처리 시작 - userId: {}", userId);
         findActiveUserById(userId).withdraw();
-        log.info("[UserService] 회원 탈퇴 처리 완료 - userId: {}", userId);
     }
 
     private User findActiveUserById(Long userId) {
         return userRepository.findByIdAndStatus(userId, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
-    }
-
-    // 온보딩 미완료 시 신규 유저로 간주한다. 온보딩은 단일 트랜잭션으로 처리되므로 LinkedAccount 존재 여부로 판단한다.
-    private boolean isNewUser(Long userId) {
-        return !linkedAccountRepository.existsByUserId(userId);
     }
 }

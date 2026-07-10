@@ -23,25 +23,28 @@ public class LinkedAccount {
 
     // AES-256 양방향 암호화가 적용된 상태로 적재
     @Convert(converter = AES256Converter.class)
-    @Column(nullable = false, length = 512)
+    @Column(length = 512)
     private String upbitAccessKey;
 
     @Convert(converter = AES256Converter.class)
-    @Column(nullable = false, length = 512)
+    @Column(length = 512)
     private String upbitSecretKey;
 
-    @Column(nullable = false, length = 50)
+    @Column(length = 50)
     private String targetCardCompany;
 
-    @Column(nullable = false, length = 4)
+    @Column(length = 4)
     private String targetCardLast4;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private TwoFactorProvider twoFactorProvider;
 
     @Column(name = "is_investment_enabled", nullable = false)
     private boolean isInvestmentEnabled = true;
+
+    @Column(name = "is_upbit_key_valid", nullable = false)
+    private boolean isUpbitKeyValid = false;
 
     @Builder
     private LinkedAccount(User user, String upbitAccessKey, String upbitSecretKey, String targetCardCompany, String targetCardLast4, TwoFactorProvider twoFactorProvider) {
@@ -53,12 +56,23 @@ public class LinkedAccount {
         this.twoFactorProvider = twoFactorProvider;
     }
 
-    public void updateUpbitCredentials(String upbitAccessKey, String upbitSecretKey) {
+    public void updateUpbitCredentials(String upbitAccessKey, String upbitSecretKey, TwoFactorProvider twoFactorProvider) {
         this.upbitAccessKey = upbitAccessKey;
         this.upbitSecretKey = upbitSecretKey;
+        this.twoFactorProvider = twoFactorProvider;
+        this.isUpbitKeyValid = true;
+    }
+
+    public void updateKbankInfo(String targetCardCompany, String targetCardLast4) {
+        this.targetCardCompany = targetCardCompany;
+        this.targetCardLast4 = targetCardLast4;
     }
 
     public void updateInvestmentStatus(boolean isEnabled) {
         this.isInvestmentEnabled = isEnabled;
+    }
+
+    public void invalidateUpbitKey() {
+        this.isUpbitKeyValid = false;
     }
 }

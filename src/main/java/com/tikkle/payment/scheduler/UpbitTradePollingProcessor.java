@@ -1,12 +1,12 @@
 package com.tikkle.payment.scheduler;
 
-import com.tikkle.notification.service.PushNotificationService;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.upbit.client.UpbitOrderClient;
 import com.tikkle.upbit.dto.response.UpbitOrderResponse;
 import com.tikkle.upbit.service.UpbitPortfolioUpdater;
 import com.tikkle.upbit.service.UpbitTradeService.TradeResult;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +39,6 @@ public class UpbitTradePollingProcessor {
     private final LinkedAccountRepository linkedAccountRepository;
     private final UpbitOrderClient upbitOrderClient;
     private final UpbitPortfolioUpdater portfolioUpdater;
-    private final PushNotificationService pushNotificationService;
 
     /**
      * 개별 이벤트에 대해 업비트 API를 호출하고 결과를 처리합니다.
@@ -65,6 +64,10 @@ public class UpbitTradePollingProcessor {
             
             try {
                 upbitOrderClient.cancelOrder(info.tradeUuid(), accessKey, secretKey);
+            } catch (UpbitInvalidKeyException e) {
+                log.error("[UpbitTradePollingProcessor] 주문 취소 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
+                self.handleInvalidKeyError(eventId, info.userId());
+                return;
             } catch (Exception e) {
                 log.error("[UpbitTradePollingProcessor] 주문 취소 API 실패 - eventId: {}", eventId, e);
             }
@@ -78,6 +81,10 @@ public class UpbitTradePollingProcessor {
         UpbitOrderResponse orderDetails;
         try {
             orderDetails = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
+        } catch (UpbitInvalidKeyException e) {
+            log.error("[UpbitTradePollingProcessor] 주문 상태 조회 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
+            self.handleInvalidKeyError(eventId, info.userId());
+            return;
         } catch (Exception e) {
             log.error("[UpbitTradePollingProcessor] 주문 상태 조회 실패 - eventId: {}", eventId, e);
             return;
@@ -123,12 +130,8 @@ public class UpbitTradePollingProcessor {
     public void handleTimeout(Long eventId, Long userId) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event != null) {
-            event.failInvestment("시장 상황(유동성 부족 등)으로 매수 취소. 원화 환불 완료.");
+            event.failInvestment("시장 상황(유동성 부족 등)으로 매수 취소. 원화는 업비트 계좌에 보관됩니다.");
         }
-        
-        String title = "자동 매수 취소 안내";
-        String body = "시장 상황(상한가 묶임 등)으로 인해 주문이 10분간 체결되지 않아 자동 취소되었습니다. 묶여있던 원화는 고객님의 업비트 계좌로 안전하게 반환되었습니다.";
-        pushNotificationService.sendPush(userId, title, body);
     }
 
     @Transactional
@@ -163,10 +166,6 @@ public class UpbitTradePollingProcessor {
             portfolioUpdater.updatePortfolio(info.userId(), info.targetMarket(), result);
             
             event.completeInvestment(totalVolume, averagePrice);
-            
-            String title = info.coinName() + " 매수 완료!";
-            String body = String.format("기다리셨죠? %s %s개 매수가 완료되어 포트폴리오에 반영되었습니다.", info.coinName(), totalVolume.toPlainString());
-            pushNotificationService.sendPush(info.userId(), title, body);
         } else {
             log.warn("[UpbitTradePollingProcessor] 체결 상태는 done 이나 체결량이 0 - eventId: {}", eventId);
             event.failInvestment("주문이 완료되었으나 실제 체결된 코인 수량이 0입니다.");
@@ -180,10 +179,18 @@ public class UpbitTradePollingProcessor {
 
         log.warn("[UpbitTradePollingProcessor] 외부 요인으로 주문 취소됨 - eventId: {}, uuid: {}", eventId, tradeUuid);
         event.failInvestment("업비트에서 주문이 취소되었습니다.");
-        
-        String title = "매수 취소 안내";
-        String body = "업비트 거래소 사정으로 매수 주문이 취소되었습니다.";
-        pushNotificationService.sendPush(userId, title, body);
+    }
+
+    @Transactional
+    public void handleInvalidKeyError(Long eventId, Long userId) {
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
+        if (account != null) {
+            account.invalidateUpbitKey();
+        }
+        PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
+        if (event != null) {
+            event.failInvestment("업비트 인증 키가 만료되거나 권한이 없습니다.");
+        }
     }
 
     public record EventInfo(

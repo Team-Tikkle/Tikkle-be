@@ -6,18 +6,18 @@ import com.tikkle.payment.service.OrderApprovalService;
 import com.tikkle.payment.sse.SseConnectionManager;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.upbit.dto.response.UpbitDepositResponse;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.service.UpbitTradeService;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -45,8 +45,9 @@ public class UpbitDepositPollingProcessor {
     private final SseConnectionManager sseConnectionManager;
 
     public void processEvent(Long eventId) {
+        EventInfo info = null;
         try {
-            EventInfo info = self.getEventInfo(eventId);
+            info = self.getEventInfo(eventId);
             if (info == null) return;
             
             // 1. 타임아웃 검사 (3.5분)
@@ -84,6 +85,13 @@ public class UpbitDepositPollingProcessor {
                 self.handleDepositFailed(eventId);
             }
 
+        } catch (UpbitInvalidKeyException e) {
+            log.error("[UpbitDepositPollingProcessor] 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
+            if (info != null) {
+                self.handleInvalidKeyError(eventId, info.userId());
+            } else {
+                self.handleGeneralError(eventId, "업비트 인증 키가 만료되거나 권한이 없습니다.");
+            }
         } catch (UpbitOrderFailedException e) {
             log.error("[UpbitDepositPollingProcessor] 업비트 매수 주문 실패 - eventId: {}", eventId, e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "업비트 매수 주문이 거절되거나 취소되었습니다.";
@@ -190,6 +198,21 @@ public class UpbitDepositPollingProcessor {
                 "message", "자동 매수 중 알 수 없는 에러가 발생했습니다."
         );
         sseConnectionManager.send(eventId, "FAILED", errorData);
+        sseConnectionManager.complete(eventId);
+    }
+
+    @Transactional
+    public void handleInvalidKeyError(Long eventId, Long userId) {
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
+        if (account != null) {
+            account.invalidateUpbitKey();
+        }
+        orderApprovalService.markAsFailed(eventId, "업비트 인증 키 만료/권한 없음");
+        Map<String, Object> errorData = Map.of(
+                "status", "UPBIT_INVALID_KEY",
+                "message", "업비트 인증 키가 만료되거나 권한이 없습니다. 앱에서 업비트 계정을 다시 연동해주세요."
+        );
+        sseConnectionManager.send(eventId, "TRADE_FAILED", errorData);
         sseConnectionManager.complete(eventId);
     }
 
