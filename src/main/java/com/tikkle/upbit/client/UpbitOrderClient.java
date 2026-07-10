@@ -3,6 +3,7 @@ package com.tikkle.upbit.client;
 import com.tikkle.upbit.dto.response.UpbitOrderResponse;
 import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.exception.UpbitOrderInquiryFailedException;
+import com.tikkle.upbit.exception.UpbitOrderCancelFailedException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ import java.util.Map;
 @Slf4j
 @Component
 public class UpbitOrderClient {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
 
     public UpbitOrderClient(@Value("${upbit.api.base-url:https://api.upbit.com}") String baseUrl) {
@@ -78,8 +80,7 @@ public class UpbitOrderClient {
             
             String errorMessage = "업비트 매수 주문에 실패했습니다.";
             try {
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode root = mapper.readTree(responseBody);
+                JsonNode root = objectMapper.readTree(responseBody);
                 if (root.has("error") && root.get("error").has("message")) {
                     errorMessage = root.get("error").get("message").asText();
                 }
@@ -125,7 +126,7 @@ public class UpbitOrderClient {
      * @param accessKey 업비트 API Access Key
      * @param secretKey 업비트 API Secret Key
      * @return 취소된 주문 내역
-     * @throws UpbitOrderInquiryFailedException 취소 실패 시
+     * @throws UpbitOrderCancelFailedException 취소 실패 시
      */
     public UpbitOrderResponse cancelOrder(String uuid, String accessKey, String secretKey) {
         try {
@@ -139,7 +140,7 @@ public class UpbitOrderClient {
                     .body(UpbitOrderResponse.class);
         } catch (Exception e) {
             log.error("[UpbitOrderClient] 업비트 주문 취소 실패 - uuid: {}", uuid, e);
-            throw new UpbitOrderInquiryFailedException();
+            throw new UpbitOrderCancelFailedException("주문 취소 실패");
         }
     }
 }
