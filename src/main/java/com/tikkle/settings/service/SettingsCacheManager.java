@@ -5,9 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 설정 변경을 결제 경로용 Redis 캐시에 반영한다.
@@ -35,21 +33,5 @@ public class SettingsCacheManager {
 
     private String cacheKey(Long userId) {
         return USER_SETTINGS_CACHE_PREFIX + userId;
-    }
-
-    public void initializeUserSettings(Long userId, String targetCardCompany, String targetCardLast4, boolean isInvestmentEnabled, List<CategorySpareChangeRule> rules) {
-        String cacheKey = cacheKey(userId);
-        Map<String, String> cacheData = new HashMap<>();
-        cacheData.put("targetCardCompany", targetCardCompany);
-        cacheData.put("targetCardLast4", targetCardLast4);
-        cacheData.put("isInvestmentEnabled", String.valueOf(isInvestmentEnabled));
-
-        rules.forEach(rule -> {
-            if (rule.getCategory() != null) {
-                cacheData.put(rule.getCategory().name(), rule.getRuleType().name());
-            }
-        });
-
-        redisTemplate.opsForHash().putAll(cacheKey, cacheData);
     }
 }
