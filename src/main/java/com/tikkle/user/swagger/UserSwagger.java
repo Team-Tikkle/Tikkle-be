@@ -1,8 +1,7 @@
 package com.tikkle.user.swagger;
 
-import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
-import com.tikkle.user.dto.request.UpdateUserRequest;
+import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.user.dto.response.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,44 +44,6 @@ public interface UserSwagger {
     })
     ApiResponse<UserResponse> getMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "내 정보 수정", description = "로그인한 유저 본인의 이름 또는 전화번호를 수정합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "SUCCESS",
-                                      "message": "요청에 성공했습니다.",
-                                      "data": {
-                                        "id": 1,
-                                        "name": "홍길동",
-                                        "email": "hong@example.com",
-                                        "status": "ACTIVE",
-                                        "createdAt": "2024-01-01T00:00:00",
-                                        "isNewUser": false
-                                      }
-                                    }
-                                    """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력값",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "COMMON-002",
-                                      "message": "잘못된 입력값입니다."
-                                    }
-                                    """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "유저를 찾을 수 없음",
-                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = """
-                                    {
-                                      "code": "USER-001",
-                                      "message": "사용자를 찾을 수 없습니다."
-                                    }
-                                    """)))
-    })
-    ApiResponse<UserResponse> updateMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-                                       UpdateUserRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "회원 탈퇴 (본인)", description = "로그인한 유저 본인을 탈퇴 처리합니다.")

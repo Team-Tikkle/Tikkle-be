@@ -3,8 +3,10 @@ package com.tikkle.settings.swagger;
 import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.settings.dto.request.UpdateInvestmentStatusRequest;
-import com.tikkle.settings.dto.request.UpdateLinkedAccountRequest;
 import com.tikkle.settings.dto.request.UpdateSpareChangeRulesRequest;
+import com.tikkle.settings.dto.request.UpdateInvestmentProfileRequest;
+import com.tikkle.settings.dto.request.UpdateKbankAccountRequest;
+import com.tikkle.settings.dto.request.UpdateUpbitKeyRequest;
 import com.tikkle.settings.dto.response.SettingsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,14 +22,24 @@ public interface SettingsSwagger {
 
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "카테고리별 잔돈 룰 변경", description = "보낸 카테고리만 부분 갱신합니다.")
+    @Operation(summary = "카테고리별 잔돈 룰 일괄 변경", description = "모든 카테고리(7개)의 잔돈 규칙을 전송하여 전체 갱신합니다.")
     ApiResponse<?> updateSpareChangeRules(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                           UpdateSpareChangeRulesRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "거래소 계정 및 API 키 수정", description = "Upbit Access Key/Secret Key를 전체 교체합니다. 보안상 기존 값은 조회로 노출하지 않습니다.")
-    ApiResponse<?> updateLinkedAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-                                       UpdateLinkedAccountRequest request);
+    @Operation(summary = "투자 성향 정보 등록/수정", description = "초기 설정 등록 및 이후 설정 화면에서의 변경을 모두 처리합니다.")
+    ApiResponse<?> updateInvestmentProfile(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+                                           UpdateInvestmentProfileRequest request);
+
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "케이뱅크 계좌/카드 정보 등록/수정", description = "초기 설정 등록 및 이후 변경을 처리합니다.")
+    ApiResponse<?> updateKbankAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+                                      UpdateKbankAccountRequest request);
+
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "업비트 API 키 등록/수정 및 유효성 검증", description = "업비트 키 등록/수정 및 5대 핵심 권한 정밀 검증을 수행합니다.")
+    ApiResponse<?> updateUpbitKey(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+                                  UpdateUpbitKeyRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "자동 투자 서비스 활성화/비활성화", description = "사용자가 결제 시 투자를 진행할지 여부를 설정합니다.")

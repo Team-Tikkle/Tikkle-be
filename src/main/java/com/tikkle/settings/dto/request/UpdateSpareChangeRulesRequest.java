@@ -5,15 +5,25 @@ import com.tikkle.payment.entity.enums.RuleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotEmpty;
+
 import jakarta.validation.constraints.NotNull;
+
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
 @Schema(description = "카테고리별 잔돈 규칙 변경 요청")
 public record UpdateSpareChangeRulesRequest(
-        @Schema(description = "변경할 카테고리 잔돈 규칙 리스트")
-        @NotEmpty(message = "변경할 잔돈 규칙은 최소 1개 이상이어야 합니다.")
+        @Schema(description = "변경할 카테고리 잔돈 규칙 리스트", example = "[\n" +
+                "  {\"category\": \"CAFE\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"MART\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"FOOD\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"SHOPPING\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"TRAFFIC\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"CULTURE\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
+                "  {\"category\": \"ETC\", \"ruleType\": \"ROUND_UP_10000\"}\n" +
+                "]")
+        @Size(min = 7, max = 7, message = "모든 카테고리에 대한 잔돈 규칙을 전송해야 합니다.")
         @Valid
         List<RuleItem> rules
 ) {
