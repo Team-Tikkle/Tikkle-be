@@ -124,6 +124,8 @@ public class PaymentHistoryService {
         if (status == null || status.equalsIgnoreCase("ALL")) {
             return List.of(
                     PaymentStatus.PENDING_PURCHASE,
+                    PaymentStatus.PENDING_DEPOSIT,
+                    PaymentStatus.PENDING_TRADE,
                     PaymentStatus.INVESTED,
                     PaymentStatus.NOT_INVESTED,
                     PaymentStatus.FAILED
@@ -131,7 +133,7 @@ public class PaymentHistoryService {
         }
 
         return switch (status.toUpperCase()) {
-            case "PENDING" -> List.of(PaymentStatus.PENDING_PURCHASE);
+            case "PENDING" -> List.of(PaymentStatus.PENDING_PURCHASE, PaymentStatus.PENDING_DEPOSIT, PaymentStatus.PENDING_TRADE);
             case "INVESTED" -> List.of(PaymentStatus.INVESTED);
             case "CANCELED" -> List.of(PaymentStatus.NOT_INVESTED, PaymentStatus.FAILED);
             default -> throw new InvalidInputValueException();

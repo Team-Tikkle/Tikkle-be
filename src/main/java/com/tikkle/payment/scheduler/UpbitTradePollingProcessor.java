@@ -11,6 +11,8 @@ import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,11 +20,20 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
+/**
+ * 업비트 매수 주문 상태를 폴링하고 체결 결과를 처리하는 프로세서입니다.
+ * 외부 API 연동 시 발생하는 트랜잭션 병목을 방지하기 위해 
+ * 데이터 갱신 로직만 별도의 트랜잭션으로 격리하여 실행합니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UpbitTradePollingProcessor {
     private static final int TIMEOUT_MINUTES = 10;
+
+    @Lazy
+    @Autowired
+    private UpbitTradePollingProcessor self;
 
     private final PaymentEventRepository paymentEventRepository;
     private final LinkedAccountRepository linkedAccountRepository;
@@ -36,7 +47,7 @@ public class UpbitTradePollingProcessor {
      */
     public void processEvent(Long eventId) {
         // 1. 필요한 기본 정보만 트랜잭션 내에서 조회 (API 호출 전)
-        EventInfo info = getEventInfo(eventId);
+        EventInfo info = self.getEventInfo(eventId);
         if (info == null) return;
         
         if (info.account() == null) {
@@ -50,41 +61,41 @@ public class UpbitTradePollingProcessor {
         // 2. 타임아웃 검사 (10분) - 외부 API(취소) 호출 포함
         LocalDateTime baseTime = info.tradeRequestedAt() != null ? info.tradeRequestedAt() : info.createdAt();
         if (baseTime.plusMinutes(TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
-            log.warn("[UpbitTradePollingScheduler] 매수 대기 타임아웃(10분) - eventId: {}, uuid: {}", eventId, info.tradeUuid());
+            log.warn("[UpbitTradePollingProcessor] 매수 대기 타임아웃(10분) - eventId: {}, uuid: {}", eventId, info.tradeUuid());
             
             try {
                 upbitOrderClient.cancelOrder(info.tradeUuid(), accessKey, secretKey);
             } catch (Exception e) {
-                log.error("[UpbitTradePollingScheduler] 주문 취소 API 실패 - eventId: {}", eventId, e);
+                log.error("[UpbitTradePollingProcessor] 주문 취소 API 실패 - eventId: {}", eventId, e);
             }
             
-            handleTimeout(eventId, info.userId());
+            self.handleTimeout(eventId, info.userId());
             return;
         }
 
         // 3. 외부 API 호출 (트랜잭션 없음)
-        log.info("[UpbitTradePollingScheduler] 업비트 주문 상태 조회 API 폴링 시작 - eventId: {}, tradeUuid: {}", eventId, info.tradeUuid());
+        log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 폴링 시작 - eventId: {}, tradeUuid: {}", eventId, info.tradeUuid());
         UpbitOrderResponse orderDetails;
         try {
             orderDetails = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
         } catch (Exception e) {
-            log.error("[UpbitTradePollingScheduler] 주문 상태 조회 실패 - eventId: {}", eventId, e);
+            log.error("[UpbitTradePollingProcessor] 주문 상태 조회 실패 - eventId: {}", eventId, e);
             return;
         }
         
         String state = orderDetails.state();
-        log.info("[UpbitTradePollingScheduler] 업비트 주문 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, state);
+        log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, state);
 
         // 4. 상태에 따른 DB 업데이트 및 푸시 알림 (DB 쓰기는 트랜잭션 내에서)
         if ("done".equals(state)) {
-            handleDoneOrder(eventId, info, orderDetails);
+            self.handleDoneOrder(eventId, info, orderDetails);
         } else if ("cancel".equals(state)) {
-            handleCanceledOrder(eventId, info.userId(), info.tradeUuid());
+            self.handleCanceledOrder(eventId, info.userId(), info.tradeUuid());
         }
     }
 
     @Transactional(readOnly = true)
-    protected EventInfo getEventInfo(Long eventId) {
+    public EventInfo getEventInfo(Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event == null) return null;
         
@@ -109,7 +120,7 @@ public class UpbitTradePollingProcessor {
     }
 
     @Transactional
-    protected void handleTimeout(Long eventId, Long userId) {
+    public void handleTimeout(Long eventId, Long userId) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event != null) {
             event.failInvestment("시장 상황(유동성 부족 등)으로 매수 취소. 원화 환불 완료.");
@@ -121,17 +132,17 @@ public class UpbitTradePollingProcessor {
     }
 
     @Transactional
-    protected void handleDoneOrder(Long eventId, EventInfo info, UpbitOrderResponse orderDetails) {
+    public void handleDoneOrder(Long eventId, EventInfo info, UpbitOrderResponse orderDetails) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event == null) return;
 
         if (info.targetMarket() == null || info.coinName() == null) {
-            log.error("[UpbitTradePollingScheduler] targetCoin 정보 누락 - eventId: {}", eventId);
+            log.error("[UpbitTradePollingProcessor] targetCoin 정보 누락 - eventId: {}", eventId);
             event.failInvestment("매수 대상 코인 정보가 누락되었습니다.");
             return;
         }
 
-        log.info("[UpbitTradePollingScheduler] 지연 매수 체결 완료 처리 시작 - eventId: {}, uuid: {}", eventId, info.tradeUuid());
+        log.info("[UpbitTradePollingProcessor] 지연 매수 체결 완료 처리 시작 - eventId: {}, uuid: {}", eventId, info.tradeUuid());
         
         BigDecimal totalVolume = BigDecimal.ZERO;
         BigDecimal totalFunds = BigDecimal.ZERO;
@@ -157,17 +168,17 @@ public class UpbitTradePollingProcessor {
             String body = String.format("기다리셨죠? %s %s개 매수가 완료되어 포트폴리오에 반영되었습니다.", info.coinName(), totalVolume.toPlainString());
             pushNotificationService.sendPush(info.userId(), title, body);
         } else {
-            log.warn("[UpbitTradePollingScheduler] 체결 상태는 done 이나 체결량이 0 - eventId: {}", eventId);
+            log.warn("[UpbitTradePollingProcessor] 체결 상태는 done 이나 체결량이 0 - eventId: {}", eventId);
             event.failInvestment("주문이 완료되었으나 실제 체결된 코인 수량이 0입니다.");
         }
     }
 
     @Transactional
-    protected void handleCanceledOrder(Long eventId, Long userId, String tradeUuid) {
+    public void handleCanceledOrder(Long eventId, Long userId, String tradeUuid) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event == null) return;
 
-        log.warn("[UpbitTradePollingScheduler] 외부 요인으로 주문 취소됨 - eventId: {}, uuid: {}", eventId, tradeUuid);
+        log.warn("[UpbitTradePollingProcessor] 외부 요인으로 주문 취소됨 - eventId: {}, uuid: {}", eventId, tradeUuid);
         event.failInvestment("업비트에서 주문이 취소되었습니다.");
         
         String title = "매수 취소 안내";
