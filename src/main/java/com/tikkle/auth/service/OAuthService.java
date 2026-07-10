@@ -12,11 +12,21 @@ import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.WithdrawnUserException;
 import com.tikkle.user.repository.UserRepository;
+import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.repository.InvestmentProfileRepository;
+import com.tikkle.user.entity.LinkedAccount;
+import com.tikkle.user.repository.LinkedAccountRepository;
+import com.tikkle.payment.entity.enums.PaymentCategory;
+import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
+import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,6 +40,9 @@ public class OAuthService {
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final InvestmentProfileRepository investmentProfileRepository;
+    private final LinkedAccountRepository linkedAccountRepository;
+    private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
 
     /**
      * 프론트엔드로부터 구글 액세스 토큰을 받아 구글 서버에서 유저 정보를 조회하고,
@@ -77,13 +90,29 @@ public class OAuthService {
         // 신규 가입. 동시 요청이 같은 이메일을 먼저 저장하면 UNIQUE 충돌이 나므로 재조회로 기존 유저를 회수한다.
         try {
             log.info("[OAuthService] 신규 회원 가입 처리 - email: {}", userInfo.email());
-            return new LoginUser(userRepository.save(User.builder()
+            User newUser = userRepository.save(User.builder()
                     .name(userInfo.name())
                     .email(userInfo.email())
                     .provider(AuthProvider.GOOGLE)
                     .providerId(userInfo.sub())
                     .status(UserStatus.ACTIVE)
-                    .build()), true);
+                    .build());
+            
+            // 신규 가입 시 빈 설정 엔티티(Profile, Account)를 생성해둔다.
+            investmentProfileRepository.save(InvestmentProfile.builder().user(newUser).build());
+            linkedAccountRepository.save(LinkedAccount.builder().user(newUser).build());
+
+            // 7개 카테고리에 대해 기본 잔돈 규칙(ROUND_UP_10000)을 생성한다.
+            List<CategorySpareChangeRule> defaultRules = Arrays.stream(PaymentCategory.values())
+                    .map(category -> CategorySpareChangeRule.builder()
+                            .user(newUser)
+                            .category(category)
+                            .ruleType(RuleType.ROUND_UP_10000)
+                            .build())
+                    .toList();
+            categorySpareChangeRuleRepository.saveAll(defaultRules);
+
+            return new LoginUser(newUser, true);
         } catch (DataIntegrityViolationException e) {
             log.warn("[OAuthService] 신규 가입 중 동시성 충돌 발생, 기존 유저 조회로 Fallback - email: {}", userInfo.email());
             final User user = userRepository.findByEmail(userInfo.email())
