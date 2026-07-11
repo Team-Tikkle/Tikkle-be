@@ -72,7 +72,7 @@ public class UpbitOrderClient {
             String responseBody = e.getResponseBodyAsString();
             log.error("[UpbitOrderClient] 업비트 매수 주문 실패 - status: {}, body: {}, error: {}", e.getStatusCode(), responseBody, e.getMessage(), e);
             
-            if (e.getStatusCode().value() == 401) {
+            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403) {
                 throw new UpbitInvalidKeyException();
             }
 
@@ -113,7 +113,7 @@ public class UpbitOrderClient {
                     .body(UpbitOrderResponse.class);
         } catch (RestClientResponseException e) {
             log.error("[UpbitOrderClient] 업비트 주문 내역 조회 실패 - status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
-            if (e.getStatusCode().value() == 401) {
+            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403) {
                 throw new UpbitInvalidKeyException();
             }
             throw new UpbitOrderInquiryFailedException();
@@ -144,7 +144,7 @@ public class UpbitOrderClient {
                     .body(UpbitOrderResponse.class);
         } catch (RestClientResponseException e) {
             log.error("[UpbitOrderClient] 업비트 주문 취소 실패 - uuid: {}, status: {}", uuid, e.getStatusCode(), e);
-            if (e.getStatusCode().value() == 401) {
+            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403) {
                 throw new UpbitInvalidKeyException();
             }
             throw new UpbitOrderCancelFailedException("주문 취소 실패");

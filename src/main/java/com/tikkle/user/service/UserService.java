@@ -28,6 +28,7 @@ public class UserService {
         boolean hasInvestmentProfile = false;
         boolean hasKbankAccount = false;
         boolean hasUpbitKey = false;
+        boolean isUpbitKeyValid = false;
 
         hasInvestmentProfile = investmentProfileRepository.findByUserId(userId)
                 .map(profile -> profile.getRiskTolerance() != null) // 하나라도 설정되었는지 확인
@@ -36,10 +37,11 @@ public class UserService {
         LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
         if (account != null) {
             hasKbankAccount = account.getTargetCardCompany() != null;
-            hasUpbitKey = account.getUpbitAccessKey() != null && account.isUpbitKeyValid();
+            hasUpbitKey = account.getUpbitAccessKey() != null;
+            isUpbitKeyValid = account.getUpbitAccessKey() != null && account.isUpbitKeyValid();
         }
 
-        return UserResponse.from(user, hasInvestmentProfile, hasKbankAccount, hasUpbitKey);
+        return UserResponse.from(user, hasInvestmentProfile, hasKbankAccount, hasUpbitKey, isUpbitKeyValid);
     }
 
     /**

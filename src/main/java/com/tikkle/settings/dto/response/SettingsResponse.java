@@ -31,7 +31,7 @@ public record SettingsResponse(
     public record CategoryRule(
             @Schema(description = "결제 카테고리 유형", example = "CAFE")
             PaymentCategory category, 
-            @Schema(description = "잔돈 저축 규칙 유형 (미설정 시 null)", example = "ROUND_UP_10000", nullable = true)
+            @Schema(description = "잔돈 저축 규칙 유형", example = "ROUND_UP_10000")
             RuleType ruleType
     ) {}
 
@@ -42,7 +42,9 @@ public record SettingsResponse(
             @Schema(description = "타겟 카드 번호 마지막 4자리", example = "1234")
             String targetCardLast4,
             @Schema(description = "업비트 2차 인증 수단", example = "KAKAOTALK")
-            TwoFactorProvider twoFactorProvider
+            TwoFactorProvider twoFactorProvider,
+            @Schema(description = "업비트 API 키 유효성 여부", example = "true")
+            boolean isUpbitKeyValid
     ) {}
 
     @Schema(description = "투자 성향 정보")

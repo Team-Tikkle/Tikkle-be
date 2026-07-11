@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 import jakarta.validation.constraints.Pattern;
 
-@Schema(description = "케이뱅크 타겟 카드 연동 및 2차 인증 수단 정보 요청")
+@Schema(description = "케이뱅크 타겟 카드 연동 정보 요청")
 public record UpdateKbankAccountRequest(
         @Schema(description = "결제 타겟 카드 끝 4자리", example = "1234")
         @NotBlank(message = "카드 번호 끝 4자리는 필수입니다.")

@@ -212,7 +212,7 @@ public class UpbitDepositPollingProcessor {
                 "status", "UPBIT_INVALID_KEY",
                 "message", "업비트 인증 키가 만료되거나 권한이 없습니다. 앱에서 업비트 계정을 다시 연동해주세요."
         );
-        sseConnectionManager.send(eventId, "TRADE_FAILED", errorData);
+        sseConnectionManager.send(eventId, "UPBIT_INVALID_KEY", errorData);
         sseConnectionManager.complete(eventId);
     }
 

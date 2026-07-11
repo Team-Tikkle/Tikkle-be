@@ -15,9 +15,10 @@ public record UserResponse(
         @Schema(description = "가입일시", example = "2024-01-01T00:00:00") LocalDateTime createdAt,
         @Schema(description = "투자 성향 설정 여부", example = "true") boolean hasInvestmentProfile,
         @Schema(description = "케이뱅크 연동 여부", example = "true") boolean hasKbankAccount,
-        @Schema(description = "업비트 키 연동 여부", example = "true") boolean hasUpbitKey
+        @Schema(description = "업비트 키 연동 여부", example = "true") boolean hasUpbitKey,
+        @Schema(description = "업비트 키 유효 여부", example = "true") boolean isUpbitKeyValid
 ) {
-    public static UserResponse from(User user, boolean hasInvestmentProfile, boolean hasKbankAccount, boolean hasUpbitKey) {
+    public static UserResponse from(User user, boolean hasInvestmentProfile, boolean hasKbankAccount, boolean hasUpbitKey, boolean isUpbitKeyValid) {
         return new UserResponse(
                 user.getId(),
                 user.getName(),
@@ -26,7 +27,8 @@ public record UserResponse(
                 user.getCreatedAt(),
                 hasInvestmentProfile,
                 hasKbankAccount,
-                hasUpbitKey
+                hasUpbitKey,
+                isUpbitKeyValid
         );
     }
 }

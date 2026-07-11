@@ -23,6 +23,7 @@ public record UpdateSpareChangeRulesRequest(
                 "  {\"category\": \"CULTURE\", \"ruleType\": \"ROUND_UP_10000\"},\n" +
                 "  {\"category\": \"ETC\", \"ruleType\": \"ROUND_UP_10000\"}\n" +
                 "]")
+        @NotNull(message = "잔돈 규칙 목록은 필수입니다.")
         @Size(min = 7, max = 7, message = "모든 카테고리에 대한 잔돈 규칙을 전송해야 합니다.")
         @Valid
         List<RuleItem> rules
