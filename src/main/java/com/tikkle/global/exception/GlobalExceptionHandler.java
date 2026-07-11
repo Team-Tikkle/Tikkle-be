@@ -21,7 +21,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
     // CustomException
     @ExceptionHandler(CustomException.class)
-    public ResponseEntity<ApiResponse<?>> handleCustomException(CustomException e) {
+    public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e) {
         ErrorCode errorCode = e.getErrorCode();
         log.warn("[CustomException] : {}", errorCode.getMessage());
         return ResponseEntity
@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
 
     // 프론트엔드의 잘못된 파라미터/JSON 입력 에러 (@Valid 실패 시)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String errorMessage = e.getBindingResult().getAllErrors().get(0).getDefaultMessage(); // 첫 번째 에러 필드의 메시지
 
         log.warn("[MethodArgumentNotValidException] : {}", errorMessage);
@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
 
     // JSON 형식이 아예 깨져서 넘어왔을 때
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<?>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         log.warn("[HttpMessageNotReadableException]", e);
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT_VALUE.getHttpStatus())
@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
 
     // 지원하지 않는 HTTP 메서드 호출 에러 (GET인데 POST로 보냈을 때)
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ApiResponse<?>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
+    public ResponseEntity<ApiResponse<Void>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
         log.warn("[HttpRequestMethodNotSupportedException]", e);
         return ResponseEntity
                 .status(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus())
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
 
     // 잘못된 주소(URL)로 요청을 보냈을 때 (404 Not Found)
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<?>> handleNoResourceFoundException(NoResourceFoundException e) {
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
         log.warn("[NoResourceFoundException] 잘못된 URL 요청: {}", e.getResourcePath());
 
         return ResponseEntity
@@ -73,7 +73,7 @@ public class GlobalExceptionHandler {
 
     // 파일 업로드 용량 초과 에러
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
         log.warn("[MaxUploadSizeExceededException]", e);
         return ResponseEntity
                 .status(ErrorCode.FILE_SIZE_EXCEEDED.getHttpStatus())
@@ -82,7 +82,7 @@ public class GlobalExceptionHandler {
 
     // 그 외 예측하지 못한 모든 서버 에러 (최후의 보루)
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<?>> handleException(Exception e) {
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         log.error("[Unhandled Exception] : ", e);
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())

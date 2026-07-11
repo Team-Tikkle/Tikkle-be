@@ -22,25 +22,25 @@ public class TestTokenController {
     private final TestTokenService testTokenService;
 
     /**
-     * 특정 이메일로 가입된 기존 유저의 토큰을 강제 발급합니다.
+     * 특정 전화번호로 가입된 기존 유저의 토큰을 강제 발급합니다.
      *
-     * @param email 발급받을 사용자의 이메일
+     * @param phoneNumber 발급받을 사용자의 전화번호
      * @return 테스트용 JWT 토큰 쌍
      */
     @PostMapping("/test-token")
-    public ApiResponse<TokenResponse> testToken(@RequestParam String email) {
-        return ApiResponse.success(testTokenService.generateTestToken(email));
+    public ApiResponse<TokenResponse> testToken(@RequestParam String phoneNumber) {
+        return ApiResponse.success(testTokenService.generateTestToken(phoneNumber));
     }
 
     /**
-     * 임의의 이메일과 이름으로 신규 회원을 가입시키고 그 유저의 토큰을 발급합니다.
+     * 임의의 전화번호와 이름으로 신규 회원을 가입시키고 그 유저의 토큰을 발급합니다.
      *
-     * @param email 가입할 이메일
+     * @param phoneNumber 가입할 전화번호
      * @param name 가입할 이름
      * @return 테스트용 JWT 토큰 쌍
      */
     @PostMapping("/test-signup")
-    public ApiResponse<TokenResponse> testSignup(@RequestParam String email, @RequestParam String name) {
-        return ApiResponse.success(testTokenService.generateTestSignupAndToken(email, name));
+    public ApiResponse<TokenResponse> testSignup(@RequestParam String phoneNumber, @RequestParam String name) {
+        return ApiResponse.success(testTokenService.generateTestSignupAndToken(phoneNumber, name));
     }
 }

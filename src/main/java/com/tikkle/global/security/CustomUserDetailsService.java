@@ -20,9 +20,9 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        final User user = userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+    public UserDetails loadUserByUsername(String phoneNumber) throws UsernameNotFoundException {
+        final User user = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + phoneNumber));
         return new CustomUserDetails(user);
     }
 }
