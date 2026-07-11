@@ -71,8 +71,6 @@ public class SettingsService {
                     account.getTargetCardCompany(),
                     account.getTargetCardLast4(),
                     account.getTwoFactorProvider(),
-                    account.getUpbitAccessKey(),
-                    account.getUpbitSecretKey(),
                     account.isUpbitKeyValid()
             );
         }

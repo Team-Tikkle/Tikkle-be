@@ -43,10 +43,6 @@ public record SettingsResponse(
             String targetCardLast4,
             @Schema(description = "업비트 2차 인증 수단", example = "KAKAOTALK")
             TwoFactorProvider twoFactorProvider,
-            @Schema(description = "업비트 API 액세스 키", example = "a1b2c3d4...")
-            String upbitAccessKey,
-            @Schema(description = "업비트 API 시크릿 키", example = "e5f6g7h8...")
-            String upbitSecretKey,
             @Schema(description = "업비트 API 키 유효성 여부", example = "true")
             boolean isUpbitKeyValid
     ) {}
