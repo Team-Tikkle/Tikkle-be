@@ -66,11 +66,14 @@ public class SettingsService {
         boolean isEnabled = (account != null) && account.isInvestmentEnabled();
         
         SettingsResponse.LinkedAccountInfo linkedAccountInfo = null;
-        if (account != null && account.getTargetCardCompany() != null) {
+        if (account != null) {
             linkedAccountInfo = new SettingsResponse.LinkedAccountInfo(
                     account.getTargetCardCompany(),
                     account.getTargetCardLast4(),
-                    account.getTwoFactorProvider()
+                    account.getTwoFactorProvider(),
+                    account.getUpbitAccessKey(),
+                    account.getUpbitSecretKey(),
+                    account.isUpbitKeyValid()
             );
         }
 
@@ -153,6 +156,7 @@ public class SettingsService {
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         account.updateKbankInfo("KBANK", request.targetCardLast4());
+        syncAfterCommit(() -> settingsCacheManager.updateKbankAccount(userId, request.targetCardLast4()));
     }
 
     /**
@@ -187,11 +191,10 @@ public class SettingsService {
     @Transactional
     public void updateInvestmentStatus(Long userId, UpdateInvestmentStatusRequest request) {
         log.info("[SettingsService] 자동 투자 활성화 상태 변경 처리 - userId: {}, isInvestmentEnabled: {}", userId, request.isInvestmentEnabled());
-        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
-        if (account != null) {
-            account.updateInvestmentStatus(request.isInvestmentEnabled());
-            syncAfterCommit(() -> settingsCacheManager.updateInvestmentStatus(userId, request.isInvestmentEnabled()));
-        }
+        LinkedAccount account = linkedAccountRepository.findByUserId(userId)
+                .orElseThrow(LinkedAccountNotFoundException::new);
+        account.updateInvestmentStatus(request.isInvestmentEnabled());
+        syncAfterCommit(() -> settingsCacheManager.updateInvestmentStatus(userId, request.isInvestmentEnabled()));
     }
 
     private void syncAfterCommit(Runnable action) {

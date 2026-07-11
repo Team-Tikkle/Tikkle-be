@@ -29,7 +29,9 @@ public interface UserSwagger {
                                         "email": "hong@example.com",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00",
-                                        "isNewUser": false
+                                        "hasInvestmentProfile": true,
+                                        "hasKbankAccount": true,
+                                        "hasUpbitKey": true
                                       }
                                     }
                                     """))),
