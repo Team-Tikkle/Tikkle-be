@@ -39,14 +39,14 @@ public class AiPortfolioService {
     private final AiRecommendationHistoryRepository historyRepository;
 
     public AiPortfolioService(
-            @Qualifier("anthropicChatModel") ChatModel anthropicChatModel,
+            @Qualifier("openAiChatModel") ChatModel openAiChatModel,
             FearAndGreedClient fearAndGreedClient,
             CoinGeckoClient coinGeckoClient,
             UpbitCandleClient upbitCandleClient,
             StringRedisTemplate redisTemplate,
             JsonMapper objectMapper,
             AiRecommendationHistoryRepository historyRepository) {
-        this.chatClient = ChatClient.builder(anthropicChatModel).build();
+        this.chatClient = ChatClient.builder(openAiChatModel).build();
         this.fearAndGreedClient = fearAndGreedClient;
         this.coinGeckoClient = coinGeckoClient;
         this.upbitCandleClient = upbitCandleClient;
@@ -120,7 +120,7 @@ public class AiPortfolioService {
     }
 
     /**
-     * AI 챗 모델(Anthropic)에 프롬프트를 전송하여 시장 상황에 맞는 가상자산 15종을 추천받습니다.
+     * AI 챗 모델(DeepSeek)에 프롬프트를 전송하여 시장 상황에 맞는 가상자산 15종을 추천받습니다.
      *
      * @param risk 사용자 위험 감수성
      * @param trend 사용자 트렌드 민감도

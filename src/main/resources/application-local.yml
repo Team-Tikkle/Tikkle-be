@@ -38,12 +38,12 @@ spring:
           model: "gemini-2.5-flash"
           temperature: 0.0
 
-    # 2. 신규: 3주 차 주식 추천 코어용 (Claude)
-    anthropic:
-      api-key: ${GMS_KEY}
-      base-url: https://gms.ssafy.io/gmsapi/api.anthropic.com
+    # 2. 신규: 3주 차 주식 추천 코어용 (DeepSeek)
+    openai:
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: https://api.deepseek.com
       chat:
-        model: claude-sonnet-4-6
+        model: deepseek-chat
         max-tokens: 2048
 
 jwt:
