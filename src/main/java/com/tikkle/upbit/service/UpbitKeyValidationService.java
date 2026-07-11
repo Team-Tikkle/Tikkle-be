@@ -53,9 +53,9 @@ public class UpbitKeyValidationService {
         // 3. 주문 하기 권한 검사 (POST /v1/orders - 더미 데이터로 검증)
         checkPermission(accessKey, secretKey, "주문 하기", () -> {
             Map<String, Object> params = new LinkedHashMap<>();
-            params.put("market", "KRW-BTC");
+            params.put("market", "KRW-INVALID");
             params.put("side", "bid");
-            params.put("price", "1000");
+            params.put("price", "10");
             params.put("ord_type", "price");
 
             StringBuilder sb = new StringBuilder();
@@ -89,10 +89,10 @@ public class UpbitKeyValidationService {
         // 5. 입금 하기 권한 검사 (POST /v1/deposits/krw - 더미 데이터로 검증)
         checkPermission(accessKey, secretKey, "입금 하기", () -> {
             Map<String, Object> params = new LinkedHashMap<>();
-            params.put("amount", "1000");
+            params.put("amount", "10");
 
             StringBuilder sb = new StringBuilder();
-            sb.append("amount=1000");
+            sb.append("amount=10");
             String token = UpbitAuthUtil.generateToken(accessKey, secretKey, sb.toString());
 
             restClient.post()
