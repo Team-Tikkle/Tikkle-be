@@ -7,7 +7,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/tikkle_db?useSSL=false&allowPublicKeyRetrieval=true
     username: "root"
-    password: "1234"
+    password: "0311"
 
   servlet:
     multipart:
@@ -60,3 +60,9 @@ tikkle:
 app:
   cors:
     allowed-origins: http://localhost:5173,https://localhost
+
+coolsms:
+  api:
+    key: ${COOLSMS_API_KEY}
+    secret: ${COOLSMS_API_SECRET}
+  sender-number: ${COOLSMS_SENDER_NUMBER}

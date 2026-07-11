@@ -62,6 +62,9 @@ dependencies {
     // Swagger (springdoc-openapi)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
 
+    // CoolSMS (Nurigo SDK)
+    implementation 'net.nurigo:sdk:4.3.0'
+
     // 테스트 도구
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
