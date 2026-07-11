@@ -1,6 +1,5 @@
 package com.tikkle.user.entity;
 
-import com.tikkle.user.entity.enums.AuthProvider;
 import com.tikkle.user.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,15 +19,11 @@ public class User {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, length = 100, unique = true)
-    private String email;
+    @Column(nullable = false, length = 20, unique = true)
+    private String phoneNumber;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AuthProvider provider;
-
-    @Column(length = 255)
-    private String providerId;
+    @Column(nullable = false, length = 255)
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -42,11 +37,10 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    private User(String name, String email, AuthProvider provider, String providerId, UserStatus status) {
+    private User(String name, String phoneNumber, String password, UserStatus status) {
         this.name = name;
-        this.email = email;
-        this.provider = provider;
-        this.providerId = providerId;
+        this.phoneNumber = phoneNumber;
+        this.password = password;
         this.status = status;
     }
 
