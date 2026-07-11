@@ -37,7 +37,7 @@ public interface PaymentHistorySwagger {
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "결제 카테고리 수정", description = "특정 결제 건의 카테고리를 사용자가 직접 변경합니다.")
-    ApiResponse<?> updateCategory(
+    ApiResponse<Void> updateCategory(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "결제 이벤트 ID", example = "10293", required = true) @PathVariable Long id,
             @Valid @RequestBody CategoryUpdateRequest request

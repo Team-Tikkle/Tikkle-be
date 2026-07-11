@@ -45,7 +45,7 @@ public class SettingsController implements SettingsSwagger {
      */
     @Override
     @PatchMapping("/spare-change-rules")
-    public ApiResponse<?> updateSpareChangeRules(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ApiResponse<Void> updateSpareChangeRules(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                  @RequestBody @Valid UpdateSpareChangeRulesRequest request) {
         settingsService.updateSpareChangeRules(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
@@ -60,7 +60,7 @@ public class SettingsController implements SettingsSwagger {
      */
     @Override
     @PatchMapping("/profile")
-    public ApiResponse<?> updateInvestmentProfile(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ApiResponse<Void> updateInvestmentProfile(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                   @RequestBody @Valid UpdateInvestmentProfileRequest request) {
         settingsService.updateInvestmentProfile(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
@@ -75,7 +75,7 @@ public class SettingsController implements SettingsSwagger {
      */
     @Override
     @PatchMapping("/kbank")
-    public ApiResponse<?> updateKbankAccount(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ApiResponse<Void> updateKbankAccount(@AuthenticationPrincipal CustomUserDetails userDetails,
                                              @RequestBody @Valid UpdateKbankAccountRequest request) {
         settingsService.updateKbankAccount(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
@@ -90,7 +90,7 @@ public class SettingsController implements SettingsSwagger {
      */
     @Override
     @PatchMapping("/upbit")
-    public ApiResponse<?> updateUpbitKey(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ApiResponse<Void> updateUpbitKey(@AuthenticationPrincipal CustomUserDetails userDetails,
                                          @RequestBody @Valid UpdateUpbitKeyRequest request) {
         settingsService.updateUpbitKey(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();
@@ -105,7 +105,7 @@ public class SettingsController implements SettingsSwagger {
      */
     @Override
     @PatchMapping("/investment")
-    public ApiResponse<?> updateInvestmentStatus(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ApiResponse<Void> updateInvestmentStatus(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                  @RequestBody @Valid UpdateInvestmentStatusRequest request) {
         settingsService.updateInvestmentStatus(userDetails.getUserId(), request);
         return ApiResponse.successWithNoData();

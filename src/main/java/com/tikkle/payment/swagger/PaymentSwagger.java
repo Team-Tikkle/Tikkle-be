@@ -2,6 +2,7 @@ package com.tikkle.payment.swagger;
 
 import com.tikkle.global.response.ApiResponse;
 import com.tikkle.payment.dto.request.PaymentScrapingRequest;
+import com.tikkle.payment.dto.response.PaymentScrapingResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -30,5 +31,5 @@ public interface PaymentSwagger {
                             value = "{ \"code\": \"PAYMENT-001\", \"message\": \"유효하지 않은 서명입니다.\" }"
                     )))
     })
-    ApiResponse<?> receivePaymentScraping(PaymentScrapingRequest request);
+    ApiResponse<PaymentScrapingResponse> receivePaymentScraping(PaymentScrapingRequest request);
 }

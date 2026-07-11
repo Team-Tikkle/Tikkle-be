@@ -79,7 +79,7 @@ public class PaymentHistoryController implements PaymentHistorySwagger {
      */
     @Override
     @PatchMapping("/{id}/category")
-    public ApiResponse<?> updateCategory(
+    public ApiResponse<Void> updateCategory(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
             @Valid @RequestBody CategoryUpdateRequest request

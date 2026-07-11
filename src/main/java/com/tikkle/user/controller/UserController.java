@@ -26,7 +26,7 @@ public class UserController implements UserSwagger {
 
     @Override
     @DeleteMapping("/me")
-    public ApiResponse<?> withdrawMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ApiResponse<Void> withdrawMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.withdrawMe(userDetails.getUserId());
         return ApiResponse.successWithNoData();
     }

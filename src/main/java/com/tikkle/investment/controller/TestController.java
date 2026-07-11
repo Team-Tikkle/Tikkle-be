@@ -18,7 +18,7 @@ public class TestController {
     private final AiPortfolioScheduler aiPortfolioScheduler;
 
     @PostMapping("/scheduler/portfolio")
-    public ApiResponse<?> triggerPortfolioScheduler() {
+    public ApiResponse<Void> triggerPortfolioScheduler() {
         log.info("[TestController] 포트폴리오 스케줄러 수동 실행 API 호출됨");
         aiPortfolioScheduler.scheduleDailyTargets();
         return ApiResponse.successWithNoData();
