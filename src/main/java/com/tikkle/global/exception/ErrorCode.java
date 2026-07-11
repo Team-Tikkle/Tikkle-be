@@ -21,6 +21,13 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH-004", "해당 자원에 대한 접근 권한이 없습니다."),
     INVALID_SOCIAL_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-005", "유효하지 않은 소셜 액세스 토큰입니다."),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "AUTH-006", "리프레시 토큰이 만료되었습니다. 다시 로그인해주세요."),
+    PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "AUTH-007", "이미 가입된 전화번호입니다."),
+    INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH-008", "비밀번호가 일치하지 않습니다."),
+
+    // SMS 본인인증 (SMS)
+    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS-001", "SMS 발송에 실패했습니다."),
+    INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "SMS-002", "인증번호가 일치하지 않거나 만료되었습니다."),
+    EXPIRED_SIGNUP_TOKEN(HttpStatus.BAD_REQUEST, "SMS-003", "휴대폰 인증이 만료되었거나 유효하지 않습니다. 다시 인증해주세요."),
 
     // 유저 (User)
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),

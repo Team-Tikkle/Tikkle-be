@@ -23,26 +23,26 @@ public interface SettingsSwagger {
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "카테고리별 잔돈 룰 일괄 변경", description = "모든 카테고리(7개)의 잔돈 규칙을 전송하여 전체 갱신합니다.")
-    ApiResponse<?> updateSpareChangeRules(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+    ApiResponse<Void> updateSpareChangeRules(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                           UpdateSpareChangeRulesRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "투자 성향 정보 등록/수정", description = "초기 설정 등록 및 이후 설정 화면에서의 변경을 모두 처리합니다.")
-    ApiResponse<?> updateInvestmentProfile(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+    ApiResponse<Void> updateInvestmentProfile(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                            UpdateInvestmentProfileRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "케이뱅크 계좌/카드 정보 등록/수정", description = "초기 설정 등록 및 이후 변경을 처리합니다.")
-    ApiResponse<?> updateKbankAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+    ApiResponse<Void> updateKbankAccount(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                       UpdateKbankAccountRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "업비트 API 키 등록/수정 및 유효성 검증", description = "업비트 키 등록/수정 및 5대 핵심 권한 정밀 검증을 수행합니다.")
-    ApiResponse<?> updateUpbitKey(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+    ApiResponse<Void> updateUpbitKey(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                   UpdateUpbitKeyRequest request);
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "자동 투자 서비스 활성화/비활성화", description = "사용자가 결제 시 투자를 진행할지 여부를 설정합니다.")
-    ApiResponse<?> updateInvestmentStatus(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+    ApiResponse<Void> updateInvestmentStatus(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
                                           UpdateInvestmentStatusRequest request);
 }

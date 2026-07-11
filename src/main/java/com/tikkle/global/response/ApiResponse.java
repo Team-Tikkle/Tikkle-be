@@ -50,7 +50,7 @@ public class ApiResponse<T> {
      *
      * @return ApiResponse 객체
      */
-    public static ApiResponse<?> successWithNoData() {
+    public static ApiResponse<Void> successWithNoData() {
         return new ApiResponse<>("SUCCESS", "요청에 성공했습니다.", null);
     }
 
@@ -62,7 +62,7 @@ public class ApiResponse<T> {
      * @param message 실패 메시지
      * @return ApiResponse 객체
      */
-    public static ApiResponse<?> error(String code, String message) {
+    public static ApiResponse<Void> error(String code, String message) {
         return new ApiResponse<>(code, message, null);
     }
 
@@ -72,7 +72,7 @@ public class ApiResponse<T> {
      * @param errorCode 에러 코드 Enum
      * @return ApiResponse 객체
      */
-    public static ApiResponse<?> error(ErrorCode errorCode) {
+    public static ApiResponse<Void> error(ErrorCode errorCode) {
         return new ApiResponse<>(errorCode.getCode(), errorCode.getMessage(), null);
     }
 }

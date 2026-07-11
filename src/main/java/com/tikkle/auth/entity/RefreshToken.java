@@ -11,7 +11,7 @@ import org.springframework.data.redis.core.TimeToLive;
 @RedisHash("refresh_token")
 public class RefreshToken {
     @Id
-    private String email;
+    private Long userId;
 
     private String token;
 

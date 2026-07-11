@@ -26,7 +26,7 @@ public interface UserSwagger {
                                       "data": {
                                         "id": 1,
                                         "name": "홍길동",
-                                        "email": "hong@example.com",
+                                        "phoneNumber": "01012345678",
                                         "status": "ACTIVE",
                                         "createdAt": "2024-01-01T00:00:00",
                                         "hasInvestmentProfile": true,
@@ -67,6 +67,6 @@ public interface UserSwagger {
                                     }
                                     """)))
     })
-    ApiResponse<?> withdrawMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
+    ApiResponse<Void> withdrawMe(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
 }

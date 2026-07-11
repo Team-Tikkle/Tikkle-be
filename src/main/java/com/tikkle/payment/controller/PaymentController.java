@@ -30,7 +30,7 @@ public class PaymentController implements PaymentSwagger {
      */
     @Override
     @PostMapping
-    public ApiResponse<?> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
+    public ApiResponse<PaymentScrapingResponse> receivePaymentScraping(@Valid @RequestBody PaymentScrapingRequest request) {
         PaymentScrapingResponse response = paymentService.processPayment(request);
         
         return ApiResponse.success(response);

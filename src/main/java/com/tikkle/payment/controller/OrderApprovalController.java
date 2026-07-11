@@ -35,7 +35,7 @@ public class OrderApprovalController implements OrderApprovalSwagger {
      */
     @Override
     @PostMapping("/approve")
-    public ApiResponse<?> approveOrder(
+    public ApiResponse<Void> approveOrder(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long eventId
     ) {
@@ -63,7 +63,7 @@ public class OrderApprovalController implements OrderApprovalSwagger {
      */
     @Override
     @PostMapping("/reject")
-    public ApiResponse<?> rejectOrder(
+    public ApiResponse<Void> rejectOrder(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long eventId
     ) {

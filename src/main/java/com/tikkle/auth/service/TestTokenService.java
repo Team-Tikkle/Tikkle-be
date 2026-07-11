@@ -5,7 +5,6 @@ import com.tikkle.auth.entity.RefreshToken;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.AuthProvider;
 import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
@@ -15,6 +14,7 @@ import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -31,50 +31,36 @@ public class TestTokenService {
     private final UserRepository userRepository;
     private final InvestmentProfileRepository investmentProfileRepository;
     private final LinkedAccountRepository linkedAccountRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    /**
-     * 기존에 가입된 회원의 이메일을 이용해 강제로 JWT 토큰을 발급합니다.
-     *
-     * @param email 발급 대상 사용자 이메일
-     * @return 엑세스 및 리프레시 토큰 응답
-     * @throws UserNotFoundException 회원이 존재하지 않을 경우
-     */
-    public TokenResponse generateTestToken(String email) {
-        userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE)
+    public TokenResponse generateTestToken(String phoneNumber) {
+        User user = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
-        return issueToken(email, false);
+        return issueToken(user.getId(), false);
     }
 
-    /**
-     * 이메일과 이름을 입력받아 신규 회원을 강제로 가입시킨 후 JWT 토큰을 발급합니다.
-     * 이미 존재하는 이메일일 경우 기존 유저로 로그인 처리됩니다.
-     *
-     * @param email 회원 이메일
-     * @param name 회원 이름
-     * @return 엑세스 및 리프레시 토큰 응답
-     */
-    public TokenResponse generateTestSignupAndToken(String email, String name) {
-        final Optional<User> existingUser = userRepository.findByEmailAndStatus(email, UserStatus.ACTIVE);
+    public TokenResponse generateTestSignupAndToken(String phoneNumber, String name) {
+        final Optional<User> existingUser = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE);
         final boolean isNewUser = existingUser.isEmpty();
         final User user = existingUser.orElseGet(() -> {
             User newUser = userRepository.save(User.builder()
-                    .email(email)
+                    .phoneNumber(phoneNumber)
+                    .password(passwordEncoder.encode("testpassword!"))
                     .name(name)
-                    .provider(AuthProvider.GOOGLE)
                     .status(UserStatus.ACTIVE)
                     .build());
             investmentProfileRepository.save(InvestmentProfile.builder().user(newUser).build());
             linkedAccountRepository.save(LinkedAccount.builder().user(newUser).build());
             return newUser;
         });
-        return issueToken(user.getEmail(), isNewUser);
+        return issueToken(user.getId(), isNewUser);
     }
 
-    private TokenResponse issueToken(String email, boolean isNewUser) {
-        final String accessToken = jwtProvider.createAccessToken(email);
-        final String refreshToken = jwtProvider.createRefreshToken(email);
+    private TokenResponse issueToken(Long userId, boolean isNewUser) {
+        final String accessToken = jwtProvider.createAccessToken(userId);
+        final String refreshToken = jwtProvider.createRefreshToken(userId);
         refreshTokenRepository.save(new RefreshToken(
-                email,
+                userId,
                 refreshToken,
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
