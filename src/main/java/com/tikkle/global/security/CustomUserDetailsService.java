@@ -2,6 +2,7 @@ package com.tikkle.global.security;
 
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
+import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,7 +23,21 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String phoneNumber) throws UsernameNotFoundException {
         final User user = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + phoneNumber));
+                .orElseThrow(UserNotFoundException::new);
+        return new CustomUserDetails(user);
+    }
+
+    /**
+     * 사용자 식별자(userId)를 기반으로 DB에서 유저 정보를 조회하여 UserDetails 객체를 생성합니다.
+     *
+     * @param userId 조회할 사용자의 식별자
+     * @return 스프링 시큐리티에서 사용할 UserDetails 객체
+     * @throws UserNotFoundException 해당 ID의 사용자가 존재하지 않거나 활성화 상태가 아닐 때 발생
+     */
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUserId(Long userId) {
+        final User user = userRepository.findByIdAndStatus(userId, UserStatus.ACTIVE)
+                .orElseThrow(UserNotFoundException::new);
         return new CustomUserDetails(user);
     }
 }
