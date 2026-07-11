@@ -31,6 +31,12 @@ public class SettingsCacheManager {
         redisTemplate.opsForHash().put(cacheKey, "isInvestmentEnabled", String.valueOf(isEnabled));
     }
 
+    public void updateKbankAccount(Long userId, String targetCardLast4) {
+        String cacheKey = cacheKey(userId);
+        redisTemplate.opsForHash().put(cacheKey, "targetCardCompany", "KBANK");
+        redisTemplate.opsForHash().put(cacheKey, "targetCardLast4", targetCardLast4);
+    }
+
     private String cacheKey(Long userId) {
         return USER_SETTINGS_CACHE_PREFIX + userId;
     }

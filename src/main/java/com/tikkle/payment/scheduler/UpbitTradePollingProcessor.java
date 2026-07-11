@@ -39,6 +39,7 @@ public class UpbitTradePollingProcessor {
     private final LinkedAccountRepository linkedAccountRepository;
     private final UpbitOrderClient upbitOrderClient;
     private final UpbitPortfolioUpdater portfolioUpdater;
+    private final com.tikkle.payment.sse.SseConnectionManager sseConnectionManager;
 
     /**
      * 개별 이벤트에 대해 업비트 API를 호출하고 결과를 처리합니다.
@@ -166,6 +167,17 @@ public class UpbitTradePollingProcessor {
             portfolioUpdater.updatePortfolio(info.userId(), info.targetMarket(), result);
             
             event.completeInvestment(totalVolume, averagePrice);
+
+            String successMsg = String.format("%s %s개 매수 성공했습니다.", info.coinName(), result.executedVolume().toPlainString());
+            java.util.Map<String, Object> successData = java.util.Map.of(
+                    "status", "SUCCESS",
+                    "message", successMsg,
+                    "targetCoinName", info.coinName(),
+                    "investedVolume", result.executedVolume(),
+                    "investedPrice", result.executedPrice()
+            );
+            sseConnectionManager.send(eventId, "SUCCESS", successData);
+            sseConnectionManager.complete(eventId);
         } else {
             log.warn("[UpbitTradePollingProcessor] 체결 상태는 done 이나 체결량이 0 - eventId: {}", eventId);
             event.failInvestment("주문이 완료되었으나 실제 체결된 코인 수량이 0입니다.");
