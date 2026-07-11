@@ -58,8 +58,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         switch (result) {
             case VALID -> {
                 try {
-                    final String phoneNumber = jwtProvider.getPhoneNumber(token);
-                    final UserDetails userDetails = userDetailsService.loadUserByUsername(phoneNumber);
+                    final Long userId = jwtProvider.getUserId(token);
+                    final UserDetails userDetails = userDetailsService.loadUserByUserId(userId);
                     final UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
