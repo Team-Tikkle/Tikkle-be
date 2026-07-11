@@ -34,9 +34,9 @@ public class TestTokenService {
     private final PasswordEncoder passwordEncoder;
 
     public TokenResponse generateTestToken(String phoneNumber) {
-        userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
+        User user = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
                 .orElseThrow(UserNotFoundException::new);
-        return issueToken(phoneNumber, false);
+        return issueToken(user.getId(), false);
     }
 
     public TokenResponse generateTestSignupAndToken(String phoneNumber, String name) {
@@ -53,14 +53,14 @@ public class TestTokenService {
             linkedAccountRepository.save(LinkedAccount.builder().user(newUser).build());
             return newUser;
         });
-        return issueToken(user.getPhoneNumber(), isNewUser);
+        return issueToken(user.getId(), isNewUser);
     }
 
-    private TokenResponse issueToken(String phoneNumber, boolean isNewUser) {
-        final String accessToken = jwtProvider.createAccessToken(phoneNumber);
-        final String refreshToken = jwtProvider.createRefreshToken(phoneNumber);
+    private TokenResponse issueToken(Long userId, boolean isNewUser) {
+        final String accessToken = jwtProvider.createAccessToken(userId);
+        final String refreshToken = jwtProvider.createRefreshToken(userId);
         refreshTokenRepository.save(new RefreshToken(
-                phoneNumber,
+                userId,
                 refreshToken,
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));

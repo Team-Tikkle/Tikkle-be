@@ -30,22 +30,22 @@ public class JwtProvider {
     }
 
     /**
-     * 사용자의 휴대폰 번호를 기반으로 Access Token을 생성합니다.
+     * 사용자의 아이디(userId)를 기반으로 Access Token을 생성합니다.
      *
-     * @param phoneNumber 토큰에 담을 사용자 휴대폰 번호
+     * @param userId 토큰에 담을 사용자 아이디
      * @return 생성된 JWT Access Token 문자열
      */
-    public String createAccessToken(String phoneNumber) {
-        return createToken(phoneNumber, accessTokenExpiration);
+    public String createAccessToken(Long userId) {
+        return createToken(userId, accessTokenExpiration);
     }
 
-    public String createRefreshToken(String phoneNumber) {
-        return createToken(phoneNumber, refreshTokenExpiration);
+    public String createRefreshToken(Long userId) {
+        return createToken(userId, refreshTokenExpiration);
     }
 
-    private String createToken(String phoneNumber, long expiration) {
+    private String createToken(Long userId, long expiration) {
         return Jwts.builder()
-                .subject(phoneNumber)
+                .subject(String.valueOf(userId))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(key)
@@ -53,13 +53,13 @@ public class JwtProvider {
     }
 
     /**
-     * 주어진 JWT 토큰에서 사용자 휴대폰 번호(Subject)을 추출합니다.
+     * 주어진 JWT 토큰에서 사용자 아이디(userId)를 추출합니다.
      *
      * @param token JWT 토큰 문자열
-     * @return 파싱된 휴대폰 번호 문자열
+     * @return 파싱된 사용자 아이디(Long)
      */
-    public String getPhoneNumber(String token) {
-        return parseClaims(token).getSubject();
+    public Long getUserId(String token) {
+        return Long.valueOf(parseClaims(token).getSubject());
     }
 
     /**

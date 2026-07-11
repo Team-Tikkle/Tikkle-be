@@ -7,8 +7,9 @@ import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.entity.RefreshToken;
 import com.tikkle.auth.exception.InvalidTokenException;
 import com.tikkle.auth.exception.RefreshTokenExpiredException;
-import com.tikkle.global.exception.CustomException;
-import com.tikkle.global.exception.ErrorCode;
+import com.tikkle.auth.exception.PhoneAlreadyRegisteredException;
+import com.tikkle.auth.exception.InvalidPasswordException;
+import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import com.tikkle.user.entity.User;
@@ -42,23 +43,23 @@ public class AuthService {
     @Transactional
     public TokenResponse signup(SignupRequest request) {
         // 1. 휴대폰 인증 토큰 검증
-        smsService.validateSignupToken(request.getPhoneNumber(), request.getSignupToken());
+        smsService.validateSignupToken(request.phoneNumber(), request.signupToken());
 
         // 2. 이미 존재하는 유저인지 확인
-        if (userRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
-            throw new CustomException(ErrorCode.PHONE_ALREADY_REGISTERED);
+        if (userRepository.findByPhoneNumber(request.phoneNumber()).isPresent()) {
+            throw new PhoneAlreadyRegisteredException();
         }
 
         // 3. 비밀번호 해싱 및 유저 생성
         User user = User.builder()
-                .name(request.getName())
-                .phoneNumber(request.getPhoneNumber())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .name(request.name())
+                .phoneNumber(request.phoneNumber())
+                .password(passwordEncoder.encode(request.password()))
                 .status(UserStatus.ACTIVE)
                 .build();
         userRepository.save(user);
 
-        return issueTokens(user.getPhoneNumber(), true);
+        return issueTokens(user.getId(), true);
     }
 
     /**
@@ -69,25 +70,25 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByPhoneNumberAndStatus(request.getPhoneNumber(), UserStatus.ACTIVE)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        User user = userRepository.findByPhoneNumberAndStatus(request.phoneNumber(), UserStatus.ACTIVE)
+                .orElseThrow(UserNotFoundException::new);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new InvalidPasswordException();
         }
 
-        return issueTokens(user.getPhoneNumber(), false);
+        return issueTokens(user.getId(), false);
     }
 
     /**
-     * 주어진 휴대폰 번호에 해당하는 사용자의 RefreshToken을 삭제하여 로그아웃 처리합니다.
+     * 주어진 아이디(userId)에 해당하는 사용자의 RefreshToken을 삭제하여 로그아웃 처리합니다.
      *
-     * @param phoneNumber 로그아웃할 사용자의 휴대폰 번호
+     * @param userId 로그아웃할 사용자의 아이디
      */
-    public void logout(String phoneNumber) {
-        log.info("[AuthService] 로그아웃 요청 - phoneNumber: {}", phoneNumber);
-        refreshTokenRepository.deleteById(phoneNumber);
-        log.info("[AuthService] 로그아웃 처리 완료 - phoneNumber: {}", phoneNumber);
+    public void logout(Long userId) {
+        log.info("[AuthService] 로그아웃 요청 - userId: {}", userId);
+        refreshTokenRepository.deleteById(userId);
+        log.info("[AuthService] 로그아웃 처리 완료 - userId: {}", userId);
     }
 
     /**
@@ -107,23 +108,32 @@ public class AuthService {
             throw new RefreshTokenExpiredException();
         }
 
-        final String phoneNumber = jwtProvider.getPhoneNumber(request.refreshToken());
-        final RefreshToken savedToken = refreshTokenRepository.findById(phoneNumber)
+        final Long userId = jwtProvider.getUserId(request.refreshToken());
+        final RefreshToken savedToken = refreshTokenRepository.findById(userId)
                 .orElseThrow(InvalidTokenException::new);
 
         if (!savedToken.getToken().equals(request.refreshToken())) {
             throw new InvalidTokenException();
         }
+        
+        log.info("[AuthService] 토큰 재발급 성공 - userId: {}", userId);
 
-        return issueTokens(phoneNumber, false);
+        return issueTokens(userId, false);
     }
 
-    private TokenResponse issueTokens(String phoneNumber, boolean isNewUser) {
-        final String newAccessToken = jwtProvider.createAccessToken(phoneNumber);
-        final String newRefreshToken = jwtProvider.createRefreshToken(phoneNumber);
+    /**
+     * 사용자 아이디(userId)를 기반으로 새로운 JWT 토큰 쌍을 발급하고 Redis에 저장합니다.
+     *
+     * @param userId 토큰을 발급할 사용자 식별자
+     * @param isNewUser 신규 가입 유저 여부
+     * @return 발급된 토큰 정보를 담은 응답 DTO
+     */
+    private TokenResponse issueTokens(Long userId, boolean isNewUser) {
+        final String newAccessToken = jwtProvider.createAccessToken(userId);
+        final String newRefreshToken = jwtProvider.createRefreshToken(userId);
 
         refreshTokenRepository.save(new RefreshToken(
-                phoneNumber,
+                userId,
                 newRefreshToken,
                 jwtProvider.getRefreshTokenExpiration() / 1000
         ));
