@@ -4,8 +4,9 @@ import net.nurigo.sdk.NurigoApp;
 import net.nurigo.sdk.message.model.Message;
 import net.nurigo.sdk.message.request.SingleMessageSendingRequest;
 import net.nurigo.sdk.message.service.DefaultMessageService;
-import com.tikkle.global.exception.CustomException;
-import com.tikkle.global.exception.ErrorCode;
+import com.tikkle.auth.exception.SmsSendFailedException;
+import com.tikkle.auth.exception.InvalidVerificationCodeException;
+import com.tikkle.auth.exception.ExpiredSignupTokenException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -75,7 +76,7 @@ public class SmsService {
             log.info("[SmsService] 인증번호 발송 완료 - phoneNumber: {}", phoneNumber);
         } catch (Exception e) {
             log.error("[SmsService] 인증번호 발송 실패 - phoneNumber: {}", phoneNumber, e);
-            throw new CustomException(ErrorCode.SMS_SEND_FAILED);
+            throw new SmsSendFailedException();
         }
     }
 
@@ -107,7 +108,7 @@ public class SmsService {
         }
         
         log.warn("[SmsService] 인증번호 검증 실패 - phoneNumber: {}", phoneNumber);
-        throw new CustomException(ErrorCode.INVALID_VERIFICATION_CODE);
+        throw new InvalidVerificationCodeException();
     }
 
     /**
@@ -120,10 +121,12 @@ public class SmsService {
     public void validateSignupToken(String phoneNumber, String token) {
         String storedToken = redisTemplate.opsForValue().get(SIGNUP_TOKEN_KEY_PREFIX + phoneNumber);
         if (storedToken == null || !storedToken.equals(token)) {
-            throw new CustomException(ErrorCode.EXPIRED_SIGNUP_TOKEN);
+            log.warn("[SmsService] 회원가입 토큰 검증 실패 - phoneNumber: {}", phoneNumber);
+            throw new ExpiredSignupTokenException();
         }
         // 검증 성공 시 삭제 (1회용)
         redisTemplate.delete(SIGNUP_TOKEN_KEY_PREFIX + phoneNumber);
+        log.info("[SmsService] 회원가입 토큰 검증 성공 - phoneNumber: {}", phoneNumber);
     }
 
     private String generateRandomCode() {

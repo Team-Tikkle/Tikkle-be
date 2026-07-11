@@ -34,7 +34,7 @@ public class AuthController implements AuthSwagger {
     @Override
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        authService.logout(userDetails.getPhoneNumber());
+        authService.logout(userDetails.getUserId());
         return ApiResponse.successWithNoData();
     }
 

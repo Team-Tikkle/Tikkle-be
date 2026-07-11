@@ -3,10 +3,9 @@ package com.tikkle.auth.controller;
 import com.tikkle.auth.dto.request.SmsSendRequest;
 import com.tikkle.auth.dto.request.SmsVerifyRequest;
 import com.tikkle.auth.dto.response.SmsVerifyResponse;
-import com.tikkle.auth.swagger.SmsSwagger;
 import com.tikkle.auth.service.SmsService;
+import com.tikkle.auth.swagger.SmsSwagger;
 import com.tikkle.global.response.ApiResponse;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,20 +19,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/auth/sms")
 public class SmsController implements SmsSwagger {
-
     private final SmsService smsService;
 
     @Override
     @PostMapping("/send")
     public ApiResponse<Void> sendVerificationCode(@Valid @RequestBody SmsSendRequest request) {
-        smsService.sendVerificationCode(request.getPhoneNumber());
+        smsService.sendVerificationCode(request.phoneNumber());
         return ApiResponse.successWithNoData();
     }
 
     @Override
     @PostMapping("/verify")
     public ApiResponse<SmsVerifyResponse> verifyCode(@Valid @RequestBody SmsVerifyRequest request) {
-        String token = smsService.verifyCodeAndGetToken(request.getPhoneNumber(), request.getCode());
+        String token = smsService.verifyCodeAndGetToken(request.phoneNumber(), request.code());
         return ApiResponse.success(new SmsVerifyResponse(token));
     }
 }
