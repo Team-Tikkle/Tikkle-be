@@ -12,8 +12,12 @@ import com.tikkle.auth.exception.InvalidPasswordException;
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.auth.repository.RefreshTokenRepository;
+import com.tikkle.investment.entity.InvestmentProfile;
+import com.tikkle.investment.repository.InvestmentProfileRepository;
+import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.UserStatus;
+import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,8 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
+    private final LinkedAccountRepository linkedAccountRepository;
+    private final InvestmentProfileRepository investmentProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final SmsService smsService;
 
@@ -58,6 +64,10 @@ public class AuthService {
                 .status(UserStatus.ACTIVE)
                 .build();
         userRepository.save(user);
+
+        // 4. 유저와 연관된 설정 엔티티(연동 계좌, 투자 성향) 초기화 생성
+        linkedAccountRepository.save(LinkedAccount.builder().user(user).build());
+        investmentProfileRepository.save(InvestmentProfile.builder().user(user).build());
 
         return issueTokens(user.getId(), true);
     }
