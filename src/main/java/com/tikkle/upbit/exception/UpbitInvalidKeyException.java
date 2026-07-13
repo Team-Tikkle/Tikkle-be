@@ -7,8 +7,4 @@ public class UpbitInvalidKeyException extends CustomException {
     public UpbitInvalidKeyException() {
         super(ErrorCode.UPBIT_INVALID_KEY);
     }
-
-    public UpbitInvalidKeyException(String message) {
-        super(ErrorCode.UPBIT_INVALID_KEY, message);
-    }
 }

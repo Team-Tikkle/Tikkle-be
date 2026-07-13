@@ -1,5 +1,6 @@
 package com.tikkle.upbit.config;
 
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,12 @@ public class UpbitClientConfig {
                 .defaultHeaders(headers -> {
                     headers.setAccept(List.of(MediaType.APPLICATION_JSON));
                 })
+                .defaultStatusHandler(
+                        status -> status.value() == 401 || status.value() == 403,
+                        (request, response) -> {
+                            throw new UpbitInvalidKeyException();
+                        }
+                )
                 .build();
     }
 }

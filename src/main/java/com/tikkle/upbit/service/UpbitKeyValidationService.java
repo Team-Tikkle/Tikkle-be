@@ -1,5 +1,6 @@
 package com.tikkle.upbit.service;
 
+import com.tikkle.upbit.exception.UpbitApiCallFailedException;
 import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -58,12 +59,7 @@ public class UpbitKeyValidationService {
             params.put("price", "10");
             params.put("ord_type", "price");
 
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, Object> entry : params.entrySet()) {
-                if (sb.length() > 0) sb.append("&");
-                sb.append(entry.getKey()).append("=").append(entry.getValue());
-            }
-            String queryString = sb.toString();
+            String queryString = UpbitAuthUtil.buildQueryString(params);
             String token = UpbitAuthUtil.generateToken(accessKey, secretKey, queryString);
 
             restClient.post()
@@ -91,9 +87,8 @@ public class UpbitKeyValidationService {
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("amount", "10");
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("amount=10");
-            String token = UpbitAuthUtil.generateToken(accessKey, secretKey, sb.toString());
+            String queryString = UpbitAuthUtil.buildQueryString(params);
+            String token = UpbitAuthUtil.generateToken(accessKey, secretKey, queryString);
 
             restClient.post()
                     .uri("/v1/deposits/krw")
@@ -110,20 +105,16 @@ public class UpbitKeyValidationService {
     private void checkPermission(String accessKey, String secretKey, String permissionName, Runnable apiCaller) {
         try {
             apiCaller.run();
+        } catch (UpbitInvalidKeyException e) {
+            log.warn("[UpbitKeyValidationService] 권한 부족 감지: {}", permissionName);
+            throw e;
         } catch (RestClientResponseException e) {
             int statusCode = e.getStatusCode().value();
-            // 401(Unauthorized) 또는 403(Forbidden)일 경우 권한 없음으로 간주
-            if (statusCode == 401 || statusCode == 403) {
-                log.warn("[UpbitKeyValidationService] 권한 부족 감지: {} - Status: {}", permissionName, statusCode);
-                throw new UpbitInvalidKeyException(String.format("업비트 API 키에 [%s] 권한이 누락되었거나, 키가 올바르지 않습니다.", permissionName));
-            }
             // 400 등 나머지 에러 코드는 파라미터(더미데이터) 오류이므로 권한은 있다고 간주함
             log.debug("[UpbitKeyValidationService] API 응답 에러 (권한 정상 추정): {} - Status: {}", permissionName, statusCode);
-        } catch (UpbitInvalidKeyException e) {
-            throw e;
         } catch (Exception e) {
             log.error("[UpbitKeyValidationService] API 호출 중 알 수 없는 에러 발생", e);
-            throw new UpbitInvalidKeyException("업비트 서버와의 통신 중 오류가 발생하여 권한을 확인할 수 없습니다.");
+            throw new UpbitApiCallFailedException();
         }
     }
 }

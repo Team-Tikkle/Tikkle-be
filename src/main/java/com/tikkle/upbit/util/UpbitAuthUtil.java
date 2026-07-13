@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -86,5 +87,23 @@ public class UpbitAuthUtil {
         } catch (NoSuchAlgorithmException e) {
             throw new UpbitTokenIssueFailedException();
         }
+    }
+
+    /**
+     * 파라미터 맵을 받아 쿼리 문자열(Query String)로 변환합니다.
+     *
+     * @param params 쿼리 파라미터 맵
+     * @return 조립된 쿼리 문자열 (예: "market=KRW-BTC&side=bid")
+     */
+    public static String buildQueryString(Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            if (sb.length() > 0) sb.append("&");
+            sb.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return sb.toString();
     }
 }

@@ -19,7 +19,6 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-002", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-003", "만료된 토큰입니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH-004", "해당 자원에 대한 접근 권한이 없습니다."),
-    INVALID_SOCIAL_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-005", "유효하지 않은 소셜 액세스 토큰입니다."),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "AUTH-006", "리프레시 토큰이 만료되었습니다. 다시 로그인해주세요."),
     PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "AUTH-007", "이미 가입된 전화번호입니다."),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH-008", "비밀번호가 일치하지 않습니다."),
@@ -51,7 +50,6 @@ public enum ErrorCode {
 
     // 투자 (Investment)
     AI_RECOMMENDATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-001", "AI 종목 추천 생성 중 오류가 발생했습니다."),
-    MARKET_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-002", "시장 데이터를 찾을 수 없습니다."),
     COIN_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-003", "매수 대상 코인을 찾을 수 없습니다."),
     COIN_SYNC_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "INVESTMENT-004", "코인 메타데이터 동기화에 실패했습니다."),
     INVESTMENT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "INVESTMENT-005", "투자 성향 정보를 찾을 수 없습니다."),
@@ -68,6 +66,9 @@ public enum ErrorCode {
     UPBIT_DEPOSIT_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-009", "업비트 입금 내역 조회에 실패했습니다."),
     UPBIT_INVALID_KEY(HttpStatus.UNAUTHORIZED, "UPBIT-010", "유효하지 않거나 권한이 부족한 업비트 API 키입니다."),
     UPBIT_CANDLE_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-011", "업비트 주봉 캔들 차트 조회에 실패했습니다."),
+    UPBIT_ACCOUNT_INQUIRY_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-012", "업비트 자산 계좌 조회에 실패했습니다."),
+    UPBIT_API_CALL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-013", "업비트 서버와의 통신 중 오류가 발생했습니다."),
+    UPBIT_ORDER_CANCEL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPBIT-014", "업비트 주문 취소에 실패했습니다."),
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
