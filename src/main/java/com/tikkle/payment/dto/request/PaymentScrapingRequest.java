@@ -12,7 +12,7 @@ public record PaymentScrapingRequest(
         @Positive(message = "사용자 ID는 양수여야 합니다.")
         Long userId,
 
-        @Schema(description = "결제된 카드사명", example = "케이뱅크")
+        @Schema(description = "결제된 카드사명", example = "KBANK")
         @NotBlank(message = "카드사명은 필수입니다.")
         String cardCompany,
 
