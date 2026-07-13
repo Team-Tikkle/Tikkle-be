@@ -1,10 +1,6 @@
 package com.tikkle.settings.dto.response;
 
-import com.tikkle.investment.entity.enums.CryptoTheme;
-import com.tikkle.investment.entity.enums.DiversificationType;
-import com.tikkle.investment.entity.enums.MemeAcceptance;
-import com.tikkle.investment.entity.enums.RiskTolerance;
-import com.tikkle.investment.entity.enums.TrendSensitivity;
+import com.tikkle.investment.entity.enums.*;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
 import com.tikkle.user.entity.enums.TwoFactorProvider;
@@ -41,7 +37,7 @@ public record SettingsResponse(
             String targetCardCompany,
             @Schema(description = "타겟 카드 번호 마지막 4자리", example = "1234")
             String targetCardLast4,
-            @Schema(description = "업비트 2차 인증 수단", example = "KAKAOTALK")
+            @Schema(description = "업비트 2차 인증 수단", example = "KAKAO")
             TwoFactorProvider twoFactorProvider,
             @Schema(description = "업비트 API 키 유효성 여부", example = "true")
             boolean isUpbitKeyValid
