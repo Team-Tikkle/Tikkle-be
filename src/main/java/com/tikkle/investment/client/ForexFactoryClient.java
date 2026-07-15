@@ -9,6 +9,9 @@ import org.springframework.web.client.RestClient;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 무료로 제공되는 Forex Factory 데이터를 통해 주요 거시경제 지표 일정을 수집하는 클라이언트입니다.
@@ -45,8 +48,20 @@ public class ForexFactoryClient {
 
             if (eventsArray != null && eventsArray.length > 0) {
                 List<MacroEventDto> events = Arrays.asList(eventsArray);
+                Instant now = Instant.now();
+                Instant limit = now.plus(48, ChronoUnit.HOURS);
+
                 String eventString = events.stream()
                         .filter(e -> "USD".equalsIgnoreCase(e.getCountry()) && "High".equalsIgnoreCase(e.getImpact()))
+                        .filter(e -> {
+                            try {
+                                Instant eventTime = OffsetDateTime.parse(e.getDate()).toInstant();
+                                return !eventTime.isBefore(now) && !eventTime.isAfter(limit);
+                            } catch (Exception ex) {
+                                log.warn("[ForexFactoryClient] 이벤트 날짜 파싱 실패 - date: {}", e.getDate());
+                                return false;
+                            }
+                        })
                         .map(e -> String.format("%s at %s", e.getTitle(), e.getDate()))
                         .collect(Collectors.joining(", "));
                         
