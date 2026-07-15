@@ -34,16 +34,24 @@ public class AiRecommendationHistory {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String candidatesJson;
 
+    @Column
+    private String hotNarratives;
+
+    @Column(columnDefinition = "TEXT")
+    private String macroEvents;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public AiRecommendationHistory(String profileHashKey, String fngIndex, String btcDominance, String weeklyTrend, String candidatesJson) {
+    public AiRecommendationHistory(String profileHashKey, String fngIndex, String btcDominance, String weeklyTrend, String candidatesJson, String hotNarratives, String macroEvents) {
         this.profileHashKey = profileHashKey;
         this.fngIndex = fngIndex;
         this.btcDominance = btcDominance;
         this.weeklyTrend = weeklyTrend;
         this.candidatesJson = candidatesJson;
+        this.hotNarratives = hotNarratives;
+        this.macroEvents = macroEvents;
     }
 }

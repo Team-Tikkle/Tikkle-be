@@ -1,7 +1,8 @@
 package com.tikkle.investment.service;
 
+import com.tikkle.investment.client.AlternativeClient;
 import com.tikkle.investment.client.CoinGeckoClient;
-import com.tikkle.investment.client.FearAndGreedClient;
+import com.tikkle.investment.client.ForexFactoryClient;
 import com.tikkle.investment.dto.response.AiCandidateResponse;
 import com.tikkle.investment.dto.response.AiRecommendationDto;
 import com.tikkle.investment.entity.AiRecommendationHistory;
@@ -31,28 +32,31 @@ import java.util.List;
 @Service
 public class AiPortfolioService {
     private final ChatClient chatClient;
-    private final FearAndGreedClient fearAndGreedClient;
+    private final AlternativeClient alternativeClient;
     private final CoinGeckoClient coinGeckoClient;
     private final UpbitCandleClient upbitCandleClient;
     private final StringRedisTemplate redisTemplate;
     private final JsonMapper objectMapper;
     private final AiRecommendationHistoryRepository historyRepository;
+    private final ForexFactoryClient forexFactoryClient;
 
     public AiPortfolioService(
             @Qualifier("openAiChatModel") ChatModel openAiChatModel,
-            FearAndGreedClient fearAndGreedClient,
+            AlternativeClient alternativeClient,
             CoinGeckoClient coinGeckoClient,
             UpbitCandleClient upbitCandleClient,
             StringRedisTemplate redisTemplate,
             JsonMapper objectMapper,
-            AiRecommendationHistoryRepository historyRepository) {
+            AiRecommendationHistoryRepository historyRepository,
+            ForexFactoryClient forexFactoryClient) {
         this.chatClient = ChatClient.builder(openAiChatModel).build();
-        this.fearAndGreedClient = fearAndGreedClient;
+        this.alternativeClient = alternativeClient;
         this.coinGeckoClient = coinGeckoClient;
         this.upbitCandleClient = upbitCandleClient;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.historyRepository = historyRepository;
+        this.forexFactoryClient = forexFactoryClient;
     }
 
     /**
@@ -64,8 +68,10 @@ public class AiPortfolioService {
         log.info("[AiPortfolioService] AI 매크로 유니버스 생성 시작 (Stage 1)");
         
         // 1. Context Data 수집
-        String fngIndex = fearAndGreedClient.getFearAndGreedIndex();
+        String fngIndex = alternativeClient.getFearAndGreedIndex();
         String btcDom = coinGeckoClient.getBtcDominance();
+        String hotNarratives = coinGeckoClient.getTopHotNarratives();
+        String macroEvents = forexFactoryClient.getUpcomingMacroEvents();
         
         // 주간 추세 데이터 수집 (BTC, ETH)
         List<UpbitCandleResponse> btcCandles = upbitCandleClient.getWeeklyCandles("KRW-BTC", 1);
@@ -75,7 +81,7 @@ public class AiPortfolioService {
         String ethWeekly = ethCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", ethCandles.get(0).getChangeRate() * 100);
         String weeklyTrend = String.format("BTC 1W Change: %s, ETH 1W Change: %s", btcWeekly, ethWeekly);
         
-        log.info("[AiPortfolioService] 외부 데이터 조회 완료 - fngIndex: {}, btcDominance: {}%, weeklyTrend: {}", fngIndex, btcDom, weeklyTrend);
+        log.info("[AiPortfolioService] 외부 데이터 조회 완료 - fngIndex: {}, btcDominance: {}%, weeklyTrend: {}, hotNarratives: {}, macroEvents: {}", fngIndex, btcDom, weeklyTrend, hotNarratives, macroEvents);
         
         int successCount = 0;
         int failCount = 0;
@@ -85,12 +91,12 @@ public class AiPortfolioService {
             for (TrendSensitivity trend : TrendSensitivity.values()) {
                 String hashKey = risk.name() + ":" + trend.name();
                 try {
-                    List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(risk, trend, fngIndex, btcDom, weeklyTrend);
+                    List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(risk, trend, fngIndex, btcDom, weeklyTrend, hotNarratives, macroEvents);
                     
-                    // Redis에 12시간 TTL로 캐싱
+                    // Redis에 24시간 TTL로 캐싱 (기존 12시간에서 24시간으로 연장하여 예외 상황 대비)
                     String redisKey = "ai:candidates:" + hashKey;
                     String jsonValue = objectMapper.writeValueAsString(new AiCandidateResponse(aiCandidates));
-                    redisTemplate.opsForValue().set(redisKey, jsonValue, Duration.ofHours(12));
+                    redisTemplate.opsForValue().set(redisKey, jsonValue, Duration.ofHours(24));
                     log.info("[AiPortfolioService] 레디스에 15개 후보군 캐싱 완료 - hashKey: {}", hashKey);
 
                     // DB에 히스토리 저장 (Analytics 및 백테스팅 용도)
@@ -100,6 +106,8 @@ public class AiPortfolioService {
                             .btcDominance(btcDom)
                             .weeklyTrend(weeklyTrend)
                             .candidatesJson(jsonValue)
+                            .hotNarratives(hotNarratives)
+                            .macroEvents(macroEvents)
                             .build();
                     historyRepository.save(history);
                     log.info("[AiPortfolioService] DB에 AI 추천 히스토리 저장 완료 - hashKey: {}", hashKey);
@@ -107,7 +115,20 @@ public class AiPortfolioService {
                     successCount++;
                 } catch (Exception e) {
                     failCount++;
-                    log.error("[AiPortfolioService] 매크로 후보군 조회 및 캐싱 실패 - hashKey: {}", hashKey, e);
+                    log.error("[AiPortfolioService] 매크로 후보군 조회 및 캐싱 3회 재시도 최종 실패 - hashKey: {}", hashKey, e);
+                    
+                    // DB Fallback: 가장 최근의 성공 히스토리를 가져와서 레디스에 복구 (Graceful Degradation)
+                    historyRepository.findTopByProfileHashKeyOrderByIdDesc(hashKey)
+                            .ifPresentOrElse(
+                                    history -> {
+                                        log.warn("[AiPortfolioService] DB에서 이전 추천 데이터(Fallback)를 불러옵니다. hashKey: {}", hashKey);
+                                        String redisKey = "ai:candidates:" + hashKey;
+                                        redisTemplate.opsForValue().set(redisKey, history.getCandidatesJson(), Duration.ofHours(24));
+                                    },
+                                    () -> {
+                                        log.error("[AiPortfolioService] DB에 이전 데이터가 존재하지 않아 Fallback 불가. hashKey: {}", hashKey);
+                                    }
+                            );
                 }
             }
         }
@@ -127,68 +148,96 @@ public class AiPortfolioService {
      * @param fngIndex 공포 탐욕 지수
      * @param btcDom 비트코인 도미넌스
      * @param weeklyTrend 주간 비트코인/이더리움 변동 추세
+     * @param hotNarratives 현재 주도 테마
+     * @param macroEvents 주요 거시경제 일정
      * @return 추천된 코인 후보군 리스트 (정확히 15개)
      */
-    private List<AiRecommendationDto> fetchAiMacroCandidates(RiskTolerance risk, TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend) {
+    private List<AiRecommendationDto> fetchAiMacroCandidates(RiskTolerance risk, TrendSensitivity trend, String fngIndex, String btcDom, String weeklyTrend, String hotNarratives, String macroEvents) {
         String promptText = """
-            You are a top-tier quantitative crypto portfolio manager. 
-            Based on the user's Risk Tolerance, Trend Sensitivity, and current macro market context, output a 'Broad Candidate Pool' of 30 to 40 cryptocurrencies from the Upbit KRW market.
-            This broad pool will later be dynamically filtered and scored by a backend quant engine based on the user's specific theme preferences, meme coin acceptance, and real-time volatility.
+            You are the Lead Quantitative Strategist at a top-tier crypto hedge fund.
+            Your task is to generate a highly optimized candidate pool of EXACTLY 15 cryptocurrencies from the Upbit KRW market. 
+            This pool will be passed to our backend quant engine for real-time scoring. 
+            You must deeply analyze the current macro market context and strictly adhere to the user's investment profile.
 
             [Market Context]
             - Fear & Greed Index: {fngIndex} (0-100)
             - BTC Dominance: {btcDom}%
             - 7-Day Macro Market Trend: {weeklyTrend}
+            - Current Hot Narratives: {hotNarratives}
+            - Upcoming Macro Events (Next 48H): {macroEvents}
 
-            [User Profile (Pool Constraints)]
+            [User Profile]
             - Risk Tolerance (Reaction to crashes): {riskTolerance}
             - Trend Sensitivity (Reaction to hype): {trendSensitivity}
 
-            [Constraints & Rules]
-            1. Select EXACTLY 15 coins that fit the Risk Tolerance and Trend Sensitivity in the current macro market. DO NOT exceed 15 coins.
-            2. If Risk Tolerance is 'SELL_IMMEDIATELY' and the market is fearful, ensure heavy blue-chips (BTC/ETH) are prominent. If 'BUY_MORE', include fundamentally strong altcoins that have dropped in price.
-            3. If Trend Sensitivity is 'FUNDAMENTAL_ONLY', avoid hype/trend coins. If 'FULL_TREND', aggressively include current narrative hot coins (e.g., AI, Memes).
-            4. CRITICAL: Your pool must be extremely diverse and cover ALL major themes so the backend has enough variety to filter. Ensure you include coins from: LAYER_1, DEFI, AI, WEB3_GAMING, RWA, and MEME.
-            5. Output the result in valid JSON containing an array of 'candidates'.
-            6. Each candidate MUST contain: 'market' (MUST be exactly in 'KRW-XXX' format, e.g., 'KRW-BTC', 'KRW-SOL'), 'coinName', 'reason' (keep reason VERY SHORT, max 20 chars), 'theme' (must be exactly one of LAYER_1, DEFI, AI, WEB3_GAMING, RWA, MEME), and 'isMeme' (boolean true/false).
-            7. DO NOT add any conversational text outside the JSON.
+            [Strategic Directives & Constraints]
+            1. QUANTITY: You MUST select EXACTLY 15 unique coins. Do not output more or less.
+            2. MISSING DATA: If any context variable says 'Unknown (Data fetch failed)', completely ignore that metric and do not hallucinate data. Rely on the remaining valid metrics.
+            3. RISK MANAGEMENT (Crucial): 
+               - If Upcoming Macro Events contain high-impact volatility triggers (e.g., CPI, Fed Speaks) OR Fear & Greed is fearful, and the user's Risk Tolerance is conservative (e.g., 'SELL_IMMEDIATELY'), you MUST prioritize heavy blue-chips (BTC, ETH) and stable Layer-1s. 
+               - If the user is aggressive ('BUY_MORE'), you may include high-beta altcoins that offer strong upside bounce opportunities.
+            4. NARRATIVE ALIGNMENT: 
+               - If Trend Sensitivity is 'FULL_TREND', aggressively include coins that match the 'Current Hot Narratives' and set 'isMeme': true if applicable. 
+               - If 'FUNDAMENTAL_ONLY', completely ignore narratives and memes, focusing purely on established infrastructure and DeFi.
+            5. DIVERSITY: To ensure the backend engine has enough variety, the 15 coins must span across multiple themes. Use ONLY these exact theme values: LAYER_1, DEFI, AI, WEB3_GAMING, RWA, MEME.
+            6. OUTPUT FORMAT: Return ONLY valid JSON representing an object with a 'candidates' array. No conversational text.
+            7. SCHEMA per candidate: 
+               - 'market' (String, MUST be exactly 'KRW-XXX', e.g., 'KRW-BTC')
+               - 'coinName' (String)
+               - 'reason' (String, max 30 chars, crisp quant reasoning)
+               - 'theme' (String, must match one of the 6 themes above)
+               - 'isMeme' (Boolean)
             """;
 
-        try {
-            String responseText = chatClient.prompt()
-                    .user(u -> u.text(promptText)
-                            .param("fngIndex", fngIndex)
-                            .param("btcDom", btcDom)
-                            .param("weeklyTrend", weeklyTrend)
-                            .param("riskTolerance", risk.name())
-                            .param("trendSensitivity", trend.name())
-                    )
-                    .call()
-                    .content();
-            
-            // LLM이 흔히 붙이는 마크다운 백틱(```json) 제거
-            if (responseText != null) {
-                responseText = responseText.trim();
-                if (responseText.startsWith("```json")) {
-                    responseText = responseText.substring(7);
-                } else if (responseText.startsWith("```")) {
-                    responseText = responseText.substring(3);
-                }
-                if (responseText.endsWith("```")) {
-                    responseText = responseText.substring(0, responseText.length() - 3);
-                }
-                responseText = responseText.trim();
-            }
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                String responseText = chatClient.prompt()
+                        .user(u -> u.text(promptText)
+                                .param("fngIndex", fngIndex)
+                                .param("btcDom", btcDom)
+                                .param("weeklyTrend", weeklyTrend)
+                                .param("hotNarratives", hotNarratives)
+                                .param("macroEvents", macroEvents)
+                                .param("riskTolerance", risk.name())
+                                .param("trendSensitivity", trend.name())
+                        )
+                        .stream()
+                        .content()
+                        .reduce("", String::concat)
+                        .block();
+                
+                // 원본 응답 로그 출력 (디버깅 용도)
+                log.info("[AiPortfolioService] AI 원본 응답 길이: {}, 내용 미리보기: {}", 
+                        responseText != null ? responseText.length() : 0,
+                        responseText != null ? responseText.substring(0, Math.min(responseText.length(), 100)).replace("\n", " ") + "..." : "null");
 
-            AiCandidateResponse response = objectMapper.readValue(responseText, AiCandidateResponse.class);
-                    
-            log.info("[AiPortfolioService] AI 후보군 생성 완료 - candidatesSize: {}, risk: {}, trend: {}", 
-                    response.candidates().size(), risk.name(), trend.name());
-            return response.candidates();
-        } catch (Exception e) {
-            log.error("[AiPortfolioService] AI 추천 API 호출 실패", e);
-            throw new AiRecommendationFailedException();
+                // LLM의 사족 및 <think> 태그를 무시하고 순수 JSON만 추출
+                if (responseText != null) {
+                    int startIndex = responseText.indexOf('{');
+                    int endIndex = responseText.lastIndexOf('}');
+                    if (startIndex != -1 && endIndex != -1 && startIndex <= endIndex) {
+                        responseText = responseText.substring(startIndex, endIndex + 1);
+                    } else {
+                        log.error("[AiPortfolioService] AI 응답에서 JSON 객체를 찾을 수 없습니다. 원본: \n{}", responseText);
+                        throw new RuntimeException("JSON 형식의 응답이 아닙니다.");
+                    }
+                }
+
+                AiCandidateResponse response = objectMapper.readValue(responseText, AiCandidateResponse.class);
+                        
+                log.info("[AiPortfolioService] AI 후보군 생성 완료 - candidatesSize: {}, risk: {}, trend: {}", 
+                        response.candidates().size(), risk.name(), trend.name());
+                return response.candidates();
+            } catch (Exception e) {
+                if (attempt == maxRetries) {
+                    log.error("[AiPortfolioService] AI 추천 API 호출 {}회 모두 실패 - errorMessage: {}", maxRetries, e.getMessage(), e);
+                    throw new AiRecommendationFailedException();
+                }
+                log.warn("[AiPortfolioService] AI 추천 API 호출 실패, 재시도합니다... (시도 횟수: {}/{}) - errorMessage: {}", attempt, maxRetries, e.getMessage());
+            }
         }
+        throw new AiRecommendationFailedException();
     }
 
     /**

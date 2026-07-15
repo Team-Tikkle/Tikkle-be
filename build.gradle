@@ -48,6 +48,9 @@ dependencies {
 
     // Spring AI for OpenAI (DeepSeek)
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    
+    // WebClient (Spring AI 스트리밍 용도)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
     // RSS 파싱 (Google News RSS 수집)
     implementation 'com.rometools:rome:2.1.0'
