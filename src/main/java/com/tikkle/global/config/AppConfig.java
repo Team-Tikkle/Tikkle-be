@@ -1,15 +1,16 @@
 package com.tikkle.global.config;
 
-import org.springframework.context.annotation.Bean;
+import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Configuration;
 
-import java.time.Clock;
-import java.time.ZoneId;
+import java.util.TimeZone;
 
 @Configuration
 public class AppConfig {
-    @Bean
-    public Clock clock() {
-        return Clock.system(ZoneId.of("Asia/Seoul"));
+    
+    @PostConstruct
+    public void init() {
+        // 애플리케이션 전역 타임존을 한국 시간(KST)으로 강제 고정
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
     }
 }
