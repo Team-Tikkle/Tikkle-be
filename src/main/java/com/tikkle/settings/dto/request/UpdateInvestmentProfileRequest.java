@@ -20,9 +20,9 @@ public record UpdateInvestmentProfileRequest(
         @NotNull(message = "트렌드 민감도 정보는 필수입니다.")
         TrendSensitivity trendSensitivity,
 
-        @Schema(description = "선호 가상자산 테마 목록 (최소 1개, 최대 3개)", example = "[\"LAYER_1\", \"AI\"]", allowableValues = {"LAYER_1", "DEFI", "AI", "WEB3_GAMING", "RWA", "MEME"})
+        @Schema(description = "선호 가상자산 테마 목록 (최소 1개, 최대 6개)", example = "[\"LAYER_1\", \"AI\"]", allowableValues = {"LAYER_1", "DEFI", "AI", "WEB3_GAMING", "RWA", "MEME"})
         @NotNull(message = "선호 가상자산 테마 정보는 필수입니다.")
-        @Size(min = 1, max = 3, message = "선호 가상자산 테마는 1개 이상, 3개 이하로 선택해야 합니다.")
+        @Size(min = 1, max = 6, message = "선호 가상자산 테마는 1개 이상, 6개 이하로 선택해야 합니다.")
         List<CryptoTheme> cryptoThemes,
 
         @Schema(description = "분산 투자 방식", example = "BALANCED", allowableValues = {"CONCENTRATED", "BALANCED", "DIVERSIFIED"})
