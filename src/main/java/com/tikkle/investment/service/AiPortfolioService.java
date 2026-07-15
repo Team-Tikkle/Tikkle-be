@@ -88,16 +88,21 @@ public class AiPortfolioService {
         String weeklyTrend = String.format("BTC 1W Change: %s, ETH 1W Change: %s", btcWeekly, ethWeekly);
         
         // 2. RAG Context: Top 50 활성 코인 추출
-        String top50CoinsContext = getTop50ActiveCoinsContext();
-        log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
-
+        // Moved inside the loop to support per-profile fallback
+        
         int successCount = 0;
         int failCount = 0;
+        String top50CoinsContext = null;
 
         for (RiskTolerance risk : RiskTolerance.values()) {
             for (TrendSensitivity trend : TrendSensitivity.values()) {
                 String hashKey = risk.name() + ":" + trend.name();
                 try {
+                    if (top50CoinsContext == null) {
+                        top50CoinsContext = getTop50ActiveCoinsContext();
+                        log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
+                    }
+                    
                     List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(
                             risk, trend, fngIndex, btcDom, weeklyTrend, hotNarratives, macroEvents, top50CoinsContext);
                     
