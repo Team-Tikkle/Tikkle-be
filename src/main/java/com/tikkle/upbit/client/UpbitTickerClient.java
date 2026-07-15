@@ -7,6 +7,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -35,7 +36,7 @@ public class UpbitTickerClient {
                     .uri("/v1/ticker?markets=" + markets)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<UpbitTickerResponse>>() {});
-            return response != null ? response : java.util.Collections.emptyList();
+            return response != null ? response : Collections.emptyList();
         } catch (Exception e) {
             log.error("[UpbitTickerClient] 업비트 시세 조회 실패 - markets: {}", markets, e);
             throw new UpbitTickerInquiryFailedException();
