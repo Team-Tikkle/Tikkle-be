@@ -48,6 +48,10 @@ public class User {
         if (name != null) this.name = name;
     }
 
+    public void updatePassword(String password) {
+        if (password != null) this.password = password;
+    }
+
     public void withdraw() {
         this.status = UserStatus.WITHDRAWN;
         this.deletedAt = LocalDateTime.now();

@@ -3,6 +3,10 @@ package com.tikkle.auth.controller;
 import com.tikkle.auth.dto.request.LoginRequest;
 import com.tikkle.auth.dto.request.ReissueRequest;
 import com.tikkle.auth.dto.request.SignupRequest;
+import com.tikkle.auth.dto.request.SmsSendRequest;
+import com.tikkle.auth.dto.request.SmsVerifyRequest;
+import com.tikkle.auth.dto.request.ResetPasswordRequest;
+import com.tikkle.auth.dto.response.SmsVerifyResponse;
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.service.AuthService;
 import com.tikkle.global.response.ApiResponse;
@@ -42,5 +46,26 @@ public class AuthController implements AuthSwagger {
     @PostMapping("/reissue")
     public ApiResponse<TokenResponse> reissue(@Valid @RequestBody ReissueRequest request) {
         return ApiResponse.success(authService.reissue(request));
+    }
+
+    @Override
+    @PostMapping("/password/reset-sms/send")
+    public ApiResponse<Void> sendPasswordResetSms(@Valid @RequestBody SmsSendRequest request) {
+        authService.sendPasswordResetSms(request.phoneNumber());
+        return ApiResponse.successWithNoData();
+    }
+
+    @Override
+    @PostMapping("/password/reset-sms/verify")
+    public ApiResponse<SmsVerifyResponse> verifyPasswordResetSms(@Valid @RequestBody SmsVerifyRequest request) {
+        String token = authService.verifyPasswordResetSms(request.phoneNumber(), request.code());
+        return ApiResponse.success(new SmsVerifyResponse(token));
+    }
+
+    @Override
+    @PostMapping("/password/reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ApiResponse.successWithNoData();
     }
 }
