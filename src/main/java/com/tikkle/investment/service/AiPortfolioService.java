@@ -76,12 +76,22 @@ public class AiPortfolioService {
         
         // 1. Context Data 수집
         String fngIndex = alternativeClient.getFearAndGreedIndex();
+        logFetchResult("Fear & Greed Index", fngIndex);
+
         String btcDom = coinGeckoClient.getBtcDominance();
+        logFetchResult("BTC Dominance", btcDom);
+
         String hotNarratives = coinGeckoClient.getTopHotNarratives();
+        logFetchResult("Hot Narratives", hotNarratives);
+
         String macroEvents = forexFactoryClient.getUpcomingMacroEvents();
+        logFetchResult("Macro Events", macroEvents);
         
         List<UpbitCandleResponse> btcCandles = upbitCandleClient.getWeeklyCandles("KRW-BTC", 1);
+        log.info("[AiPortfolioService] 외부 API 수집 {} - BTC 주봉 캔들: {}건 조회", btcCandles.isEmpty() ? "실패" : "성공", btcCandles.size());
+
         List<UpbitCandleResponse> ethCandles = upbitCandleClient.getWeeklyCandles("KRW-ETH", 1);
+        log.info("[AiPortfolioService] 외부 API 수집 {} - ETH 주봉 캔들: {}건 조회", ethCandles.isEmpty() ? "실패" : "성공", ethCandles.size());
         
         String btcWeekly = btcCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", btcCandles.get(0).getChangeRate() * 100);
         String ethWeekly = ethCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", ethCandles.get(0).getChangeRate() * 100);
@@ -267,5 +277,13 @@ public class AiPortfolioService {
         String risk = profile.getRiskTolerance().name();
         String trend = profile.getTrendSensitivity().name();
         return String.join(":", risk, trend);
+    }
+
+    private void logFetchResult(String dataName, String dataValue) {
+        if (dataValue == null || dataValue.startsWith("Unknown")) {
+            log.warn("[AiPortfolioService] 외부 API 수집 실패 - {}: {}", dataName, dataValue);
+        } else {
+            log.info("[AiPortfolioService] 외부 API 수집 성공 - {}: {}", dataName, dataValue);
+        }
     }
 }
