@@ -70,8 +70,7 @@ public class SettingsService {
             linkedAccountInfo = new SettingsResponse.LinkedAccountInfo(
                     account.getTargetCardCompany(),
                     account.getTargetCardLast4(),
-                    account.getTwoFactorProvider(),
-                    account.isUpbitKeyValid()
+                    account.getTwoFactorProvider()
             );
         }
 

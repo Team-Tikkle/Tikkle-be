@@ -87,11 +87,7 @@ public class UpbitDepositPollingProcessor {
 
         } catch (UpbitInvalidKeyException e) {
             log.error("[UpbitDepositPollingProcessor] 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
-            if (info != null) {
-                self.handleInvalidKeyError(eventId, info.userId());
-            } else {
-                self.handleGeneralError(eventId, "업비트 인증 키가 만료되거나 권한이 없습니다.");
-            }
+            self.handleInvalidKeyError(eventId);
         } catch (UpbitOrderFailedException e) {
             log.error("[UpbitDepositPollingProcessor] 업비트 매수 주문 실패 - eventId: {}", eventId, e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "업비트 매수 주문이 거절되거나 취소되었습니다.";
@@ -202,11 +198,7 @@ public class UpbitDepositPollingProcessor {
     }
 
     @Transactional
-    public void handleInvalidKeyError(Long eventId, Long userId) {
-        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
-        if (account != null) {
-            account.invalidateUpbitKey();
-        }
+    public void handleInvalidKeyError(Long eventId) {
         orderApprovalService.markAsFailed(eventId, "업비트 인증 키 만료/권한 없음");
         Map<String, Object> errorData = Map.of(
                 "status", "UPBIT_INVALID_KEY",

@@ -67,7 +67,7 @@ public class UpbitTradePollingProcessor {
                 upbitOrderClient.cancelOrder(info.tradeUuid(), accessKey, secretKey);
             } catch (UpbitInvalidKeyException e) {
                 log.error("[UpbitTradePollingProcessor] 주문 취소 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
-                self.handleInvalidKeyError(eventId, info.userId());
+                self.handleInvalidKeyError(eventId);
                 return;
             } catch (Exception e) {
                 log.error("[UpbitTradePollingProcessor] 주문 취소 API 실패 - eventId: {}", eventId, e);
@@ -84,7 +84,7 @@ public class UpbitTradePollingProcessor {
             orderDetails = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
         } catch (UpbitInvalidKeyException e) {
             log.error("[UpbitTradePollingProcessor] 주문 상태 조회 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
-            self.handleInvalidKeyError(eventId, info.userId());
+            self.handleInvalidKeyError(eventId);
             return;
         } catch (Exception e) {
             log.error("[UpbitTradePollingProcessor] 주문 상태 조회 실패 - eventId: {}", eventId, e);
@@ -194,11 +194,7 @@ public class UpbitTradePollingProcessor {
     }
 
     @Transactional
-    public void handleInvalidKeyError(Long eventId, Long userId) {
-        LinkedAccount account = linkedAccountRepository.findByUserId(userId).orElse(null);
-        if (account != null) {
-            account.invalidateUpbitKey();
-        }
+    public void handleInvalidKeyError(Long eventId) {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event != null) {
             event.failInvestment("업비트 인증 키가 만료되거나 권한이 없습니다.");
