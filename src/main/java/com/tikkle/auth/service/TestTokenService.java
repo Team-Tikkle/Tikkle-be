@@ -5,7 +5,7 @@ import com.tikkle.auth.entity.RefreshToken;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
+
 import com.tikkle.user.exception.UserNotFoundException;
 import com.tikkle.user.repository.UserRepository;
 import com.tikkle.investment.entity.InvestmentProfile;
@@ -34,20 +34,20 @@ public class TestTokenService {
     private final PasswordEncoder passwordEncoder;
 
     public TokenResponse generateTestToken(String phoneNumber) {
-        User user = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE)
+        User user = userRepository.findByPhoneNumber(phoneNumber)
                 .orElseThrow(UserNotFoundException::new);
         return issueToken(user.getId(), false);
     }
 
     public TokenResponse generateTestSignupAndToken(String phoneNumber, String name) {
-        final Optional<User> existingUser = userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE);
+        final Optional<User> existingUser = userRepository.findByPhoneNumber(phoneNumber);
         final boolean isNewUser = existingUser.isEmpty();
         final User user = existingUser.orElseGet(() -> {
             User newUser = userRepository.save(User.builder()
                     .phoneNumber(phoneNumber)
-                    .password(passwordEncoder.encode("testpassword!"))
+                    // 비밀번호 정책(영문+숫자+특수문자 8~20자)을 만족해야 이 계정으로 로그인 API를 호출할 수 있다
+                    .password(passwordEncoder.encode("testpassword1!"))
                     .name(name)
-                    .status(UserStatus.ACTIVE)
                     .build());
             investmentProfileRepository.save(InvestmentProfile.builder().user(newUser).build());
             linkedAccountRepository.save(LinkedAccount.builder().user(newUser).build());
