@@ -27,10 +27,12 @@ public enum ErrorCode {
     SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS-001", "SMS 발송에 실패했습니다."),
     INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "SMS-002", "인증번호가 일치하지 않거나 만료되었습니다."),
     EXPIRED_SIGNUP_TOKEN(HttpStatus.BAD_REQUEST, "SMS-003", "휴대폰 인증이 만료되었거나 유효하지 않습니다. 다시 인증해주세요."),
+    SMS_SEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "SMS-004", "인증번호는 1분에 한 번만 요청할 수 있습니다. 잠시 후 다시 시도해주세요."),
+    SMS_DAILY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "SMS-005", "하루 인증번호 요청 한도를 초과했습니다. 24시간 후 다시 시도해주세요."),
+    VERIFICATION_ATTEMPT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "SMS-006", "인증번호 입력 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),
 
     // 유저 (User)
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-001", "사용자를 찾을 수 없습니다."),
-    WITHDRAWN_USER(HttpStatus.FORBIDDEN, "USER-002", "탈퇴한 계정입니다. 탈퇴 후 일정 기간이 지나야 다시 가입할 수 있습니다."),
     LINKED_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-003", "연동된 증권사 계좌 정보를 찾을 수 없습니다."),
     INVALID_TWO_FACTOR_PROVIDER(HttpStatus.BAD_REQUEST, "USER-004", "업비트 2차 인증 수단(카카오톡/네이버/하나은행)이 설정되지 않았거나 올바르지 않습니다."),
     NO_CATEGORY_RULE(HttpStatus.NOT_FOUND, "USER-005", "해당 카테고리에 대한 투자 규칙이 설정되어 있지 않습니다."),
