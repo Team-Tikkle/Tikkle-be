@@ -24,6 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.tikkle.auth.dto.request.ResetPasswordRequest;
+import com.tikkle.auth.entity.enums.SmsPurpose;
 
 /**
  * 회원가입, 로그인, 로그아웃, 토큰 재발급 등 인증 관련 비즈니스 로직을 처리하는 서비스입니다.
@@ -129,6 +131,51 @@ public class AuthService {
         log.info("[AuthService] 토큰 재발급 성공 - userId: {}", userId);
 
         return issueTokens(userId, false);
+    }
+
+    /**
+     * 비밀번호 재설정을 위한 SMS 인증번호 발송 요청
+     *
+     * @param phoneNumber 휴대폰 번호
+     */
+    public void sendPasswordResetSms(String phoneNumber) {
+        // 1. 가입 여부 확인
+        if (userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE).isEmpty()) {
+            throw new UserNotFoundException();
+        }
+        // 2. 인증번호 발송
+        smsService.sendVerificationCode(phoneNumber, SmsPurpose.PASSWORD_RESET);
+    }
+
+    /**
+     * 비밀번호 재설정을 위한 SMS 인증번호 검증 및 토큰 발급
+     *
+     * @param phoneNumber 휴대폰 번호
+     * @param code 인증번호
+     * @return 발급된 재설정용 토큰
+     */
+    public String verifyPasswordResetSms(String phoneNumber, String code) {
+        return smsService.verifyCodeAndGetToken(phoneNumber, code, SmsPurpose.PASSWORD_RESET);
+    }
+
+    /**
+     * 검증된 토큰을 사용하여 새로운 비밀번호로 재설정합니다.
+     *
+     * @param request 비밀번호 재설정 요청 DTO
+     */
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        // 1. 재설정 토큰 유효성 검증
+        smsService.validatePasswordResetToken(request.phoneNumber(), request.resetToken());
+
+        // 2. 유저 확인
+        User user = userRepository.findByPhoneNumberAndStatus(request.phoneNumber(), UserStatus.ACTIVE)
+                .orElseThrow(UserNotFoundException::new);
+
+        // 3. 비밀번호 변경 로직 (더티 체킹)
+        user.updatePassword(passwordEncoder.encode(request.newPassword()));
+        
+        log.info("[AuthService] 비밀번호 재설정 완료 - userId: {}", user.getId());
     }
 
     /**
