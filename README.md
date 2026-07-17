@@ -36,7 +36,7 @@ Tikkle은 카드 결제에서 발생하는 잔돈을 사용자의 투자 성향�
 - 투자 용어, 초보자 글, 추천 영상, 마켓 토픽 제공
 - 스케줄러 기반 코인 메타데이터 동기화, AI 추천 후보 생성, 뉴스 수집, 미승인 주문 만료, 입금·체결 폴링
 
-> **모든 매수는 사용자 승인을 거칩니다.** 자동/수동 매매 방식(execution mode) 개념은 존재하지 않습니다.
+> **모든 매수는 사용자 승인을 거칩니다.**
 
 ## 프로젝트 구조
 
@@ -91,46 +91,6 @@ src/main/java/com/tikkle
 
 `local` 프로필에서만 테스트용 API인 `/api/auth/test-token`, `/api/auth/test-signup`, `/api/test/**`가 공개됩니다.
 
-## 로컬 실행
-
-### 사전 준비
-
-- Java 21
-- Docker / Docker Compose
-- MySQL 8.0
-- Redis 7
-
-### 인프라 실행
-
-```bash
-docker-compose -f docker-compose.local.yml up -d
-```
-
-로컬 compose는 MySQL과 Redis를 실행합니다.
-
-- MySQL: `localhost:3306`
-- Database: `tikkle_db`
-- Redis: `localhost:6379`
-
-### 애플리케이션 실행
-
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
-```
-
-Windows PowerShell:
-
-```powershell
-.\gradlew.bat bootRun --args='--spring.profiles.active=local'
-```
-
-### 빌드 확인
-
-테스트 코드는 아직 없습니다(`src/test`에 `application-test.yml`만 존재). 검증은 컴파일 기준으로 합니다.
-
-```bash
-./gradlew compileJava
-```
 
 ## 주요 스케줄러
 

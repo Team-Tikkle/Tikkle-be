@@ -42,7 +42,7 @@ CREATE TABLE `USERS` (
 -- 회원 탈퇴는 논리 삭제가 아닌 완전 삭제다. USERS 행과 소유 데이터(INVESTMENT_PROFILE(+THEMES),
 -- CATEGORY_SPARE_CHANGE_RULES, LINKED_ACCOUNTS, PORTFOLIOS, PAYMENT_EVENTS) 및 Redis 세션·설정 캐시를
 -- 모두 제거하며, phone_number가 즉시 회수되어 동일 번호로 곧바로 재가입할 수 있다.
--- 따라서 계정 상태 개념 자체가 없으며, status/deleted_at 컬럼과 UserStatus enum은 제거되었다.
+-- 따라서 계정 상태 개념 자체가 없다.
 
 CREATE TABLE `PAYMENT_EVENTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
