@@ -3,6 +3,7 @@ package com.tikkle.auth.controller;
 import com.tikkle.auth.dto.response.TokenResponse;
 import com.tikkle.auth.service.TestTokenService;
 import com.tikkle.global.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,8 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 로컬 개발 환경에서 테스트용 JWT 토큰을 손쉽게 발급받기 위한 컨트롤러입니다.
- * 이 컨트롤러는 "local" 프로필에서만 활성화됩니다.
+ * 이 컨트롤러는 "local" 프로필에서만 활성화되며, 운영 명세와 섞이지 않도록 Swagger 문서에서 제외합니다.
  */
+@Hidden
 @RestController
 @Profile("local")
 @RequestMapping("/api/auth")

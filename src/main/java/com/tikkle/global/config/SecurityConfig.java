@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -56,7 +57,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(PERMIT_ALL_URLS).permitAll();
-                    auth.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments").permitAll();
+                    auth.requestMatchers(HttpMethod.POST, "/api/payments").permitAll();
                     if (isLocal) {
                         auth.requestMatchers("/api/auth/test-token", "/api/auth/test-signup", "/api/test/**").permitAll();
                     }

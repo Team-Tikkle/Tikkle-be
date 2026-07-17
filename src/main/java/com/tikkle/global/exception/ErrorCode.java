@@ -26,7 +26,7 @@ public enum ErrorCode {
     // SMS 본인인증 (SMS)
     SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS-001", "SMS 발송에 실패했습니다."),
     INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "SMS-002", "인증번호가 일치하지 않거나 만료되었습니다."),
-    EXPIRED_SIGNUP_TOKEN(HttpStatus.BAD_REQUEST, "SMS-003", "휴대폰 인증이 만료되었거나 유효하지 않습니다. 다시 인증해주세요."),
+    INVALID_VERIFICATION_TOKEN(HttpStatus.BAD_REQUEST, "SMS-003", "휴대폰 인증이 만료되었거나 유효하지 않습니다. 다시 인증해주세요."),
     SMS_SEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "SMS-004", "인증번호는 1분에 한 번만 요청할 수 있습니다. 잠시 후 다시 시도해주세요."),
     SMS_DAILY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "SMS-005", "하루 인증번호 요청 한도를 초과했습니다. 24시간 후 다시 시도해주세요."),
     VERIFICATION_ATTEMPT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "SMS-006", "인증번호 입력 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),

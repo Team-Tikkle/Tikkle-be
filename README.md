@@ -12,64 +12,77 @@ Tikkle은 카드 결제에서 발생하는 잔돈을 사용자의 투자 성향�
 | --- | --- |
 | Language | Java 21 |
 | Framework | Spring Boot 4.0.6 |
-| Persistence | Spring Data JPA, MySQL |
-| Cache / Token Store | Redis |
-| Security | Spring Security, JWT, HMAC SHA-256 요청 서명 |
-| AI | Spring AI, Google Gemini, Anthropic Claude |
-| External API | Google OAuth, Upbit API, CoinGecko, Fear & Greed API, Google News RSS |
+| Persistence | Spring Data JPA, MySQL 8 (복잡 쿼리는 QueryDSL) |
+| Cache / Token Store | Redis 7 |
+| Security | Spring Security, JWT, BCrypt, HMAC SHA-256 요청 서명, AES-256 필드 암호화 |
+| AI | Spring AI — Google Gemini `gemini-2.5-flash` (가맹점 분류), DeepSeek `deepseek-v4-pro` (AI 유니버스 생성, OpenAI 호환 스타터 사용) |
+| External API | Upbit API, CoinGecko, Fear & Greed API, Google News RSS, CoolSMS(Nurigo) |
+| Realtime | Spring WebFlux WebClient, SSE |
 | API Docs | springdoc-openapi / Swagger |
 | Infra | Docker, Docker Compose, GitHub Actions, GCP Artifact Registry |
 
 ## 주요 기능
 
-- Google OAuth 로그인 및 자체 JWT 발급
-- 사용자 온보딩: 투자 성향, 관심 테마, 매매 방식, 잔돈 규칙, Upbit API 키 등록
+- 휴대폰 SMS 본인인증 기반 회원가입 / 로그인 및 자체 JWT 발급, SMS 인증 기반 비밀번호 재설정
+- 사용자 설정: 5축 투자 성향, 카테고리별 잔돈 규칙, 타겟 카드, Upbit API 키 등록
 - 결제 푸시 알림 수신 및 HMAC 서명 검증
 - 결제 가맹점 AI 분류 및 7대 카테고리 매핑
 - 카테고리별 잔돈 규칙 계산
-- 자동 매수 또는 수동 승인 기반 Upbit 주문 처리
-- 포트폴리오 스냅샷 조회
-- 결제 대시보드 및 결제 피드 조회
+- 2단계 퀀트 엔진 기반 매수 종목 선정
+- 사용자 승인 기반 Upbit 원화 입금(2FA) 및 매수 주문 처리
+- 포트폴리오 실시간 조회
+- 결제 대시보드 및 결제 피드 조회, 결제 카테고리 수정
 - 투자 설정 변경 및 거래소 계정 정보 교체
 - 투자 용어, 초보자 글, 추천 영상, 마켓 토픽 제공
-- 스케줄러 기반 코인 메타데이터 동기화, AI 추천 후보 생성, 뉴스 수집, 수동 주문 만료 처리
+- 스케줄러 기반 코인 메타데이터 동기화, AI 추천 후보 생성, 뉴스 수집, 미승인 주문 만료, 입금·체결 폴링
+
+> **모든 매수는 사용자 승인을 거칩니다.**
 
 ## 프로젝트 구조
 
 ```text
 src/main/java/com/tikkle
-├── auth        # Google OAuth, JWT 발급/검증, refresh token 관리
+├── auth        # SMS 회원가입/로그인, JWT 발급/검증, refresh token, 비밀번호 재설정
 ├── global      # 공통 설정, 보안, CORS, 예외 처리, 응답 포맷, 암호화 유틸
 ├── insight     # 투자 콘텐츠, Google News RSS 수집, 마켓 토픽
-├── investment  # 포트폴리오, AI 추천, 코인 메타데이터, 투자 성향
-├── onboarding  # 최초 사용자 설정 등록
-├── payment     # 결제 알림 수신, 잔돈 계산, 결제 내역, 수동 주문 승인/거절
-├── settings    # 매매 방식, 잔돈 규칙, 거래소 계정 설정
-├── upbit       # Upbit 마켓/시세/주문 API 연동
-└── user        # 사용자 조회, 수정, 탈퇴
+├── investment  # AI 추천, 코인 메타데이터, 5축 투자 성향, 포트폴리오 엔티티
+├── payment     # 결제 알림 수신, 잔돈 계산, 결제 내역, 주문 승인/거절, 입금·체결 폴링, SSE
+├── settings    # 잔돈 규칙, 투자 성향, 타겟 카드, Upbit 키, 투자 on/off
+├── upbit       # Upbit 마켓/시세/주문/입금/계좌 API 연동 및 실시간 포트폴리오 조회
+└── user        # 사용자 조회, 탈퇴
 ```
+
+최초 사용자 설정은 별도 도메인이 아니라 `settings` 엔드포인트를 통해 이루어집니다.
 
 ## API 요약
 
 | Domain | Method / Path | 설명 | 인증 |
 | --- | --- | --- | --- |
-| Auth | `POST /api/auth/oauth/google` | Google access token으로 로그인/회원가입 | Public |
+| Auth | `POST /api/auth/signup` | SMS 인증 완료 후 회원가입 | Public |
+| Auth | `POST /api/auth/login` | 휴대폰 번호 + 비밀번호 로그인 | Public |
 | Auth | `POST /api/auth/reissue` | refresh token으로 JWT 재발급 | Public |
 | Auth | `POST /api/auth/logout` | refresh token 삭제 | JWT |
-| Onboarding | `POST /api/onboarding` | 투자 성향, 잔돈 규칙, Upbit 키 등록 | JWT |
+| Auth | `POST /api/auth/sms/send` | 회원가입용 인증번호 발송 | Public |
+| Auth | `POST /api/auth/sms/verify` | 회원가입용 인증번호 검증 및 임시 토큰 발급 | Public |
+| Auth | `POST /api/auth/password/reset-sms/send` | 비밀번호 재설정용 인증번호 발송 | Public |
+| Auth | `POST /api/auth/password/reset-sms/verify` | 재설정용 인증번호 검증 및 임시 토큰 발급 | Public |
+| Auth | `POST /api/auth/password/reset` | 임시 토큰으로 비밀번호 재설정 (기존 세션 무효화) | Public |
 | User | `GET /api/users/me` | 내 정보 조회 | JWT |
-| User | `PATCH /api/users/me` | 내 정보 수정 | JWT |
-| User | `DELETE /api/users/me` | 회원 탈퇴 | JWT |
-| Portfolio | `GET /api/portfolios` | 보유 코인 및 평가 금액 스냅샷 | JWT |
+| User | `DELETE /api/users/me` | 회원 탈퇴 (완전 삭제, 즉시 재가입 가능) | JWT |
+| Portfolio | `GET /api/upbit/portfolios` | Upbit API 기반 실시간 보유 종목 조회 | JWT |
 | Payment | `POST /api/payments` | Android 결제 푸시 알림 수신 | HMAC |
 | Payment | `GET /api/payments/dashboard` | 월별 결제/잔돈 대시보드 | JWT |
 | Payment | `GET /api/payments` | 결제 피드 페이징 조회 | JWT |
-| Manual Order | `POST /api/payments/{eventId}/approve` | 수동 매수 승인 | JWT |
-| Manual Order | `POST /api/payments/{eventId}/reject` | 수동 매수 거절 | JWT |
-| Settings | `GET /api/settings` | 매매 방식과 잔돈 규칙 조회 | JWT |
-| Settings | `PATCH /api/settings/execution-mode` | 자동/수동 매매 방식 변경 | JWT |
+| Payment | `PATCH /api/payments/{id}/category` | 결제 카테고리 수정 | JWT |
+| Order | `POST /api/payments/{eventId}/approve` | 매수 승인 → Upbit 원화 입금(2FA) 요청 | JWT |
+| Order | `POST /api/payments/{eventId}/reject` | 매수 거절 | JWT |
+| Order | `GET /api/payments/{eventId}/stream` | 매수 파이프라인 결과 SSE 구독 | JWT |
+| Settings | `GET /api/settings` | 잔돈 규칙 + 투자 성향 + 연동 계좌 + 투자 on/off 조회 | JWT |
 | Settings | `PATCH /api/settings/spare-change-rules` | 카테고리별 잔돈 규칙 변경 | JWT |
-| Settings | `PATCH /api/settings/linked-account` | Upbit API 키 및 카드 정보 교체 | JWT |
+| Settings | `PATCH /api/settings/profile` | 5축 투자 성향 변경 | JWT |
+| Settings | `PATCH /api/settings/kbank` | 타겟 카드 정보 변경 | JWT |
+| Settings | `PATCH /api/settings/upbit` | Upbit API 키 및 2차 인증 수단 교체 | JWT |
+| Settings | `PATCH /api/settings/investment` | 잔돈 투자 on/off | JWT |
 | Insight | `GET /api/insights/market-topics` | 최신 마켓 토픽 조회 | JWT |
 | Insight | `GET /api/insights/terms` | 투자 용어 조회 | JWT |
 | Insight | `GET /api/insights/articles` | 초보자 글 목록 조회 | JWT |
@@ -78,56 +91,24 @@ src/main/java/com/tikkle
 
 `local` 프로필에서만 테스트용 API인 `/api/auth/test-token`, `/api/auth/test-signup`, `/api/test/**`가 공개됩니다.
 
-## 로컬 실행
-
-### 사전 준비
-
-- Java 21
-- Docker / Docker Compose
-- MySQL 8.0
-- Redis 7
-
-### 인프라 실행
-
-```bash
-docker-compose -f docker-compose.local.yml up -d
-```
-
-로컬 compose는 MySQL과 Redis를 실행합니다.
-
-- MySQL: `localhost:3306`
-- Database: `tikkle_db`
-- Redis: `localhost:6379`
-
-### 애플리케이션 실행
-
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
-```
-
-Windows PowerShell:
-
-```powershell
-.\gradlew.bat bootRun --args='--spring.profiles.active=local'
-```
-
-### 테스트
-
-```bash
-./gradlew test
-```
 
 ## 주요 스케줄러
+
+분산 락이 없으므로 단일 인스턴스 운영을 전제합니다.
 
 | Scheduler | 주기 | 설명 |
 | --- | --- | --- |
 | `CoinSyncScheduler` | 매일 04:00 KST | Upbit 코인 메타데이터 동기화 |
-| `AiPortfolioScheduler` | 매일 00:00, 12:00 KST | 투자 성향별 AI 추천 후보 생성 |
+| `AiPortfolioScheduler` | 매일 02:00, 14:00 KST | 투자 성향별 AI 추천 후보 생성 |
 | `MarketTopicScheduler` | 매일 07:00, 18:00 KST | Google News RSS 기반 마켓 토픽 수집 |
-| `ManualOrderExpirationScheduler` | 매시간 정각 | 수동 승인 대기 주문 만료 처리 |
+| `PendingOrderExpirationScheduler` | 매시간 정각 | 24시간 미승인 매수 대기 건 만료 처리 |
+| `UpbitDepositPollingScheduler` | 3초 간격 | 원화 입금 도착 확인 후 매수 주문 실행 |
+| `UpbitTradePollingScheduler` | 10초 간격 | 매수 체결 확인 및 정산 (10분 초과 시 취소) |
 
 ## 참고 문서
 
 - DB 스키마: `docs/Tikkle_ERD.md`
 - 기능 명세: `docs/Tikkle_requirements.md`
 - 개발 계획: `docs/Tikkle_plan.md`
+- 인증 API 명세 (클라이언트 계약): `docs/Tikkle_auth_api.md`
+- 업비트/결제 API 명세 (클라이언트 계약): `docs/Tikkle_upbit_api.md`

@@ -9,7 +9,7 @@ import com.tikkle.auth.exception.SmsSendCooldownException;
 import com.tikkle.auth.exception.SmsDailyLimitExceededException;
 import com.tikkle.auth.exception.InvalidVerificationCodeException;
 import com.tikkle.auth.exception.VerificationAttemptExceededException;
-import com.tikkle.auth.exception.ExpiredSignupTokenException;
+import com.tikkle.auth.exception.InvalidVerificationTokenException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -261,7 +261,7 @@ public class SmsService {
         String storedToken = redisTemplate.opsForValue().get(getTokenKey(phoneNumber, purpose));
         if (storedToken == null || !storedToken.equals(token)) {
             log.warn("[SmsService] 임시 토큰 검증 실패 - phoneNumber: {}, purpose: {}", phoneNumber, purpose);
-            throw new ExpiredSignupTokenException();
+            throw new InvalidVerificationTokenException();
         }
         log.info("[SmsService] 임시 토큰 검증 성공 - phoneNumber: {}, purpose: {}", phoneNumber, purpose);
     }
