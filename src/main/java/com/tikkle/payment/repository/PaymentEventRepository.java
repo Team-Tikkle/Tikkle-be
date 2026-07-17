@@ -20,6 +20,8 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     Optional<PaymentEvent> findByIdAndUserId(Long id, Long userId);
 
+    boolean existsByIdAndUserId(Long id, Long userId);
+
     // 회원 탈퇴 시 원장 일괄 삭제
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM PaymentEvent p WHERE p.userId = :userId")
