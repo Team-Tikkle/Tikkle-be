@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
         log.warn("[CustomException] : {}", errorCode.getMessage());
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(ApiResponse.error(errorCode.getCode(), errorCode.getMessage()));
+                .body(ApiResponse.error(errorCode));
     }
 
     // 프론트엔드의 잘못된 파라미터/JSON 입력 에러 (@Valid 실패 시)
@@ -58,7 +58,7 @@ public class GlobalExceptionHandler {
         log.warn("[HttpRequestMethodNotSupportedException]", e);
         return ResponseEntity
                 .status(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus())
-                .body(ApiResponse.error(ErrorCode.METHOD_NOT_ALLOWED.getCode(), ErrorCode.METHOD_NOT_ALLOWED.getMessage()));
+                .body(ApiResponse.error(ErrorCode.METHOD_NOT_ALLOWED));
     }
 
     // 잘못된 주소(URL)로 요청을 보냈을 때 (404 Not Found)
@@ -68,7 +68,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(ErrorCode.URL_NOT_FOUND.getHttpStatus())
-                .body(ApiResponse.error(ErrorCode.URL_NOT_FOUND.getCode(), ErrorCode.URL_NOT_FOUND.getMessage()));
+                .body(ApiResponse.error(ErrorCode.URL_NOT_FOUND));
     }
 
     // 파일 업로드 용량 초과 에러
@@ -77,7 +77,7 @@ public class GlobalExceptionHandler {
         log.warn("[MaxUploadSizeExceededException]", e);
         return ResponseEntity
                 .status(ErrorCode.FILE_SIZE_EXCEEDED.getHttpStatus())
-                .body(ApiResponse.error(ErrorCode.FILE_SIZE_EXCEEDED.getCode(), ErrorCode.FILE_SIZE_EXCEEDED.getMessage()));
+                .body(ApiResponse.error(ErrorCode.FILE_SIZE_EXCEEDED));
     }
 
     // 그 외 예측하지 못한 모든 서버 에러 (최후의 보루)
@@ -86,8 +86,6 @@ public class GlobalExceptionHandler {
         log.error("[Unhandled Exception] : ", e);
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
-                .body(ApiResponse.error(
-                        ErrorCode.INTERNAL_SERVER_ERROR.getCode(),
-                        ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+                .body(ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 }
