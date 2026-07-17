@@ -43,9 +43,6 @@ public class LinkedAccount {
     @Column(name = "is_investment_enabled", nullable = false)
     private boolean isInvestmentEnabled = true;
 
-    @Column(name = "is_upbit_key_valid", nullable = false)
-    private boolean isUpbitKeyValid = false;
-
     @Builder
     private LinkedAccount(User user, String upbitAccessKey, String upbitSecretKey, String targetCardCompany, String targetCardLast4, TwoFactorProvider twoFactorProvider) {
         this.user = user;
@@ -60,7 +57,6 @@ public class LinkedAccount {
         this.upbitAccessKey = upbitAccessKey;
         this.upbitSecretKey = upbitSecretKey;
         this.twoFactorProvider = twoFactorProvider;
-        this.isUpbitKeyValid = true;
     }
 
     public void updateKbankInfo(String targetCardCompany, String targetCardLast4) {
@@ -70,9 +66,5 @@ public class LinkedAccount {
 
     public void updateInvestmentStatus(boolean isEnabled) {
         this.isInvestmentEnabled = isEnabled;
-    }
-
-    public void invalidateUpbitKey() {
-        this.isUpbitKeyValid = false;
     }
 }

@@ -2,6 +2,7 @@
 
 > 이 파일을 참고하여 API 설계, 쿼리 작성, 기능 개발 시 테이블 구조를 파악하세요.
 > **본 문서는 `src/main/java/com/tikkle` 엔티티 코드 기준으로 동기화되어 있습니다.**
+> 테이블 물리명은 전부 **대문자 스네이크 케이스**입니다 (AGENTS.md §5.4 규칙).
 
 ---
 
@@ -9,15 +10,14 @@
 
 | 테이블명 | 설명 |
 |---------|------|
-| `USERS` | 회원 기본 정보 |
-| `investment_profile` | 유저별 가상자산 투자 성향(5축) |
-| `investment_profile_themes` | 투자 프로필별 관심 코인 테마 (다중 선택, Set) |
-| `category_spare_change_rules` | 카테고리별 다이나믹 잔돈 규칙 |
-| `linked_accounts` | 금융 연동 정보 (Upbit API 키, 타겟 카드 정보) |
-| `investment_settings` | 매매 방식(자동/수동) 등 공통 투자 설정 |
+| `USERS` | 회원 기본 정보 (휴대폰 번호 + 비밀번호 인증) |
+| `INVESTMENT_PROFILE` | 유저별 가상자산 투자 성향(5축) |
+| `INVESTMENT_PROFILE_THEMES` | 투자 프로필별 관심 코인 테마 (다중 선택, Set) |
+| `CATEGORY_SPARE_CHANGE_RULES` | 카테고리별 다이나믹 잔돈 규칙 |
+| `LINKED_ACCOUNTS` | 금융 연동 정보 (Upbit API 키, 타겟 카드, 2차 인증 수단) |
 | `PAYMENT_EVENTS` | 결제 이벤트 원장 |
-| `payment_category_mapping` | 가맹점 키워드 → 카테고리 분류 사전 (전역 캐시, AI 학습 결과 누적) |
-| `ai_recommendation_history` | 12시간 주기 AI 추천 15종목 유니버스 이력 (Risk x Trend 9개 조합별 캐싱용) |
+| `PAYMENT_CATEGORY_MAPPING` | 가맹점 키워드 → 카테고리 분류 사전 (전역 캐시, AI 학습 결과 누적) |
+| `AI_RECOMMENDATION_HISTORY` | 12시간 주기 AI 추천 15종목 유니버스 이력 (Risk x Trend 9개 조합별 캐싱용) |
 | `PORTFOLIOS` | 보유 종목 현황 |
 | `COIN_METADATA` | 업비트 마켓(코인) 메타데이터 (마켓코드/한글명/영문명, 매일 동기화) |
 | `MARKET_TOPICS` | 투데이 마켓 토픽 (Google News RSS 수집) |
@@ -25,7 +25,7 @@
 | `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
 | `RECOMMENDED_VIDEOS` | 추천 영상 (시딩, 외부 링크) |
 
-> **Redis 저장소 (RDB 외):** 리프레시 토큰(`refresh_token` RedisHash), 결제 멱등성 키(`payment:tx:{transactionId}`, SETNX 24h), 유저 설정 캐시(`user:settings:{userId}` Hash), 스케줄러 분산 락(`scheduler:lock:*`).
+> **Redis 저장소 (RDB 외):** 리프레시 토큰(`refresh_token` RedisHash), 결제 멱등성 키(`payment:tx:{transactionId}`, SETNX 24h), 유저 설정 캐시(`user:settings:{userId}` Hash).
 
 ---
 
@@ -35,79 +35,89 @@
 CREATE TABLE `USERS` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `name`          VARCHAR(50)     NOT NULL,
-    `email`         VARCHAR(100)    NOT NULL,
-    `provider`      VARCHAR(20)     NOT NULL,   -- AuthProvider: GOOGLE
-    `provider_id`   VARCHAR(255)    NULL,       -- 소셜 로그인 고유 ID
-    `status`        VARCHAR(20)     NOT NULL,   -- UserStatus: ACTIVE, WITHDRAWN
-    `created_at`    DATETIME        NOT NULL,
-    `deleted_at`    DATETIME        NULL
+    `phone_number`  VARCHAR(20)     NOT NULL,   -- 로그인 식별자 (UNIQUE)
+    `password`      VARCHAR(255)    NOT NULL,   -- BCrypt 해시
+    `created_at`    DATETIME        NOT NULL
 );
+-- 회원 탈퇴는 논리 삭제가 아닌 완전 삭제다. USERS 행과 소유 데이터(INVESTMENT_PROFILE(+THEMES),
+-- CATEGORY_SPARE_CHANGE_RULES, LINKED_ACCOUNTS, PORTFOLIOS, PAYMENT_EVENTS) 및 Redis 세션·설정 캐시를
+-- 모두 제거하며, phone_number가 즉시 회수되어 동일 번호로 곧바로 재가입할 수 있다.
+-- 따라서 계정 상태 개념 자체가 없으며, status/deleted_at 컬럼과 UserStatus enum은 제거되었다.
 
 CREATE TABLE `PAYMENT_EVENTS` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
-    `user_id`               BIGINT          NOT NULL,
+    `user_id`              BIGINT          NOT NULL,   -- FK 매핑 없이 Long 스칼라로 보관(느슨한 결합)
     `card_company`          VARCHAR(50)     NOT NULL,
     `card_number_last_4`    VARCHAR(4)      NOT NULL,
     `merchant`              VARCHAR(100)    NOT NULL,   -- 분류된 keyword 또는 원본 가맹점명
+    `raw_merchant`          VARCHAR(100)    NOT NULL,   -- 스크래핑된 원본 가맹점명
     `amount`                INT             NOT NULL,
     `spare_change`          INT             NOT NULL,
     `category`              VARCHAR(20)     NULL,       -- PaymentCategory
     `status`                VARCHAR(20)     NOT NULL,   -- PaymentStatus
-    `transaction_id`        VARCHAR(255)    NOT NULL,   -- 결정적 해시 기반 고유 ID
-    `reason`                VARCHAR(255)    NULL,        -- 미투자/실패 사유 등
+    `transaction_id`        VARCHAR(255)    NOT NULL,   -- 결정적 해시 기반 고유 ID (UNIQUE)
+    `reason`                VARCHAR(255)    NULL,       -- 미투자/실패 사유 등
+    `created_at`            DATETIME        NOT NULL,
+    `deposit_uuid`          VARCHAR(255)    NULL,       -- 업비트 원화 입금 요청 UUID (UNIQUE)
+    `deposit_requested_at`  DATETIME        NULL,       -- 입금 요청 시각 (폴링 타임아웃 기준)
+    `trade_uuid`            VARCHAR(255)    NULL,       -- 업비트 매수 주문 UUID (UNIQUE)
+    `trade_requested_at`    DATETIME        NULL,       -- 매수 주문 시각 (폴링 타임아웃 기준)
     `target_coin_market`    VARCHAR(20)     NULL,       -- FK -> COIN_METADATA(market)
-    `created_at`            DATETIME        NOT NULL
+    `invested_volume`       DECIMAL(30,8)   NULL,       -- 체결 수량
+    `invested_price`        DECIMAL(30,8)   NULL        -- 체결 평균 단가
 );
 
-CREATE TABLE `investment_profile` (
+CREATE TABLE `INVESTMENT_PROFILE` (
     `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`               BIGINT          NOT NULL,
-    `risk_tolerance`        VARCHAR(30)     NOT NULL,   -- RiskTolerance (하락장 방어 심리)
-    `trend_sensitivity`     VARCHAR(30)     NOT NULL,   -- TrendSensitivity (트렌드 민감도)
-    `diversification_type`  VARCHAR(30)     NOT NULL,   -- DiversificationType (포트폴리오 분산도)
-    `meme_acceptance`       VARCHAR(30)     NOT NULL    -- MemeAcceptance (밈 코인 수용도)
+    `risk_tolerance`        VARCHAR(30)     NULL,       -- RiskTolerance (하락장 방어 심리)
+    `trend_sensitivity`     VARCHAR(30)     NULL,       -- TrendSensitivity (트렌드 민감도)
+    `diversification_type`  VARCHAR(30)     NULL,       -- DiversificationType (포트폴리오 분산도)
+    `meme_acceptance`       VARCHAR(30)     NULL        -- MemeAcceptance (밈 코인 수용도)
 );
+-- 가입 시 빈 행이 먼저 생성되고 온보딩(설정) 시점에 채워지므로 5축 컬럼은 nullable.
 
-CREATE TABLE `investment_profile_themes` (
+CREATE TABLE `INVESTMENT_PROFILE_THEMES` (
     `investment_profile_id` BIGINT          NOT NULL,
-    `theme`                 VARCHAR(30)     NOT NULL    -- CryptoTheme (관심 코인 테마, 다중)
+    `theme`                 VARCHAR(30)     NOT NULL    -- CryptoTheme (관심 코인 테마, 다중 / 최대 6개)
 );
 
-CREATE TABLE `category_spare_change_rules` (
+CREATE TABLE `CATEGORY_SPARE_CHANGE_RULES` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `user_id`       BIGINT          NOT NULL,
     `category`      VARCHAR(30)     NOT NULL,   -- PaymentCategory
     `rule_type`     VARCHAR(30)     NOT NULL    -- RuleType
 );
 
-CREATE TABLE `linked_accounts` (
-    `id`                    BIGINT          NOT NULL    AUTO_INCREMENT,
-    `user_id`               BIGINT          NOT NULL,
-    `upbit_access_key`      VARCHAR(512)    NOT NULL,   -- AES-256 암호화 저장
-    `upbit_secret_key`      VARCHAR(512)    NOT NULL,   -- AES-256 암호화 저장
-    `target_card_company`   VARCHAR(50)     NOT NULL,
-    `target_card_last_4`    VARCHAR(4)      NOT NULL
+CREATE TABLE `LINKED_ACCOUNTS` (
+    `id`                        BIGINT          NOT NULL    AUTO_INCREMENT,
+    `user_id`                   BIGINT          NOT NULL,
+    `upbit_access_key`          VARCHAR(512)    NULL,       -- AES-256 암호화 저장. 가입 시 빈 행 생성 후 연동 시점에 채움
+    `upbit_secret_key`          VARCHAR(512)    NULL,       -- AES-256 암호화 저장. 가입 시 빈 행 생성 후 연동 시점에 채움
+    `target_card_company`       VARCHAR(50)     NULL,
+    `target_card_last4`         VARCHAR(4)      NULL,       -- 엔티티에 @Column(name=...)이 없어 Hibernate 기본 전략이 생성한 이름 (PAYMENT_EVENTS의 card_number_last_4와 표기가 다름에 주의)
+    `two_factor_provider`       VARCHAR(20)     NULL,       -- TwoFactorProvider (업비트 원화 입금 2차 인증 수단)
+    `is_investment_enabled`     BOOLEAN         NOT NULL    DEFAULT TRUE
 );
+-- 업비트 키의 유효성은 별도 컬럼으로 보관하지 않는다.
+-- 등록/수정 시점에만 UpbitKeyValidationService가 5대 권한을 검증하고,
+-- 이후의 만료/권한 회수는 실제 업비트 API 호출이 401을 반환할 때 감지되어 UPBIT-010으로 전파된다.
 
-CREATE TABLE `investment_settings` (
-    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
-    `user_id`           BIGINT          NOT NULL,
-    `execution_mode`    VARCHAR(20)     NOT NULL    -- ExecutionMode: AUTO, MANUAL
-);
-
-CREATE TABLE `payment_category_mapping` (
+CREATE TABLE `PAYMENT_CATEGORY_MAPPING` (
     `id`            BIGINT          NOT NULL    AUTO_INCREMENT,
     `keyword`       VARCHAR(255)    NOT NULL,   -- 가맹점 핵심 상호명 (UNIQUE)
     `category`      VARCHAR(30)     NOT NULL    -- PaymentCategory
 );
 
-CREATE TABLE `ai_recommendation_history` (
+CREATE TABLE `AI_RECOMMENDATION_HISTORY` (
     `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
     `profile_hash_key`  VARCHAR(255)    NOT NULL,   -- 예: BUY_MORE:FULL_TREND
     `fng_index`         VARCHAR(255)    NOT NULL,
     `btc_dominance`     VARCHAR(255)    NOT NULL,
     `weekly_trend`      VARCHAR(255)    NOT NULL,
     `candidates_json`   TEXT            NOT NULL,   -- 15개 추천 후보군 JSON
+    `hot_narratives`    VARCHAR(255)    NULL,       -- 수집된 시장 내러티브 요약
+    `macro_events`      TEXT            NULL,       -- 수집된 매크로 이벤트
     `created_at`        DATETIME        NOT NULL
 );
 
@@ -170,12 +180,11 @@ CREATE TABLE `RECOMMENDED_VIDEOS` (
 -- PRIMARY KEY
 ALTER TABLE `USERS`                         ADD CONSTRAINT `PK_USERS`                       PRIMARY KEY (`id`);
 ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `PK_PAYMENT_EVENTS`              PRIMARY KEY (`id`);
-ALTER TABLE `investment_profile`            ADD CONSTRAINT `PK_INVESTMENT_PROFILE`          PRIMARY KEY (`id`);
-ALTER TABLE `category_spare_change_rules`   ADD CONSTRAINT `PK_CATEGORY_SPARE_CHANGE_RULES` PRIMARY KEY (`id`);
-ALTER TABLE `linked_accounts`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS`             PRIMARY KEY (`id`);
-ALTER TABLE `investment_settings`           ADD CONSTRAINT `PK_INVESTMENT_SETTINGS`         PRIMARY KEY (`id`);
-ALTER TABLE `payment_category_mapping`      ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPING`    PRIMARY KEY (`id`);
-ALTER TABLE `ai_recommendation_history`     ADD CONSTRAINT `PK_AI_RECOMMENDATION_HISTORY`   PRIMARY KEY (`id`);
+ALTER TABLE `INVESTMENT_PROFILE`            ADD CONSTRAINT `PK_INVESTMENT_PROFILE`          PRIMARY KEY (`id`);
+ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `PK_CATEGORY_SPARE_CHANGE_RULES` PRIMARY KEY (`id`);
+ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `PK_LINKED_ACCOUNTS`             PRIMARY KEY (`id`);
+ALTER TABLE `PAYMENT_CATEGORY_MAPPING`      ADD CONSTRAINT `PK_PAYMENT_CATEGORY_MAPPING`    PRIMARY KEY (`id`);
+ALTER TABLE `AI_RECOMMENDATION_HISTORY`     ADD CONSTRAINT `PK_AI_RECOMMENDATION_HISTORY`   PRIMARY KEY (`id`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `PK_PORTFOLIOS`                  PRIMARY KEY (`id`);
 ALTER TABLE `COIN_METADATA`                 ADD CONSTRAINT `PK_COIN_METADATA`               PRIMARY KEY (`market`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `PK_MARKET_TOPICS`               PRIMARY KEY (`id`);
@@ -184,19 +193,26 @@ ALTER TABLE `BEGINNER_ARTICLES`             ADD CONSTRAINT `PK_BEGINNER_ARTICLES
 ALTER TABLE `RECOMMENDED_VIDEOS`            ADD CONSTRAINT `PK_RECOMMENDED_VIDEOS`          PRIMARY KEY (`id`);
 
 -- UNIQUE
-ALTER TABLE `USERS`                         ADD CONSTRAINT `UQ_USERS_EMAIL`                 UNIQUE (`email`);
+ALTER TABLE `USERS`                         ADD CONSTRAINT `UQ_USERS_PHONE_NUMBER`          UNIQUE (`phone_number`);
 ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `UQ_PAYMENT_EVENTS_TX_ID`        UNIQUE (`transaction_id`);
-ALTER TABLE `investment_profile`            ADD CONSTRAINT `UQ_INVESTMENT_PROFILE_USER`     UNIQUE (`user_id`);
-ALTER TABLE `category_spare_change_rules`   ADD CONSTRAINT `UQ_CATEGORY_RULES_USER_CAT`     UNIQUE (`user_id`, `category`);
-ALTER TABLE `linked_accounts`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_USER`        UNIQUE (`user_id`);
-ALTER TABLE `investment_settings`           ADD CONSTRAINT `UQ_INVESTMENT_SETTINGS_USER`    UNIQUE (`user_id`);
-ALTER TABLE `payment_category_mapping`      ADD CONSTRAINT `UQ_PAYMENT_CAT_MAPPING_KEYWORD` UNIQUE (`keyword`);
+ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `UQ_PAYMENT_EVENTS_DEPOSIT_UUID` UNIQUE (`deposit_uuid`);
+ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `UQ_PAYMENT_EVENTS_TRADE_UUID`   UNIQUE (`trade_uuid`);
+ALTER TABLE `INVESTMENT_PROFILE`            ADD CONSTRAINT `UQ_INVESTMENT_PROFILE_USER`     UNIQUE (`user_id`);
+ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `UQ_CATEGORY_RULES_USER_CAT`     UNIQUE (`user_id`, `category`);
+ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_USER`        UNIQUE (`user_id`);
+ALTER TABLE `PAYMENT_CATEGORY_MAPPING`      ADD CONSTRAINT `UQ_PAYMENT_CAT_MAPPING_KEYWORD` UNIQUE (`keyword`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `UQ_USER_MARKET`                 UNIQUE (`user_id`, `market`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`          UNIQUE (`link`);
 
 -- FOREIGN KEY (JPA 연관관계)
+ALTER TABLE `INVESTMENT_PROFILE`            ADD CONSTRAINT `FK_INVESTMENT_PROFILE_USER`     FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
+ALTER TABLE `INVESTMENT_PROFILE_THEMES`     ADD CONSTRAINT `FK_PROFILE_THEMES_PROFILE`      FOREIGN KEY (`investment_profile_id`) REFERENCES `INVESTMENT_PROFILE`(`id`);
+ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `FK_CATEGORY_RULES_USER`         FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
+ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `FK_LINKED_ACCOUNTS_USER`        FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
+ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `FK_PORTFOLIOS_USER`             FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
 ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `FK_PAYMENT_EVENTS_COIN`         FOREIGN KEY (`target_coin_market`) REFERENCES `COIN_METADATA`(`market`);
--- 참고: PAYMENT_EVENTS.user_id 는 FK 매핑 없이 Long 스칼라로 보관(느슨한 결합).
+-- 참고: PAYMENT_EVENTS.user_id 는 USERS를 가리키지만 JPA 연관관계 없이 Long 스칼라로 보관(느슨한 결합).
+--       결제 원장은 유저 엔티티에 의존하지 않고 독립적으로 적재/조회된다.
 ```
 
 ---
@@ -205,18 +221,17 @@ ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `FK_PAYMENT_EVENTS_CO
 
 ```
 USERS (1)
- ├── investment_profile (1)              - 가상자산 투자 성향(5축)
- │    └── investment_profile_themes (N)  - 관심 코인 테마 (1:N 다중 선택, Set)
- ├── category_spare_change_rules (N)     - 카테고리별 잔돈 규칙 (user_id+category UNIQUE)
- ├── linked_accounts (1)                 - 금융 연동 정보 (Upbit API 키, 타겟 카드)
- ├── investment_settings (1)             - 공통 투자 설정 (자동/수동)
- ├── PAYMENT_EVENTS (N)                  - 결제 이벤트 (user_id 스칼라 보관)
- └── PORTFOLIOS (N)                      - 보유 종목 현황 (user_id+market UNIQUE)
+ ├── INVESTMENT_PROFILE (1)              - 가상자산 투자 성향(5축)
+ │    └── INVESTMENT_PROFILE_THEMES (N)  - 관심 코인 테마 (1:N 다중 선택, Set)
+ ├── CATEGORY_SPARE_CHANGE_RULES (N)     - 카테고리별 잔돈 규칙 (user_id+category UNIQUE)
+ ├── LINKED_ACCOUNTS (1)                 - 금융 연동 정보 (Upbit API 키, 타겟 카드, 2차 인증)
+ ├── PORTFOLIOS (N)                      - 보유 종목 현황 (user_id+market UNIQUE)
+ └── PAYMENT_EVENTS (N)                  - 결제 이벤트 (JPA 연관관계 없이 user_id 스칼라 보관)
 
 PAYMENT_EVENTS (N) ──> COIN_METADATA (1)  - target_coin_market FK (실시간 퀀트 스코어링 기반 매수 타겟 코인)
 
-payment_category_mapping  - 전역 키워드→카테고리 사전 (유저 무관, AI 분류 결과 누적 캐시)
-ai_recommendation_history - AI 매크로 유니버스 후보군 (12시간 주기 9개 성향 조합별 캐싱)
+PAYMENT_CATEGORY_MAPPING  - 전역 키워드→카테고리 사전 (유저 무관, AI 분류 결과 누적 캐시)
+AI_RECOMMENDATION_HISTORY - AI 매크로 유니버스 후보군 (12시간 주기 9개 성향 조합별 캐싱)
 COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
 
 인사이트 (독립 테이블, FK 없음)
@@ -232,14 +247,27 @@ COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
 
 | 테이블/엔티티 | 컬럼/필드 | 값 |
 |---|---|---|
-| `USERS` | `status` | `ACTIVE`, `WITHDRAWN` |
-| `USERS` | `provider` | `GOOGLE` |
-| `PAYMENT_EVENTS` | `status` | `NOT_INVESTED`, `CLASSIFYING`, `WAITING_APPROVAL`, `ORDERING`, `INVESTED`, `FAILED` |
-| `PAYMENT_EVENTS` / `category_spare_change_rules` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
-| `category_spare_change_rules` | `rule_type` | `ROUND_UP_10000`, `ROUND_UP_20000`, `ROUND_UP_30000`, `ROUND_UP_40000`, `ROUND_UP_50000`, `PERCENT_10`, `PERCENT_15`, `PERCENT_20`, `PERCENT_25`, `PERCENT_30` |
-| `investment_settings` | `execution_mode` | `AUTO`, `MANUAL` |
-| `investment_profile` | `risk_tolerance` | `SELL_IMMEDIATELY`(2), `HOLD`(5), `BUY_MORE`(9) — *괄호 안은 성향 점수* |
-| `investment_profile` | `trend_sensitivity` | `FUNDAMENTAL_ONLY`(2), `PARTIAL_TREND`(5), `FULL_TREND`(9) |
-| `investment_profile` | `diversification_type` | `CONCENTRATED`, `BALANCED`, `DIVERSIFIED` |
-| `investment_profile` | `meme_acceptance` | `NONE`(0%), `SMALL`(10%), `ACTIVE`(30%) — *괄호 안은 최대 편입 비중* |
-| `investment_profile_themes` | `theme` | `LAYER_1`, `DEFI`, `AI`, `WEB3_GAMING`, `RWA`, `MEME` |
+| `PAYMENT_EVENTS` | `status` | `NOT_INVESTED`, `PENDING_PURCHASE`, `PENDING_DEPOSIT`, `PENDING_TRADE`, `INVESTED`, `FAILED` |
+| `PAYMENT_EVENTS` / `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
+| `CATEGORY_SPARE_CHANGE_RULES` | `rule_type` | `ROUND_UP_10000`, `ROUND_UP_20000`, `ROUND_UP_30000`, `ROUND_UP_40000`, `ROUND_UP_50000`, `PERCENT_10`, `PERCENT_15`, `PERCENT_20`, `PERCENT_25`, `PERCENT_30` |
+| `LINKED_ACCOUNTS` | `two_factor_provider` | `TwoFactorProvider` — 업비트 원화 입금 시 사용할 2차 인증 수단 |
+| `INVESTMENT_PROFILE` | `risk_tolerance` | `SELL_IMMEDIATELY`(2), `HOLD`(5), `BUY_MORE`(9) — *괄호 안은 성향 점수* |
+| `INVESTMENT_PROFILE` | `trend_sensitivity` | `FUNDAMENTAL_ONLY`(2), `PARTIAL_TREND`(5), `FULL_TREND`(9) |
+| `INVESTMENT_PROFILE` | `diversification_type` | `CONCENTRATED`, `BALANCED`, `DIVERSIFIED` |
+| `INVESTMENT_PROFILE` | `meme_acceptance` | `NONE`(0%), `SMALL`(10%), `ACTIVE`(30%) — *괄호 안은 최대 편입 비중* |
+| `INVESTMENT_PROFILE_THEMES` | `theme` | `LAYER_1`, `DEFI`, `AI`, `WEB3_GAMING`, `RWA`, `MEME` |
+
+### PaymentStatus 전이 흐름
+
+```
+[결제 수신]
+   ├── 잔돈 0원 / 최소 투자 금액(5,100원) 미달 ──> NOT_INVESTED (종료)
+   └── 코인 추천 완료 ──> PENDING_PURCHASE
+                            ├── [유저 거절] ─────────> NOT_INVESTED
+                            ├── [24시간 미응답] ─────> NOT_INVESTED (PendingOrderExpirationScheduler)
+                            └── [유저 승인]
+                                  └── 업비트 원화 입금 요청(2차 인증) ──> PENDING_DEPOSIT
+                                        └── [입금 완료 폴링] ──> 매수 주문 ──> PENDING_TRADE
+                                              └── [체결 폴링] ──> INVESTED
+```
+> 실패(거래소 에러, 키 만료, 체결량 0 등)는 어느 단계에서든 `FAILED` + `reason` 기록.

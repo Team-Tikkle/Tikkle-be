@@ -5,7 +5,6 @@ import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.upbit.client.UpbitAccountClient;
 import com.tikkle.upbit.dto.response.UpbitAccountResponse;
 import com.tikkle.upbit.dto.response.UpbitRealtimePortfolioResponse;
-import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.util.UpbitAuthUtil;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
@@ -41,10 +40,7 @@ public class UpbitPortfolioService {
         LinkedAccount linkedAccount = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
-        if (!linkedAccount.isUpbitKeyValid()) {
-            throw new UpbitInvalidKeyException();
-        }
-
+        // 키의 만료/권한 회수는 아래 업비트 호출이 401을 반환하며 UpbitInvalidKeyException으로 전파된다.
         String token = UpbitAuthUtil.generateToken(
                 linkedAccount.getUpbitAccessKey(),
                 linkedAccount.getUpbitSecretKey()

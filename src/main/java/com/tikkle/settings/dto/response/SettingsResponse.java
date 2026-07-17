@@ -38,9 +38,7 @@ public record SettingsResponse(
             @Schema(description = "타겟 카드 번호 마지막 4자리", example = "1234")
             String targetCardLast4,
             @Schema(description = "업비트 2차 인증 수단", example = "KAKAO")
-            TwoFactorProvider twoFactorProvider,
-            @Schema(description = "업비트 API 키 유효성 여부", example = "true")
-            boolean isUpbitKeyValid
+            TwoFactorProvider twoFactorProvider
     ) {}
 
     @Schema(description = "투자 성향 정보")

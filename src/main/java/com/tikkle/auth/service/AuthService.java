@@ -16,14 +16,16 @@ import com.tikkle.investment.entity.InvestmentProfile;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.tikkle.auth.dto.request.ResetPasswordRequest;
 import com.tikkle.auth.entity.enums.SmsPurpose;
 
@@ -33,6 +35,7 @@ import com.tikkle.auth.entity.enums.SmsPurpose;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AuthService {
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -50,10 +53,11 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
-        // 1. 휴대폰 인증 토큰 검증
+        // 1. 휴대폰 인증 토큰을 가장 먼저 검증한다 (이 시점에는 소모하지 않는다).
+        // 중복 가입 검사를 앞에 두면 아무 토큰이나 넣어도 409/400 차이로 가입 여부가 노출된다.
         smsService.validateSignupToken(request.phoneNumber(), request.signupToken());
 
-        // 2. 이미 존재하는 유저인지 확인
+        // 2. 인증된 요청에 한해 중복 가입 여부를 확인한다
         if (userRepository.findByPhoneNumber(request.phoneNumber()).isPresent()) {
             throw new PhoneAlreadyRegisteredException();
         }
@@ -63,13 +67,23 @@ public class AuthService {
                 .name(request.name())
                 .phoneNumber(request.phoneNumber())
                 .password(passwordEncoder.encode(request.password()))
-                .status(UserStatus.ACTIVE)
                 .build();
-        userRepository.save(user);
+        try {
+            // 동시 요청이 1번 검사를 함께 통과한 경우 UNIQUE 제약으로 걸러내 500 대신 409를 반환한다
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("[AuthService] 동시성 중복 가입 감지 - phoneNumber: {}", request.phoneNumber());
+            throw new PhoneAlreadyRegisteredException();
+        }
 
         // 4. 유저와 연관된 설정 엔티티(연동 계좌, 투자 성향) 초기화 생성
         linkedAccountRepository.save(LinkedAccount.builder().user(user).build());
         investmentProfileRepository.save(InvestmentProfile.builder().user(user).build());
+
+        // 5. 가입이 확정된 뒤에만 인증 토큰을 소모한다
+        consumeTokenAfterCommit(request.phoneNumber(), SmsPurpose.SIGNUP);
+
+        log.info("[AuthService] 회원가입 완료 - userId: {}", user.getId());
 
         return issueTokens(user.getId(), true);
     }
@@ -82,7 +96,7 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByPhoneNumberAndStatus(request.phoneNumber(), UserStatus.ACTIVE)
+        User user = userRepository.findByPhoneNumber(request.phoneNumber())
                 .orElseThrow(UserNotFoundException::new);
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
@@ -134,16 +148,19 @@ public class AuthService {
     }
 
     /**
-     * 비밀번호 재설정을 위한 SMS 인증번호 발송 요청
+     * 비밀번호 재설정을 위한 SMS 인증번호 발송 요청.
+     * 미가입 번호라도 정상 응답(200)을 반환하여 가입 여부가 노출되는 사용자 열거를 방지합니다.
      *
      * @param phoneNumber 휴대폰 번호
      */
     public void sendPasswordResetSms(String phoneNumber) {
-        // 1. 가입 여부 확인
-        if (userRepository.findByPhoneNumberAndStatus(phoneNumber, UserStatus.ACTIVE).isEmpty()) {
-            throw new UserNotFoundException();
+        if (userRepository.findByPhoneNumber(phoneNumber).isEmpty()) {
+            // 발송하지 않더라도 쿼터는 동일하게 소모해야 응답/쿨다운 차이로 가입 여부를 추론할 수 없다
+            smsService.consumeSendQuota(phoneNumber, SmsPurpose.PASSWORD_RESET);
+            log.info("[AuthService] 미가입 번호의 비밀번호 재설정 요청 - 발송 생략(사용자 열거 방지) - phoneNumber: {}", phoneNumber);
+            return;
         }
-        // 2. 인증번호 발송
+
         smsService.sendVerificationCode(phoneNumber, SmsPurpose.PASSWORD_RESET);
     }
 
@@ -165,17 +182,44 @@ public class AuthService {
      */
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        // 1. 재설정 토큰 유효성 검증
+        // 1. 재설정 토큰을 가장 먼저 검증한다 (이 시점에는 소모하지 않는다).
+        // 유저 조회를 앞에 두면 아무 토큰이나 넣어도 404/400 차이로 가입 여부가 노출되어
+        // sendPasswordResetSms의 사용자 열거 방지가 그대로 우회된다.
         smsService.validatePasswordResetToken(request.phoneNumber(), request.resetToken());
 
-        // 2. 유저 확인
-        User user = userRepository.findByPhoneNumberAndStatus(request.phoneNumber(), UserStatus.ACTIVE)
+        // 2. 인증된 요청에 한해 유저를 조회한다
+        User user = userRepository.findByPhoneNumber(request.phoneNumber())
                 .orElseThrow(UserNotFoundException::new);
 
         // 3. 비밀번호 변경 로직 (더티 체킹)
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
-        
-        log.info("[AuthService] 비밀번호 재설정 완료 - userId: {}", user.getId());
+
+        // 4. 기존 세션 무효화 - 계정 탈취 상황에서 공격자의 리프레시 토큰을 즉시 끊는다
+        refreshTokenRepository.deleteById(user.getId());
+
+        // 5. 재설정이 확정된 뒤에만 인증 토큰을 소모한다
+        consumeTokenAfterCommit(request.phoneNumber(), SmsPurpose.PASSWORD_RESET);
+
+        log.info("[AuthService] 비밀번호 재설정 완료 및 기존 세션 무효화 - userId: {}", user.getId());
+    }
+
+    /**
+     * DB 트랜잭션이 커밋된 뒤에 SMS 임시 토큰을 소모합니다.
+     * Redis는 트랜잭션 롤백 대상이 아니므로, 커밋 전에 삭제하면 후속 실패 시
+     * 사용자가 아무 잘못 없이 SMS 인증을 다시 해야 하는 문제가 생깁니다.
+     */
+    private void consumeTokenAfterCommit(String phoneNumber, SmsPurpose purpose) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    smsService.consumeToken(phoneNumber, purpose);
+                } catch (Exception e) {
+                    // 삭제 실패해도 토큰은 TTL(30분)로 만료되며, 중복 사용은 선행 검증 단계에서 차단된다
+                    log.error("[AuthService] 커밋 후 SMS 임시 토큰 삭제 실패 - phoneNumber: {}, purpose: {}", phoneNumber, purpose, e);
+                }
+            }
+        });
     }
 
     /**

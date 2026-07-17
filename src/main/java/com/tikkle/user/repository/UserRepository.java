@@ -1,7 +1,6 @@
 package com.tikkle.user.repository;
 
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -12,8 +11,6 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByPhoneNumber(String phoneNumber);
-    Optional<User> findByPhoneNumberAndStatus(String phoneNumber, UserStatus status);
-    Optional<User> findByIdAndStatus(Long id, UserStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")

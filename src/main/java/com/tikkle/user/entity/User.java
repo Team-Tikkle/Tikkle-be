@@ -1,6 +1,5 @@
 package com.tikkle.user.entity;
 
-import com.tikkle.user.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -25,23 +24,15 @@ public class User {
     @Column(nullable = false, length = 255)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private UserStatus status;
-
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column
-    private LocalDateTime deletedAt;
-
     @Builder
-    private User(String name, String phoneNumber, String password, UserStatus status) {
+    private User(String name, String phoneNumber, String password) {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.password = password;
-        this.status = status;
     }
 
     public void update(String name) {
@@ -50,10 +41,5 @@ public class User {
 
     public void updatePassword(String password) {
         if (password != null) this.password = password;
-    }
-
-    public void withdraw() {
-        this.status = UserStatus.WITHDRAWN;
-        this.deletedAt = LocalDateTime.now();
     }
 }

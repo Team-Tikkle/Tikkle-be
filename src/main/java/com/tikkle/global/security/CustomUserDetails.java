@@ -1,7 +1,6 @@
 package com.tikkle.global.security;
 
 import com.tikkle.user.entity.User;
-import com.tikkle.user.entity.enums.UserStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -44,8 +43,9 @@ public class CustomUserDetails implements UserDetails {
         return user.getPhoneNumber();
     }
 
+    // 탈퇴가 완전 삭제이므로 조회된 유저는 항상 활성 상태다.
     @Override
     public boolean isEnabled() {
-        return user.getStatus() == UserStatus.ACTIVE;
+        return true;
     }
 }

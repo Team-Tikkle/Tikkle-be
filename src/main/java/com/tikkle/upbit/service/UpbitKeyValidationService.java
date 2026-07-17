@@ -26,6 +26,7 @@ public class UpbitKeyValidationService {
      * 입력된 업비트 Access Key와 Secret Key를 사용하여 5가지 필수 권한이 모두 존재하는지 검증합니다.
      * (자산조회, 주문조회, 주문하기, 입금조회, 입금하기)
      * 권한이 하나라도 누락되거나 키가 유효하지 않으면 UpbitInvalidKeyException을 발생시킵니다.
+     * 키 등록/수정 시점에만 호출되며, 이후 키의 만료나 권한 회수는 실제 업비트 API 호출 시점에 감지됩니다.
      */
     public void validateKeyOrThrow(String accessKey, String secretKey) {
         log.info("[UpbitKeyValidationService] 업비트 API 키 정밀 권한 검증 시작...");

@@ -37,6 +37,10 @@ public class SettingsCacheManager {
         redisTemplate.opsForHash().put(cacheKey, "targetCardLast4", targetCardLast4);
     }
 
+    public void evict(Long userId) {
+        redisTemplate.delete(cacheKey(userId));
+    }
+
     private String cacheKey(Long userId) {
         return USER_SETTINGS_CACHE_PREFIX + userId;
     }

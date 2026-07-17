@@ -45,12 +45,17 @@ public class OrderApprovalController implements OrderApprovalSwagger {
 
     /**
      * 입금 상태 모니터링을 위한 SSE 연결
+     *
+     * @param userDetails 인증된 사용자 정보
+     * @param eventId 구독할 결제 이벤트 ID
+     * @return 결제 진행 상황을 전달하는 SSE Emitter
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamOrderApproval(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long eventId
     ) {
+        orderApprovalService.validateEventOwnership(userDetails.getUserId(), eventId);
         return sseConnectionManager.createEmitter(eventId);
     }
 
