@@ -53,13 +53,14 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
-        // 1. 중복 가입 여부를 토큰 소모 전에 확인한다 (실패 시 SMS 재인증을 요구하지 않기 위함)
+        // 1. 휴대폰 인증 토큰을 가장 먼저 검증한다 (이 시점에는 소모하지 않는다).
+        // 중복 가입 검사를 앞에 두면 아무 토큰이나 넣어도 409/400 차이로 가입 여부가 노출된다.
+        smsService.validateSignupToken(request.phoneNumber(), request.signupToken());
+
+        // 2. 인증된 요청에 한해 중복 가입 여부를 확인한다
         if (userRepository.findByPhoneNumber(request.phoneNumber()).isPresent()) {
             throw new PhoneAlreadyRegisteredException();
         }
-
-        // 2. 휴대폰 인증 토큰 검증 (이 시점에는 소모하지 않는다)
-        smsService.validateSignupToken(request.phoneNumber(), request.signupToken());
 
         // 3. 비밀번호 해싱 및 유저 생성
         User user = User.builder()
@@ -181,12 +182,14 @@ public class AuthService {
      */
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        // 1. 유저 확인을 토큰 소모 전에 수행한다
+        // 1. 재설정 토큰을 가장 먼저 검증한다 (이 시점에는 소모하지 않는다).
+        // 유저 조회를 앞에 두면 아무 토큰이나 넣어도 404/400 차이로 가입 여부가 노출되어
+        // sendPasswordResetSms의 사용자 열거 방지가 그대로 우회된다.
+        smsService.validatePasswordResetToken(request.phoneNumber(), request.resetToken());
+
+        // 2. 인증된 요청에 한해 유저를 조회한다
         User user = userRepository.findByPhoneNumber(request.phoneNumber())
                 .orElseThrow(UserNotFoundException::new);
-
-        // 2. 재설정 토큰 유효성 검증 (이 시점에는 소모하지 않는다)
-        smsService.validatePasswordResetToken(request.phoneNumber(), request.resetToken());
 
         // 3. 비밀번호 변경 로직 (더티 체킹)
         user.updatePassword(passwordEncoder.encode(request.newPassword()));

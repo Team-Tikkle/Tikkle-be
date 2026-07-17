@@ -11,11 +11,9 @@ public record LoginRequest(
         @Pattern(regexp = "^01[0-9]{8,9}$", message = "올바른 휴대폰 번호 형식이 아닙니다.")
         String phoneNumber,
 
-        @Schema(description = "비밀번호 (영문/숫자/특수문자 포함 8~20자)", example = "password123!")
+        // 로그인은 비밀번호를 설정하는 것이 아니라 대조하는 단계이므로 복잡도 검증을 두지 않는다.
+        // 검증을 두면 정책 도입 이전에 가입한 계정이 대조 전에 400으로 막혀 로그인 자체가 불가능해진다.
+        @Schema(description = "비밀번호", example = "password123!")
         @NotBlank(message = "비밀번호는 필수입니다.")
-        @Pattern(
-                regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,20}$",
-                message = "비밀번호는 영문, 숫자, 특수문자를 모두 포함한 8~20자여야 합니다."
-        )
         String password
 ) {}
