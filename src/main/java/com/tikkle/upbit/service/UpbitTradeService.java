@@ -2,11 +2,10 @@ package com.tikkle.upbit.service;
 
 import com.tikkle.upbit.client.UpbitOrderClient;
 import com.tikkle.upbit.dto.response.UpbitOrderResponse;
-import com.tikkle.upbit.exception.UpbitOrderExecutionFailedException;
+import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.exception.LinkedAccountNotFoundException;
 import com.tikkle.user.repository.LinkedAccountRepository;
-import com.tikkle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,9 +23,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UpbitTradeService {
 
+    private static final BigDecimal FEE_MULTIPLIER = new BigDecimal("1.0005");
+    private static final int EXECUTION_POLL_ATTEMPTS = 10;
+    private static final long EXECUTION_POLL_INTERVAL_MS = 500L;
+
     private final UpbitOrderClient upbitOrderClient;
     private final LinkedAccountRepository linkedAccountRepository;
-    private final UserRepository userRepository;
     private final UpbitPortfolioUpdater portfolioUpdater;
 
     /**
@@ -38,78 +40,108 @@ public class UpbitTradeService {
      * 사용자의 업비트 계좌 정보를 조회한 뒤 지정된 코인(마켓)에 대해 시장가 매수를 수행합니다.
      * 체결이 완료될 때까지 일정 횟수 폴링하며, 완료 후 사용자의 포트폴리오 원장을 업데이트합니다.
      *
+     * <p>주문이 업비트에 접수된 뒤로는 어떤 실패가 나더라도 예외를 던지지 않고
+     * {@code isPending=true}로 반환합니다. 예외를 던지면 이미 체결됐거나 체결될 주문의
+     * uuid를 잃어버려 사용자의 코인이 유실되기 때문이며, 이후 추적은 매수 폴링 스케줄러가 맡습니다.
+     *
      * @param userId 매수를 수행할 사용자 ID
      * @param market 매수할 마켓 (예: KRW-BTC)
      * @param krwAmount 매수할 원화 금액
+     * @param identifier 주문 멱등 식별자 (결제 이벤트당 고유)
      * @return 체결 결과 (평단가, 수량, 주문UUID, 지연여부)
      * @throws LinkedAccountNotFoundException 연동된 계좌가 없는 경우
      */
-    public TradeResult executeTrade(Long userId, String market, int krwAmount) {
-        log.info("[UpbitTradeService] 시장가 매수 주문 시작 - userId: {}, market: {}, krwAmount: {}", userId, market, krwAmount);
-        // 1. 사전 데이터 로드 (I/O 발생 전, 별도 트랜잭션 불필요)
+    public TradeResult executeTrade(Long userId, String market, int krwAmount, String identifier) {
+        log.info("[UpbitTradeService] 시장가 매수 주문 시작 - userId: {}, market: {}, krwAmount: {}, identifier: {}",
+                userId, market, krwAmount, identifier);
+
         LinkedAccount linkedAccount = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         String accessKey = linkedAccount.getUpbitAccessKey();
         String secretKey = linkedAccount.getUpbitSecretKey();
 
-        // 2. 수수료(0.05%) 역산: 수수료를 포함한 총 출금액이 사용자의 잔돈(krwAmount)을 초과하지 않도록 보정 (BigDecimal 안전 연산)
-        BigDecimal amountBd = BigDecimal.valueOf(krwAmount);
-        BigDecimal feeRate = new BigDecimal("1.0005");
-        int orderAmount = amountBd.divide(feeRate, 0, RoundingMode.FLOOR).intValue();
+        // 수수료(0.05%) 역산: 수수료를 포함한 총 출금액이 사용자의 잔돈(krwAmount)을 초과하지 않도록 보정
+        int orderAmount = BigDecimal.valueOf(krwAmount)
+                .divide(FEE_MULTIPLIER, 0, RoundingMode.FLOOR)
+                .intValue();
 
-        // 3. 시장가 매수 주문 (Blocking I/O)
-        UpbitOrderResponse orderResponse = upbitOrderClient.placeMarketBuyOrder(market, orderAmount, accessKey, secretKey);
-        String uuid = orderResponse.uuid();
+        String uuid = placeOrderIdempotently(market, orderAmount, accessKey, secretKey, identifier);
 
-        // 4. 체결 대기 (500ms)
+        // 이 지점부터 주문은 업비트에 실재한다. uuid를 잃으면 코인이 유실되므로 예외를 밖으로 내보내지 않는다.
         try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            return awaitExecution(userId, market, uuid, accessKey, secretKey);
+        } catch (Exception e) {
+            log.error("[UpbitTradeService] 주문 접수 후 체결 확인 실패, 비동기 추적으로 전환 - uuid: {}", uuid, e);
+            return new TradeResult(null, null, uuid, true);
         }
+    }
 
-        // 5. 체결 확인 및 가중 평균 계산 (최대 10회 폴링, 약 5초)
+    /**
+     * identifier를 멱등키로 사용해 시장가 매수 주문을 접수하고 주문 uuid를 반환합니다.
+     * 주문 요청이 실패하면 응답만 유실됐거나 동일 identifier 재요청이 거부된 경우일 수 있으므로,
+     * identifier로 재조회해 실제 접수 여부를 확인한 뒤에만 실패로 확정합니다.
+     */
+    private String placeOrderIdempotently(String market, int orderAmount, String accessKey, String secretKey, String identifier) {
+        try {
+            return upbitOrderClient.placeMarketBuyOrder(market, orderAmount, accessKey, secretKey, identifier).uuid();
+        } catch (UpbitInvalidKeyException e) {
+            // 키 문제면 identifier 재조회도 같은 이유로 실패하므로 즉시 전파한다
+            throw e;
+        } catch (Exception e) {
+            UpbitOrderResponse existing = upbitOrderClient.findOrderByIdentifier(identifier, accessKey, secretKey);
+            if (existing == null || existing.uuid() == null) {
+                throw e;
+            }
+            log.warn("[UpbitTradeService] 주문 요청은 실패했으나 identifier로 접수된 주문을 확인, 해당 주문을 이어서 추적 - identifier: {}, uuid: {}",
+                    identifier, existing.uuid(), e);
+            return existing.uuid();
+        }
+    }
+
+    /**
+     * 접수된 주문의 체결을 최대 {@value #EXECUTION_POLL_ATTEMPTS}회 폴링하며 기다립니다.
+     * 시간 내에 체결이 확인되면 원장까지 반영하고, 확인되지 않으면 비동기 추적 대상으로 넘깁니다.
+     */
+    private TradeResult awaitExecution(Long userId, String market, String uuid, String accessKey, String secretKey) {
         BigDecimal totalVolume = BigDecimal.ZERO;
         BigDecimal totalFunds = BigDecimal.ZERO;
-        boolean isExecuted = false;
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < EXECUTION_POLL_ATTEMPTS; i++) {
+            sleep();
+
             UpbitOrderResponse orderDetails = upbitOrderClient.getOrderDetails(uuid, accessKey, secretKey);
             List<UpbitOrderResponse.UpbitTrade> trades = orderDetails.trades();
             String state = orderDetails.state();
 
+            // 시장가 매수는 부분 체결 후 잔량이 cancel 되는 것이 정상 흐름이므로 done/cancel 모두 체결로 본다
             if (trades != null && !trades.isEmpty() && ("done".equals(state) || "cancel".equals(state))) {
-                isExecuted = true;
                 for (UpbitOrderResponse.UpbitTrade trade : trades) {
-                    BigDecimal volume = new BigDecimal(trade.volume());
-                    BigDecimal funds = new BigDecimal(trade.funds());
-                    
-                    totalVolume = totalVolume.add(volume);
-                    totalFunds = totalFunds.add(funds);
+                    totalVolume = totalVolume.add(new BigDecimal(trade.volume()));
+                    totalFunds = totalFunds.add(new BigDecimal(trade.funds()));
                 }
-                break; // 체결 완료되면 폴링 중단
-            }
-
-            try {
-                Thread.sleep(500); // 실패 또는 부분체결 시 500ms 대기 후 재시도
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                break;
             }
         }
 
-        if (!isExecuted || totalVolume.compareTo(BigDecimal.ZERO) == 0) {
+        if (totalVolume.compareTo(BigDecimal.ZERO) == 0) {
             log.info("[UpbitTradeService] 5초 내 체결 실패, 비동기 추적으로 전환 - uuid: {}", uuid);
             return new TradeResult(null, null, uuid, true);
         }
 
-        // 6. 가중 평균 평단가 산출 = 총 체결 금액 / 총 체결 수량
         BigDecimal averagePrice = totalFunds.divide(totalVolume, 4, RoundingMode.HALF_UP);
         TradeResult result = new TradeResult(averagePrice, totalVolume, uuid, false);
 
-        // 7. 트랜잭션 분리된 컴포넌트를 통해 원장 업데이트 호출
         portfolioUpdater.updatePortfolio(userId, market, result);
 
         return result;
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(EXECUTION_POLL_INTERVAL_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

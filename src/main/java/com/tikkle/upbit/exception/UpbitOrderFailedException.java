@@ -7,8 +7,4 @@ public class UpbitOrderFailedException extends CustomException {
     public UpbitOrderFailedException() {
         super(ErrorCode.UPBIT_ORDER_FAILED);
     }
-
-    public UpbitOrderFailedException(String detailMessage) {
-        super(ErrorCode.UPBIT_ORDER_FAILED, detailMessage);
-    }
 }
