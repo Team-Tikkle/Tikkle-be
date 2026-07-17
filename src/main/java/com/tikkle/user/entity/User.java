@@ -35,10 +35,6 @@ public class User {
         this.password = password;
     }
 
-    public void update(String name) {
-        if (name != null) this.name = name;
-    }
-
     public void updatePassword(String password) {
         if (password != null) this.password = password;
     }

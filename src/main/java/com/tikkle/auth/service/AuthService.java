@@ -233,11 +233,11 @@ public class AuthService {
         final String newAccessToken = jwtProvider.createAccessToken(userId);
         final String newRefreshToken = jwtProvider.createRefreshToken(userId);
 
-        refreshTokenRepository.save(new RefreshToken(
-                userId,
-                newRefreshToken,
-                jwtProvider.getRefreshTokenExpiration() / 1000
-        ));
+        refreshTokenRepository.save(RefreshToken.builder()
+                .userId(userId)
+                .token(newRefreshToken)
+                .expiration(jwtProvider.getRefreshTokenExpiration() / 1000)
+                .build());
 
         return new TokenResponse(newAccessToken, newRefreshToken, isNewUser);
     }

@@ -59,11 +59,11 @@ public class TestTokenService {
     private TokenResponse issueToken(Long userId, boolean isNewUser) {
         final String accessToken = jwtProvider.createAccessToken(userId);
         final String refreshToken = jwtProvider.createRefreshToken(userId);
-        refreshTokenRepository.save(new RefreshToken(
-                userId,
-                refreshToken,
-                jwtProvider.getRefreshTokenExpiration() / 1000
-        ));
+        refreshTokenRepository.save(RefreshToken.builder()
+                .userId(userId)
+                .token(refreshToken)
+                .expiration(jwtProvider.getRefreshTokenExpiration() / 1000)
+                .build());
         return new TokenResponse(accessToken, refreshToken, isNewUser);
     }
 }
