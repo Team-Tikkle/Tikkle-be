@@ -75,7 +75,7 @@ CREATE TABLE `INVESTMENT_PROFILE` (
     `diversification_type`  VARCHAR(30)     NULL,       -- DiversificationType (포트폴리오 분산도)
     `meme_acceptance`       VARCHAR(30)     NULL        -- MemeAcceptance (밈 코인 수용도)
 );
--- 가입 시 빈 행이 먼저 생성되고 온보딩(설정) 시점에 채워지므로 5축 컬럼은 nullable.
+-- 가입 시 빈 행이 먼저 생성되고 온보딩(설정) 시점에 채워지므로 4축(risk_tolerance, trend_sensitivity, diversification_type, meme_acceptance) 컬럼은 nullable. 5번째 축(crypto_themes)은 별도 INVESTMENT_PROFILE_THEMES 테이블에 저장된다.
 
 CREATE TABLE `INVESTMENT_PROFILE_THEMES` (
     `investment_profile_id` BIGINT          NOT NULL,
