@@ -12,7 +12,7 @@ Tikkle은 카드 결제에서 발생하는 잔돈을 사용자의 투자 성향�
 | --- | --- |
 | Language | Java 21 |
 | Framework | Spring Boot 4.0.6 |
-| Persistence | Spring Data JPA, MySQL 8 (복잡 쿼리는 QueryDSL) |
+| Persistence | Spring Data JPA, MySQL 8 (복잡 쿼리는 `@Query` JPQL) |
 | Cache / Token Store | Redis 7 |
 | Security | Spring Security, JWT, BCrypt, HMAC SHA-256 요청 서명, AES-256 필드 암호화 |
 | AI | Spring AI — Google Gemini `gemini-2.5-flash` (가맹점 분류), DeepSeek `deepseek-v4-pro` (AI 유니버스 생성, OpenAI 호환 스타터 사용) |
@@ -107,8 +107,9 @@ src/main/java/com/tikkle
 
 ## 참고 문서
 
-- DB 스키마: `docs/Tikkle_ERD.md`
+- 서비스 기획서: `docs/Tikkle_plan.md`
 - 기능 명세: `docs/Tikkle_requirements.md`
-- 개발 계획: `docs/Tikkle_plan.md`
-- 인증 API 명세 (클라이언트 계약): `docs/Tikkle_auth_api.md`
-- 업비트/결제 API 명세 (클라이언트 계약): `docs/Tikkle_upbit_api.md`
+- 결제 → 투자 파이프라인 (상태 모델·SSE·실패 처리): `docs/Tikkle_payment_investment_flow.md`
+- DB 스키마: `docs/Tikkle_ERD.md`
+- 화면 설명서: `docs/화면설명서/화면설명서.md`
+- API 명세: Swagger UI (위 링크 참조)
