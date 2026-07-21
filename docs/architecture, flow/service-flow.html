@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1600px; height:900px; overflow:hidden; }
+  body {
+    font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif;
+    background:#E9EDF3; position:relative; color:#191F28;
+  }
+  body::before { content:''; position:absolute; inset:0;
+    background:radial-gradient(900px 500px at 80% 10%, rgba(61,84,197,.10), transparent 60%),
+               radial-gradient(700px 450px at 10% 90%, rgba(49,130,246,.08), transparent 60%);
+  }
+  .brand { position:absolute; top:52px; left:64px; display:flex; align-items:center; gap:14px; }
+  .brand .logo { width:48px; height:48px; position:relative; overflow:hidden; border-radius:13px;
+    box-shadow:0 6px 14px rgba(61,84,197,.35); }
+  .brand .logo img { position:absolute; width:52.09px; height:49.73px; left:-1.85px; top:-.48px; }
+  .brand .name { font-size:24px; font-weight:800; color:#3D54C5; letter-spacing:-.02em; }
+  h1 { position:absolute; top:108px; left:64px; font-size:44px; font-weight:800; letter-spacing:-.03em; }
+  .subtitle { position:absolute; top:172px; left:64px; font-size:20px; color:#6B7684; font-weight:500; }
+  .subtitle b { color:#3182F6; font-weight:700; }
+
+  .row { position:absolute; top:280px; left:64px; width:1472px;
+    display:flex; align-items:stretch; justify-content:space-between; }
+  .step { position:relative; width:216px; background:#fff; border-radius:20px;
+    box-shadow:0 4px 18px rgba(25,31,40,.07); padding:56px 18px 26px; text-align:center; }
+  .num { position:absolute; top:16px; left:16px; width:30px; height:30px; border-radius:9px;
+    background:#3D54C5; color:#fff; font-size:15px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 10px rgba(61,84,197,.3); }
+  .icirc { width:72px; height:72px; border-radius:50%; background:#EAF2FE;
+    display:flex; align-items:center; justify-content:center; margin:0 auto 22px; }
+  .icirc svg { width:34px; height:34px; stroke:#3182F6; fill:none;
+    stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .step h3 { font-size:19px; font-weight:800; letter-spacing:-.02em; margin-bottom:12px; }
+  .step p { font-size:14px; color:#6B7684; line-height:1.55; font-weight:500; word-break:keep-all; }
+  .arr { align-self:center; color:#B0B8C1; font-size:22px; font-weight:700; padding:0 2px; }
+
+  .footnote { position:absolute; top:740px; left:64px; width:1472px; display:flex; gap:14px; justify-content:center; }
+  .tag { background:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.95);
+    border-radius:999px; padding:10px 22px; font-size:15px; font-weight:600; color:#4E5968;
+    box-shadow:0 2px 10px rgba(25,31,40,.05); }
+  .tag b { color:#3D54C5; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"><img src="logo.png" alt="Tikkle"></div>
+    <div class="name">Tikkle</div>
+  </div>
+  <h1>서비스 핵심 플로우</h1>
+  <div class="subtitle">결제 감지부터 매수 체결까지 6단계  </div>
+
+  <div class="row">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="4" rx="1.5"/><path d="M17 5.5h2a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 21.5H5A1.5 1.5 0 0 1 3.5 20V7A1.5 1.5 0 0 1 5 5.5h2"/><path d="M8 12h8M8 16h5"/></svg></div>
+      <h3>투자 성향 온보딩</h3>
+      <p>설문으로 5축 투자 성향과 카테고리별 잔돈 룰, 업비트 계정을 설정합니다.</p>
+    </div>
+    <div class="arr">›</div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/></svg></div>
+      <h3>일상 카드 결제</h3>
+      <p>평소처럼 결제하면 앱이 결제정보를 서버로 전송합니다.</p>
+    </div>
+    <div class="arr">›</div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3 8-7.5 9.5-4.5-1.5-7.5-5-7.5-9.5V6L12 3z"/><path d="M9 12l2 2 4-4.5"/></svg></div>
+      <h3>검증 · 잔돈 정산</h3>
+      <p>결제정보 검증 후 AI가 가맹점을 분류하고 룰에 따라 잔돈을 계산합니다.</p>
+    </div>
+    <div class="arr">›</div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><path d="M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2L5 10.5l5.2-1.8L12 3.5z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z"/></svg></div>
+      <h3>AI 코인 추천</h3>
+      <p> 실시간으로 사용자 성향에 적합한 코인을 선정합니다.</p>
+    </div>
+    <div class="arr">›</div>
+    <div class="step">
+      <div class="num">5</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><path d="M18 8.5A6 6 0 0 0 6 8.5c0 5.5-2.5 7-2.5 7h17S18 14 18 8.5"/><path d="M10 19.5a2.2 2.2 0 0 0 4 0"/></svg></div>
+      <h3>사용자 매수 승인</h3>
+      <p>사용자가 추천된 코인에 대한 최종 매수여부를 결정합니다.</p>
+    </div>
+    <div class="arr">›</div>
+    <div class="step">
+      <div class="num">6</div>
+      <div class="icirc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 16V8.5M8.5 11.5L12 8l3.5 3.5"/></svg></div>
+      <h3>Upbit 입금 · 매수</h3>
+      <p>2차 인증 입금 → 시장가 매수 체결 후 최종 결과를 알려줍니다.</p>
+    </div>
+  </div>
+</body>
+</html>

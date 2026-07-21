@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1600px; height:900px; overflow:hidden; }
+  body {
+    font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif;
+    background:#E9EDF3; position:relative; color:#191F28;
+  }
+  body::before { content:''; position:absolute; inset:0;
+    background:radial-gradient(900px 500px at 78% 12%, rgba(61,84,197,.10), transparent 60%),
+               radial-gradient(700px 450px at 12% 88%, rgba(49,130,246,.08), transparent 60%);
+  }
+  .brand { position:absolute; top:52px; left:64px; display:flex; align-items:center; gap:14px; }
+  .brand .logo { width:48px; height:48px; position:relative; overflow:hidden; border-radius:13px;
+    box-shadow:0 6px 14px rgba(61,84,197,.35); }
+  .brand .logo img { position:absolute; width:52.09px; height:49.73px; left:-1.85px; top:-.48px; }
+  .brand .name { font-size:24px; font-weight:800; color:#3D54C5; letter-spacing:-.02em; }
+  h1 { position:absolute; top:108px; left:64px; font-size:44px; font-weight:800; letter-spacing:-.03em; }
+
+  .card { position:absolute; background:#fff; border-radius:18px;
+    box-shadow:0 4px 18px rgba(25,31,40,.07); display:flex; align-items:center;
+    justify-content:center; gap:12px; font-weight:700; font-size:19px; }
+  .card img { width:30px; height:30px; object-fit:contain; }
+  .chip { width:30px; height:30px; border-radius:8px; color:#fff; display:flex;
+    align-items:center; justify-content:center; font-size:12px; font-weight:800; }
+
+  .group { position:absolute; border-radius:22px; }
+  .gcp { left:560px; top:250px; width:700px; height:420px; background:rgba(255,255,255,.55);
+    border:1.5px solid rgba(255,255,255,.9); box-shadow:0 6px 24px rgba(25,31,40,.05); }
+  .docker { left:610px; top:330px; width:400px; height:300px; background:rgba(240,246,255,.75);
+    border:1.5px solid #CFE0F5; border-radius:18px; position:absolute; }
+  .glabel { position:absolute; display:flex; align-items:center; gap:9px;
+    font-size:18px; font-weight:700; color:#4E5968; }
+  .glabel img { width:22px; height:22px; }
+
+  .sub { font-size:13px; font-weight:500; color:#8B95A1; margin-top:3px; line-height:1.35; }
+  .col { display:flex; flex-direction:column; align-items:flex-start; }
+  .alabel { position:absolute; font-size:15px; font-weight:600; color:#6B7684; }
+  svg.arrows { position:absolute; inset:0; width:1600px; height:900px; pointer-events:none; }
+  .ext-title { font-size:14px; font-weight:700; color:#8B95A1; letter-spacing:.02em; margin-bottom:8px; }
+  .ext { position:absolute; background:#fff; border-radius:18px; box-shadow:0 4px 18px rgba(25,31,40,.07);
+    padding:16px 20px 14px; }
+  .ext .row { display:flex; gap:18px; }
+  .ext .item { display:flex; flex-direction:column; align-items:center; gap:6px; width:76px; }
+  .ext .item img { width:28px; height:28px; object-fit:contain; }
+  .ext .item span { font-size:12px; font-weight:600; color:#4E5968; text-align:center; line-height:1.25; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"><img src="logo.png" alt="Tikkle"></div>
+    <div class="name">Tikkle</div>
+  </div>
+  <h1>시스템 아키텍처</h1>
+
+  <!-- CI/CD -->
+  <div class="card" style="left:820px; top:60px; width:190px; height:74px;">
+    <img src="https://cdn.simpleicons.org/github/181717"><span>GitHub</span>
+  </div>
+  <div class="card" style="left:1140px; top:60px; width:200px; height:74px;">
+    <img src="https://cdn.simpleicons.org/githubactions/2088FF"><span>Actions</span>
+  </div>
+  <div class="card" style="left:1330px; top:250px; width:150px; height:96px; flex-direction:column; gap:6px;">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3182F6" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 2v9m0 0l8-4.5M12 11L4 6.5"/>
+    </svg>
+    <span style="font-size:15px;">Registry</span>
+  </div>
+
+  <!-- Client -->
+  <div class="card" style="left:64px; top:400px; width:270px; height:110px; gap:20px;">
+    <img src="https://cdn.simpleicons.org/vuedotjs/4FC08D" style="width:38px;height:38px;">
+    <img src="https://cdn.simpleicons.org/capacitor/119EFF" style="width:38px;height:38px;">
+    <div class="col">
+      <span style="font-size:16px;">Android App</span>
+      <span class="sub">케이뱅크 결제 푸시 파싱</span>
+    </div>
+  </div>
+
+  <!-- Google Cloud group -->
+  <div class="group gcp"></div>
+  <div class="glabel" style="left:600px; top:274px;">
+    <img src="https://cdn.simpleicons.org/googlecloud/4285F4"><span>Google Cloud</span>
+  </div>
+  <div class="docker"></div>
+  <div class="glabel" style="left:648px; top:352px;">
+    <img src="https://cdn.simpleicons.org/docker/2496ED"><span>Docker</span>
+  </div>
+
+  <div class="card" style="left:700px; top:400px; width:220px; height:74px;">
+    <img src="https://cdn.simpleicons.org/redis/FF4438"><span>Redis</span>
+  </div>
+  <div class="card" style="left:680px; top:530px; width:260px; height:84px;">
+    <img src="https://cdn.simpleicons.org/springboot/6DB33F">
+    <div class="col"><span>Spring Boot</span><span class="sub">Java 21 · 도메인 8개</span></div>
+  </div>
+  <div class="card" style="left:1050px; top:530px; width:180px; height:84px;">
+    <img src="https://cdn.simpleicons.org/mysql/4479A1"><span>MySQL</span>
+  </div>
+
+  <!-- LLM group -->
+  <div class="ext" style="left:560px; top:756px; width:250px;">
+    <div class="ext-title">LLM API</div>
+    <div class="row">
+      <div class="item"><img src="https://cdn.simpleicons.org/googlegemini/8E75B2"><span>Gemini<br>가맹점 분류</span></div>
+      <div class="item">
+        <div class="chip" style="background:#4D6BFE;">DS</div>
+        <span>DeepSeek<br>코인 추천</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crypto group -->
+  <div class="ext" style="left:900px; top:756px; width:385px;">
+    <div class="ext-title">Crypto API</div>
+    <div class="row">
+      <div class="item"><div class="chip" style="background:#093687;">UP</div><span>Upbit<br>입금·주문·시세</span></div>
+      <div class="item">
+        <img src="https://cdn.simpleicons.org/coingecko/8DC63F" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="chip" style="background:#8DC63F; display:none;">CG</div>
+        <span>CoinGecko<br></span>
+      </div>
+      <div class="item"><div class="chip" style="background:#df370d;">AM</div><span>Alternative.me</span></div>
+      <div class="item"><div class="chip" style="background:#9723f5;">FF</div><span>ForexFactory</span></div>
+    </div>
+  </div>
+
+  <!-- News / SMS group -->
+  <div class="ext" style="left:1320px; top:756px; width:240px;">
+    <div class="ext-title">News · SMS</div>
+    <div class="row">
+      <div class="item"><img src="https://cdn.simpleicons.org/googlenews/174EA6"><span>News RSS<br>마켓 토픽</span></div>
+      <div class="item"><div class="chip" style="background:#2C7FFF;">SMS</div><span>CoolSMS<br>본인 인증</span></div>
+    </div>
+  </div>
+
+  <!-- Arrows -->
+  <svg class="arrows">
+    <defs>
+      <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+        <path d="M1,1 L8,4.5 L1,8" fill="none" stroke="#8B95A1" stroke-width="1.6" stroke-linecap="round"/>
+      </marker>
+      <marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto-start-reverse">
+        <path d="M1,1 L8,4.5 L1,8" fill="none" stroke="#8B95A1" stroke-width="1.6" stroke-linecap="round"/>
+      </marker>
+    </defs>
+    <g stroke="#8B95A1" stroke-width="2" fill="none" marker-end="url(#a)">
+      <line x1="1012" y1="97" x2="1132" y2="97"/>
+      <line x1="1240" y1="136" x2="1360" y2="243"/>
+      <line x1="1328" y1="298" x2="1018" y2="380"/>
+      <line x1="336" y1="455" x2="672" y2="560"/>
+      <line x1="760" y1="616" x2="700" y2="748"/>
+      <line x1="880" y1="616" x2="1040" y2="748"/>
+      <line x1="940" y1="600" x2="1400" y2="748"/>
+    </g>
+    <g stroke="#8B95A1" stroke-width="2" fill="none" marker-end="url(#a)" marker-start="url(#b)">
+      <line x1="810" y1="480" x2="810" y2="520"/>
+      <line x1="946" y1="572" x2="1040" y2="572"/>
+    </g>
+  </svg>
+
+  <!-- Arrow labels -->
+  <div class="alabel" style="left:1040px; top:66px;">Git Push</div>
+  <div class="alabel" style="left:1310px; top:170px;">Push Image</div>
+  <div class="alabel" style="left:1120px; top:310px;">Pull Image</div>
+  <div class="alabel" style="left:430px; top:440px; text-align:center;">REST API · SSE<br><span style="font-size:13px; color:#8B95A1;"></span></div>
+  <div class="alabel" style="left:824px; top:488px;">Cache R/W</div>
+  <div class="alabel" style="left:952px; top:540px;">DB R/W</div>
+  <div class="alabel" style="left:590px; top:672px;">LLM API Call</div>
+  <div class="alabel" style="left:986px; top:668px;">Crypto API Call</div>
+  <div class="alabel" style="left:1300px; top:660px;">RSS · SMS</div>
+</body>
+</html>

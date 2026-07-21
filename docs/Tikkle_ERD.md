@@ -25,7 +25,22 @@
 | `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
 | `RECOMMENDED_VIDEOS` | 추천 영상 (시딩, 외부 링크) |
 
-> **Redis 저장소 (RDB 외):** 리프레시 토큰(`refresh_token` RedisHash), 결제 멱등성 키(`payment:tx:{transactionId}`, SETNX 24h), 유저 설정 캐시(`user:settings:{userId}` Hash).
+> **Redis 저장소 (RDB 외)**
+>
+> | 키 | 용도 | TTL |
+> |---|---|---|
+> | `refresh_token` (RedisHash) | 리프레시 토큰 | 토큰 만료시간 |
+> | `payment:tx:{transactionId}` | 결제 멱등성 키 (SETNX) | 24시간 |
+> | `user:settings:{userId}` (Hash) | 유저 설정 캐시 (투자 on/off, 타겟 카드, 카테고리별 규칙) | 무기한 (설정 변경 시 갱신, 탈퇴 시 삭제) |
+> | `insight:market-topics` | 마켓 토픽 목록 캐시 | 12시간 (수집 배치 완료 시 무효화) |
+> | `ai:candidates:{profileHashKey}` | AI 추천 유니버스 후보군 (예: `BUY_MORE:FULL_TREND`) | 12시간 |
+> | `SMS_AUTH:{purpose}:{phone}` | SMS 인증번호 | 3분 |
+> | `SMS_ATTEMPT:{purpose}:{phone}` | 인증번호 검증 실패 횟수 (5회 초과 시 무효화) | 인증번호와 동일 주기 |
+> | `SMS_COOLDOWN:{purpose}:{phone}` | 재발송 쿨다운 | 60초 |
+> | `SMS_DAILY:{purpose}:{phone}` | 일일 발송 횟수 (5회 한도) | 24시간 |
+> | `SIGNUP_TOKEN:{phone}` / `PASSWORD_RESET_TOKEN:{phone}` | SMS 인증 완료 토큰 | 30분 |
+>
+> `{purpose}`는 `SmsPurpose` enum (`SIGNUP`, `PASSWORD_RESET`). 스케줄러용 분산 락은 존재하지 않으므로 **단일 인스턴스 운영을 전제**한다.
 
 ---
 
@@ -75,7 +90,7 @@ CREATE TABLE `INVESTMENT_PROFILE` (
     `diversification_type`  VARCHAR(30)     NULL,       -- DiversificationType (포트폴리오 분산도)
     `meme_acceptance`       VARCHAR(30)     NULL        -- MemeAcceptance (밈 코인 수용도)
 );
--- 가입 시 빈 행이 먼저 생성되고 온보딩(설정) 시점에 채워지므로 5축 컬럼은 nullable.
+-- 가입 시 빈 행이 먼저 생성되고 온보딩(설정) 시점에 채워지므로 4축(risk_tolerance, trend_sensitivity, diversification_type, meme_acceptance) 컬럼은 nullable. 5번째 축(crypto_themes)은 별도 INVESTMENT_PROFILE_THEMES 테이블에 저장된다.
 
 CREATE TABLE `INVESTMENT_PROFILE_THEMES` (
     `investment_profile_id` BIGINT          NOT NULL,
@@ -250,7 +265,8 @@ COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
 | `PAYMENT_EVENTS` | `status` | `NOT_INVESTED`, `PENDING_PURCHASE`, `PENDING_DEPOSIT`, `PENDING_TRADE`, `INVESTED`, `FAILED` |
 | `PAYMENT_EVENTS` / `CATEGORY_SPARE_CHANGE_RULES` | `category` | `CAFE`, `MART`, `FOOD`, `SHOPPING`, `TRAFFIC`, `CULTURE`, `ETC` |
 | `CATEGORY_SPARE_CHANGE_RULES` | `rule_type` | `ROUND_UP_10000`, `ROUND_UP_20000`, `ROUND_UP_30000`, `ROUND_UP_40000`, `ROUND_UP_50000`, `PERCENT_10`, `PERCENT_15`, `PERCENT_20`, `PERCENT_25`, `PERCENT_30` |
-| `LINKED_ACCOUNTS` | `two_factor_provider` | `TwoFactorProvider` — 업비트 원화 입금 시 사용할 2차 인증 수단 |
+| `LINKED_ACCOUNTS` | `two_factor_provider` | `KAKAO`, `NAVER`, `HANA` — 업비트 원화 입금 2차 인증 수단. 각각 업비트 API에 `kakao` / `naver` / `hana` 문자열로 전달된다 |
+| `LINKED_ACCOUNTS` | `target_card_company` | 컬럼 타입은 `VARCHAR`(String)이며 enum 매핑이 아니다. 다만 `TargetCardCompany` enum이 상수로 존재하고 값은 **`KBANK`(케이뱅크) 하나뿐**이다 (현재 케이뱅크 카드 단일 지원) |
 | `INVESTMENT_PROFILE` | `risk_tolerance` | `SELL_IMMEDIATELY`(2), `HOLD`(5), `BUY_MORE`(9) — *괄호 안은 성향 점수* |
 | `INVESTMENT_PROFILE` | `trend_sensitivity` | `FUNDAMENTAL_ONLY`(2), `PARTIAL_TREND`(5), `FULL_TREND`(9) |
 | `INVESTMENT_PROFILE` | `diversification_type` | `CONCENTRATED`, `BALANCED`, `DIVERSIFIED` |
@@ -267,7 +283,15 @@ COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
                             ├── [24시간 미응답] ─────> NOT_INVESTED (PendingOrderExpirationScheduler)
                             └── [유저 승인]
                                   └── 업비트 원화 입금 요청(2차 인증) ──> PENDING_DEPOSIT
+                                        ├── [2차 인증 210초 초과] ──> PENDING_PURCHASE (복구, 재승인 가능)
+                                        ├── [입금 거절/취소] ────────> FAILED
                                         └── [입금 완료 폴링] ──> 매수 주문 ──> PENDING_TRADE
-                                              └── [체결 폴링] ──> INVESTED
+                                              ├── [5초 내 체결] ─────> INVESTED
+                                              ├── [체결 폴링] ───────> INVESTED
+                                              └── [10분 미체결] ─────> 주문 취소 ──> FAILED
 ```
-> 실패(거래소 에러, 키 만료, 체결량 0 등)는 어느 단계에서든 `FAILED` + `reason` 기록.
+> **복구 전이 주의:** 2차 인증 타임아웃(210초)은 실패가 아니라 `PENDING_PURCHASE`로 **되돌린다**
+> (`PaymentEvent.revertToPendingPurchase()` — `deposit_uuid`와 `deposit_requested_at`을 함께 `NULL`로 초기화).
+> 사용자가 다시 승인할 수 있으며, 이 건은 24시간 만료 규칙을 그대로 따른다.
+>
+> 실패(입금 거절, 매수 주문 실패, 키 만료, 체결량 0, 10분 타임아웃 등)는 어느 단계에서든 `FAILED` + `reason` 기록.
