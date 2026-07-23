@@ -1,5 +1,7 @@
 package com.tikkle.payment.scheduler;
 
+import com.tikkle.notification.entity.enums.NotificationType;
+import com.tikkle.notification.service.PushNotificationService;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.service.OrderApprovalService;
@@ -43,6 +45,7 @@ public class UpbitDepositPollingProcessor {
     private final UpbitTradeService upbitTradeService;
     private final OrderApprovalService orderApprovalService;
     private final SseConnectionManager sseConnectionManager;
+    private final PushNotificationService pushNotificationService;
 
     public void processEvent(Long eventId) {
         try {
@@ -170,6 +173,8 @@ public class UpbitDepositPollingProcessor {
 
     @Transactional
     public void handleDepositFailed(Long eventId) {
+        // SSE가 살아있으면(사용자가 화면 대기 중) FCM은 억제한다. send/complete 이전에 캡처.
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
         orderApprovalService.markAsFailed(eventId, "업비트 입금 거절 또는 취소(deposit state=REJECTED|CANCELED)");
         Map<String, Object> failData = Map.of(
                 "status", "DEPOSIT_FAILED",
@@ -177,10 +182,16 @@ public class UpbitDepositPollingProcessor {
         );
         sseConnectionManager.send(eventId, "DEPOSIT_FAILED", failData);
         sseConnectionManager.complete(eventId);
+
+        if (!wasConnected) {
+            notifyByFcm(eventId, NotificationType.DEPOSIT_FAILED,
+                    "업비트 원화 입금이 거절되어 투자를 진행하지 못했어요. 출금된 금액은 없습니다.");
+        }
     }
 
     @Transactional
     public void handleTradeFailed(Long eventId) {
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
         orderApprovalService.markAsFailed(eventId, "업비트 매수 주문 접수 실패. 입금된 원화는 업비트 계좌에 잔류");
         Map<String, Object> errorData = Map.of(
                 "status", "TRADE_FAILED",
@@ -188,6 +199,11 @@ public class UpbitDepositPollingProcessor {
         );
         sseConnectionManager.send(eventId, "TRADE_FAILED", errorData);
         sseConnectionManager.complete(eventId);
+
+        if (!wasConnected) {
+            notifyByFcm(eventId, NotificationType.TRADE_FAILED,
+                    "매수 주문이 접수되지 못했어요. 입금된 원화는 업비트 계좌에 있습니다.");
+        }
     }
 
     @Transactional
@@ -203,6 +219,7 @@ public class UpbitDepositPollingProcessor {
 
     @Transactional
     public void handleInvalidKeyError(Long eventId) {
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
         orderApprovalService.markAsFailed(eventId, "업비트 API 키 만료 또는 권한 부족(401/403)");
         Map<String, Object> errorData = Map.of(
                 "status", "UPBIT_INVALID_KEY",
@@ -210,6 +227,22 @@ public class UpbitDepositPollingProcessor {
         );
         sseConnectionManager.send(eventId, "UPBIT_INVALID_KEY", errorData);
         sseConnectionManager.complete(eventId);
+
+        if (!wasConnected) {
+            notifyByFcm(eventId, NotificationType.UPBIT_INVALID_KEY,
+                    "투자를 계속하려면 업비트 API 키를 다시 연동해 주세요.");
+        }
+    }
+
+    /**
+     * 결제 이벤트의 소유 유저에게 FCM 결과 알림을 발송합니다.
+     * SSE가 끊긴 뒤(앱 이탈) 도착하는 결과를 실제로 전달하는 경로입니다.
+     */
+    private void notifyByFcm(Long eventId, NotificationType type, String body) {
+        PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
+        if (event != null) {
+            pushNotificationService.send(event.getUserId(), type, body, eventId);
+        }
     }
 
     public record EventInfo(

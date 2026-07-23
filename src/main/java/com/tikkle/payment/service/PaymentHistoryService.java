@@ -65,11 +65,15 @@ public class PaymentHistoryService {
                 .map(p -> new PaymentDashboardResponse.CategorySpending(p.getCategory().name(), p.getAmount()))
                 .collect(Collectors.toList());
 
+        // 3. 리스너 유실 가시화용 — 가장 최근 결제 감지 시각(월 무관)
+        LocalDateTime lastPaymentDetectedAt = paymentEventRepository.findLatestCreatedAtByUserId(userId);
+
         return new PaymentDashboardResponse(
                 totalPayment,
                 totalInvestedChange,
                 totalUninvested,
                 pendingCount,
+                lastPaymentDetectedAt,
                 categorySpending
         );
     }

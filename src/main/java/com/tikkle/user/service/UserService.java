@@ -3,6 +3,7 @@ package com.tikkle.user.service;
 import com.tikkle.auth.repository.RefreshTokenRepository;
 import com.tikkle.investment.repository.InvestmentProfileRepository;
 import com.tikkle.investment.repository.PortfolioRepository;
+import com.tikkle.notification.repository.DeviceTokenRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.settings.service.SettingsCacheManager;
@@ -32,6 +33,7 @@ public class UserService {
     private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SettingsCacheManager settingsCacheManager;
+    private final DeviceTokenRepository deviceTokenRepository;
 
     public UserResponse getMe(Long userId) {
         final User user = findUserById(userId);
@@ -73,6 +75,7 @@ public class UserService {
         portfolioRepository.deleteByUserId(userId);
         categorySpareChangeRuleRepository.deleteByUserId(userId);
         linkedAccountRepository.deleteByUserId(userId);
+        deviceTokenRepository.deleteByUserId(userId);
 
         // 3. 투자 성향은 @ElementCollection(INVESTMENT_PROFILE_THEMES)을 함께 정리해야 하므로
         //    벌크 삭제가 아닌 엔티티 삭제로 처리하여 Hibernate가 테마 행까지 지우게 한다

@@ -75,7 +75,7 @@ sequenceDiagram
 ## 3. 결제 수집 API (안드로이드 → 서버)
 
 - **엔드포인트**: `POST /api/payments` — JWT가 아닌 **HMAC 서명 인증** (Security에서는 permitAll, 인터셉터가 검증)
-- **동작 방식**: 안드로이드 앱이 케이뱅크 앱의 결제 푸시 알림을 스크래핑하여 서버로 전송한다. 서버에는 FCM 등 푸시 인프라가 없으며, 이 API의 **응답을 받은 앱이 직접 로컬 알림**("잔돈 N원으로 ○○ 코인에 투자할까요?")을 띄운다.
+- **동작 방식**: 안드로이드 앱이 케이뱅크 앱의 결제 푸시 알림을 스크래핑하여 서버로 전송한다. 매수 **제안** 알림("잔돈 N원으로 ○○ 코인에 투자할까요?")은 이 API의 **응답을 받은 앱이 직접 로컬 알림**으로 띄운다. (승인 이후의 **결과** 알림은 서버가 FCM으로 단독 발송한다 — §9.1.)
 
 **요청 본문** (`PaymentScrapingRequest`)
 
@@ -289,6 +289,25 @@ stateDiagram-v2
 ```
 
 > `CONNECTED` / `PROCESSING`의 data는 JSON이 아닌 **평문 문자열**이므로 무조건 `JSON.parse` 하지 말 것. (현재 FE는 두 이벤트를 파싱 없이 무시하도록 구현되어 있다.)
+
+### 9.1 FCM 결과 알림 (SSE 보완)
+
+SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 커버한다. 지연 체결·10분 타임아웃·24시간 만료처럼 **SSE가 이미 끊긴 뒤 확정되는 결과**, 그리고 앱을 떠난 상태에서 도착하는 실패는 서버가 **FCM**으로 단독 발송한다. SSE와 FCM은 경쟁이 아니라 **역할 분담**이다.
+
+| `NotificationType` | 발송 지점(코드) | 대응 SSE 이벤트 | SSE 억제 |
+| --- | --- | --- | --- |
+| `TRADE_SUCCESS` | `UpbitTradePollingProcessor.handleSettledOrder` | `SUCCESS` | 미적용(지연 구간, 사실상 항상 끊김) |
+| `TRADE_TIMEOUT` | `UpbitTradePollingProcessor.handleTimeout` | `TRADE_FAILED` | 미적용 |
+| `UPBIT_INVALID_KEY` | `UpbitTradePollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | 미적용 |
+| `DEPOSIT_FAILED` | `UpbitDepositPollingProcessor.handleDepositFailed` | `DEPOSIT_FAILED` | **적용** |
+| `TRADE_FAILED` | `UpbitDepositPollingProcessor.handleTradeFailed` | `TRADE_FAILED` | **적용** |
+| `UPBIT_INVALID_KEY` | `UpbitDepositPollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | **적용** |
+| `ORDER_EXPIRED` | `PendingOrderExpirationScheduler.expireOldPendingOrders` | (없음) | 미적용 |
+
+- **억제 규칙**: SSE 커넥션이 살아있으면(사용자가 화면 대기 중) 동일 이벤트의 FCM은 보내지 않는다. `SseConnectionManager.isConnected(eventId)`로 판정하며, `complete()`가 맵에서 제거하므로 판정은 반드시 `send()` **이전에 캡처**한다.
+- **입금 210초 타임아웃**(`UpbitDepositPollingProcessor.handleTimeout`)은 FCM 대상이 **아니다**. `PENDING_PURCHASE`로 복구되어 재승인 가능하고 사용자가 화면 앞에 있으므로 SSE `TIMEOUT`만으로 충분하다.
+- **발송 3원칙**: ① 트랜잭션 커밋 이후 발송(`afterCommit`, 롤백 시 허위 알림 방지) ② 발송 실패는 상위로 전파하지 않고 로깅만(결제 파이프라인 비차단) ③ FCM이 무효 판정한 토큰(`UNREGISTERED`/`INVALID_ARGUMENT`)은 즉시 정리.
+- **비활성 스위치**: `tikkle.fcm.enabled=false`(로컬 기본값)이면 `FirebaseMessaging` 빈이 없어 발송은 no-op이 된다. 페이로드·딥링크 상세 계약은 `Tikkle_notification_spec.md` §7 참조.
 
 ---
 

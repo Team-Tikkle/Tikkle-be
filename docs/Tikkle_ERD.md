@@ -24,6 +24,7 @@
 | `INVESTMENT_TERMS` | 투자 용어집 (시딩) |
 | `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
 | `RECOMMENDED_VIDEOS` | 추천 영상 (시딩, 외부 링크) |
+| `DEVICE_TOKENS` | FCM 디바이스 토큰 (결과 알림 발송 대상, 유저당 다중 기기) |
 
 > **Redis 저장소 (RDB 외)**
 >
@@ -185,6 +186,13 @@ CREATE TABLE `RECOMMENDED_VIDEOS` (
     `channel_name`      VARCHAR(100)    NULL,
     `display_order`     INT             NOT NULL
 );
+CREATE TABLE `DEVICE_TOKENS` (
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `user_id`           BIGINT          NOT NULL,   -- USERS FK (@ManyToOne). 회원 탈퇴 시 명시적으로 함께 삭제
+    `fcm_token`         VARCHAR(512)    NOT NULL,   -- UNIQUE. 재로그인/기기 양도 시 소유 user_id를 이전(upsert)
+    `created_at`        DATETIME        NOT NULL,
+    `updated_at`        DATETIME        NOT NULL
+);
 
 ```
 
@@ -206,6 +214,7 @@ ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `PK_MARKET_TOPICS`   
 ALTER TABLE `INVESTMENT_TERMS`              ADD CONSTRAINT `PK_INVESTMENT_TERMS`            PRIMARY KEY (`id`);
 ALTER TABLE `BEGINNER_ARTICLES`             ADD CONSTRAINT `PK_BEGINNER_ARTICLES`           PRIMARY KEY (`id`);
 ALTER TABLE `RECOMMENDED_VIDEOS`            ADD CONSTRAINT `PK_RECOMMENDED_VIDEOS`          PRIMARY KEY (`id`);
+ALTER TABLE `DEVICE_TOKENS`                 ADD CONSTRAINT `PK_DEVICE_TOKENS`               PRIMARY KEY (`id`);
 
 -- UNIQUE
 ALTER TABLE `USERS`                         ADD CONSTRAINT `UQ_USERS_PHONE_NUMBER`          UNIQUE (`phone_number`);
@@ -218,6 +227,7 @@ ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `UQ_LINKED_ACCOUNTS_U
 ALTER TABLE `PAYMENT_CATEGORY_MAPPING`      ADD CONSTRAINT `UQ_PAYMENT_CAT_MAPPING_KEYWORD` UNIQUE (`keyword`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `UQ_USER_MARKET`                 UNIQUE (`user_id`, `market`);
 ALTER TABLE `MARKET_TOPICS`                 ADD CONSTRAINT `UQ_MARKET_TOPICS_LINK`          UNIQUE (`link`);
+ALTER TABLE `DEVICE_TOKENS`                 ADD CONSTRAINT `UQ_DEVICE_TOKENS_FCM_TOKEN`     UNIQUE (`fcm_token`);
 
 -- FOREIGN KEY (JPA 연관관계)
 ALTER TABLE `INVESTMENT_PROFILE`            ADD CONSTRAINT `FK_INVESTMENT_PROFILE_USER`     FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
@@ -226,6 +236,7 @@ ALTER TABLE `CATEGORY_SPARE_CHANGE_RULES`   ADD CONSTRAINT `FK_CATEGORY_RULES_US
 ALTER TABLE `LINKED_ACCOUNTS`               ADD CONSTRAINT `FK_LINKED_ACCOUNTS_USER`        FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
 ALTER TABLE `PORTFOLIOS`                    ADD CONSTRAINT `FK_PORTFOLIOS_USER`             FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
 ALTER TABLE `PAYMENT_EVENTS`                ADD CONSTRAINT `FK_PAYMENT_EVENTS_COIN`         FOREIGN KEY (`target_coin_market`) REFERENCES `COIN_METADATA`(`market`);
+ALTER TABLE `DEVICE_TOKENS`                 ADD CONSTRAINT `FK_DEVICE_TOKENS_USER`          FOREIGN KEY (`user_id`) REFERENCES `USERS`(`id`);
 -- 참고: PAYMENT_EVENTS.user_id 는 USERS를 가리키지만 JPA 연관관계 없이 Long 스칼라로 보관(느슨한 결합).
 --       결제 원장은 유저 엔티티에 의존하지 않고 독립적으로 적재/조회된다.
 ```
@@ -241,6 +252,7 @@ USERS (1)
  ├── CATEGORY_SPARE_CHANGE_RULES (N)     - 카테고리별 잔돈 규칙 (user_id+category UNIQUE)
  ├── LINKED_ACCOUNTS (1)                 - 금융 연동 정보 (Upbit API 키, 타겟 카드, 2차 인증)
  ├── PORTFOLIOS (N)                      - 보유 종목 현황 (user_id+market UNIQUE)
+ ├── DEVICE_TOKENS (N)                   - FCM 디바이스 토큰 (fcm_token UNIQUE, @ManyToOne FK)
  └── PAYMENT_EVENTS (N)                  - 결제 이벤트 (JPA 연관관계 없이 user_id 스칼라 보관)
 
 PAYMENT_EVENTS (N) ──> COIN_METADATA (1)  - target_coin_market FK (실시간 퀀트 스코어링 기반 매수 타겟 코인)
@@ -272,6 +284,7 @@ COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
 | `INVESTMENT_PROFILE` | `diversification_type` | `CONCENTRATED`, `BALANCED`, `DIVERSIFIED` |
 | `INVESTMENT_PROFILE` | `meme_acceptance` | `NONE`(0%), `SMALL`(10%), `ACTIVE`(30%) — *괄호 안은 최대 편입 비중* |
 | `INVESTMENT_PROFILE_THEMES` | `theme` | `LAYER_1`, `DEFI`, `AI`, `WEB3_GAMING`, `RWA`, `MEME` |
+| `NotificationType` (DB 컬럼 아님, FCM 발송 종류) | — | `TRADE_SUCCESS`, `TRADE_TIMEOUT`, `DEPOSIT_FAILED`, `TRADE_FAILED`, `UPBIT_INVALID_KEY`, `ORDER_EXPIRED` — 각 값은 고정 제목(title)과 딥링크(deepLink)를 가진다. `DEVICE_TOKENS`에 저장되지 않고 발송 시점에만 사용 |
 
 ### PaymentStatus 전이 흐름
 
