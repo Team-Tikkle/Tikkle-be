@@ -37,6 +37,10 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     long countByUserIdAndStatus(Long userId, PaymentStatus status);
 
+    // 리스너 유실 가시화용 — 가장 최근 결제 감지 시각(월 무관), 결제가 없으면 null
+    @Query("SELECT MAX(p.createdAt) FROM PaymentEvent p WHERE p.userId = :userId")
+    LocalDateTime findLatestCreatedAtByUserId(@Param("userId") Long userId);
+
     @Query("SELECT SUM(p.amount) FROM PaymentEvent p WHERE p.userId = :userId AND p.createdAt >= :startDate AND p.createdAt <= :endDate")
     Long sumAmountByUserIdAndCreatedAtBetween(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 

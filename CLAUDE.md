@@ -43,6 +43,7 @@ End-to-end flow: SMS (phone + password) auth → setup via `/api/settings/*` (5-
 | Security | Spring Security, JWT (jjwt for app auth, auth0 java-jwt for Upbit), BCrypt, HMAC SHA-256 request signing, AES-256 field encryption |
 | AI | Spring AI (`spring-ai-bom:2.0.0`) — Google Gemini `gemini-2.5-flash` (sync merchant classification) + DeepSeek `deepseek-v4-pro` via the OpenAI-compatible starter, `base-url: https://api.deepseek.com` (12h universe generation) |
 | External APIs | Upbit, CoinGecko, Fear & Greed, Google News RSS (rome), CoolSMS (Nurigo SDK) |
+| Push | Firebase Admin SDK (FCM) — server-initiated payment result notifications; gated by `tikkle.fcm.enabled` (off locally, no-op when disabled) |
 | Realtime | Spring WebFlux WebClient (AI streaming), SSE (payment domain) |
 | Build | Gradle wrapper, `jar { enabled = false }` |
 | Docs | springdoc-openapi / Swagger |
@@ -79,13 +80,14 @@ com.tikkle
 ├── global      # config, security (JWT/CORS), exception, ApiResponse wrapper, AES256 crypto util
 ├── insight     # investment terms/articles/videos (seeded), Google News RSS fetch, market topics
 ├── investment  # 2-stage AI recommendation, coin metadata, 5-axis risk profile, portfolio entity (no controller — reads go through `upbit`)
+├── notification # FCM device-token register/unregister + push result-notification sending (payment pipeline results)
 ├── payment     # payment push ingestion, fail-fast filter, spare-change calc, order approve/reject, deposit/trade polling, SSE
 ├── settings    # spare-change rules, investment profile, target card, Upbit key, investment on/off
 ├── upbit       # Upbit market/ticker/order/deposit/account API integration + realtime portfolio read
 └── user        # user read, withdraw
 ```
 
-Each domain follows: `controller`, `service`, `repository`, `entity` (+`entity/enums`), `dto/request`, `dto/response`, `exception`, `swagger`. Some add `scheduler`, `client`, `filter`, `interceptor`, `sse`, `fetcher`, `seed`, `config`, `util`, `service/component`. `investment` has no `controller`/`swagger`; `global` has no domain layers.
+Each domain follows: `controller`, `service`, `repository`, `entity` (+`entity/enums`), `dto/request`, `dto/response`, `exception`, `swagger`. Some add `scheduler`, `client`, `filter`, `interceptor`, `sse`, `fetcher`, `seed`, `config`, `util`, `service/component`. `investment` has no `controller`/`swagger`; `notification` has no `exception` (token validation falls back to `COMMON-002`); `global` has no domain layers.
 
 **There is no `onboarding` domain.** First-time setup is done through the `settings` endpoints.
 
@@ -187,8 +189,8 @@ public class UserService {
 
 **→ Read `docs/Tikkle_ERD.md` for the full DDL, constraints, relations, and complete enum value lists.** It is kept in sync with entity code. Quick orientation:
 
-- **Tables** (all UPPER_SNAKE_CASE): `USERS`, `INVESTMENT_PROFILE`, `INVESTMENT_PROFILE_THEMES`, `CATEGORY_SPARE_CHANGE_RULES`, `LINKED_ACCOUNTS`, `PAYMENT_EVENTS`, `PAYMENT_CATEGORY_MAPPING`, `AI_RECOMMENDATION_HISTORY`, `PORTFOLIOS`, `COIN_METADATA`, `MARKET_TOPICS`, `INVESTMENT_TERMS`, `BEGINNER_ARTICLES`, `RECOMMENDED_VIDEOS`.
-- **Relations gotcha:** `INVESTMENT_PROFILE`, `CATEGORY_SPARE_CHANGE_RULES`, `LINKED_ACCOUNTS`, `PORTFOLIOS` all hold a JPA `@ManyToOne`/`@OneToOne` FK to `USERS`. The exception is `PAYMENT_EVENTS.user_id`, which is a **plain Long scalar with no JPA relation (loose coupling)** — the payment ledger stays independent of the user entity. `PAYMENT_EVENTS.target_coin_market` is a JPA FK → `COIN_METADATA(market)`. Upbit keys in `LINKED_ACCOUNTS` are AES-256 encrypted.
+- **Tables** (all UPPER_SNAKE_CASE): `USERS`, `INVESTMENT_PROFILE`, `INVESTMENT_PROFILE_THEMES`, `CATEGORY_SPARE_CHANGE_RULES`, `LINKED_ACCOUNTS`, `PAYMENT_EVENTS`, `PAYMENT_CATEGORY_MAPPING`, `AI_RECOMMENDATION_HISTORY`, `PORTFOLIOS`, `COIN_METADATA`, `MARKET_TOPICS`, `INVESTMENT_TERMS`, `BEGINNER_ARTICLES`, `RECOMMENDED_VIDEOS`, `DEVICE_TOKENS`.
+- **Relations gotcha:** `INVESTMENT_PROFILE`, `CATEGORY_SPARE_CHANGE_RULES`, `LINKED_ACCOUNTS`, `PORTFOLIOS`, `DEVICE_TOKENS` all hold a JPA `@ManyToOne`/`@OneToOne` FK to `USERS` (so withdrawal must delete them before `USERS`). The exception is `PAYMENT_EVENTS.user_id`, which is a **plain Long scalar with no JPA relation (loose coupling)** — the payment ledger stays independent of the user entity. `PAYMENT_EVENTS.target_coin_market` is a JPA FK → `COIN_METADATA(market)`. Upbit keys in `LINKED_ACCOUNTS` are AES-256 encrypted.
 - **Redis (non-RDB) stores:** refresh tokens (`refresh_token` RedisHash), payment idempotency key (`payment:tx:{transactionId}`, SETNX 24h), user settings cache (`user:settings:{userId}` Hash), SMS auth state (`SMS_AUTH:{purpose}:{phone}` 3min code, `SMS_ATTEMPT:` fail counter, `SMS_COOLDOWN:` 60s resend lock, `SMS_DAILY:` 24h send counter, `SIGNUP_TOKEN:{phone}` / `PASSWORD_RESET_TOKEN:{phone}` 30min). **No distributed scheduler lock exists** — schedulers assume a single instance.
 - **Enums** live in each domain's `entity/enums`; the ERD doc lists every value. Most-used: `PaymentCategory` (7: CAFE/MART/FOOD/SHOPPING/TRAFFIC/CULTURE/ETC), `PaymentStatus` (NOT_INVESTED/PENDING_PURCHASE/PENDING_DEPOSIT/PENDING_TRADE/INVESTED/FAILED), and the 5-axis profile (RiskTolerance, TrendSensitivity, DiversificationType, MemeAcceptance, CryptoTheme). The 9 Risk×Trend combos drive `AI_RECOMMENDATION_HISTORY.profile_hash_key` (e.g. `BUY_MORE:FULL_TREND`).
 
@@ -219,7 +221,9 @@ Grouped by domain in `global.exception.ErrorCode`. When adding codes, follow the
 | Auth | `POST /api/auth/password/reset` | reset password with the verify token; also invalidates the refresh token | Public |
 | Auth | `POST /api/auth/test-token` `.../test-signup` | local-only test JWT issue | Public (`local` only) |
 | User | `GET /api/users/me` | my info | JWT |
-| User | `DELETE /api/users/me` | withdraw — **hard delete** of the user + all owned data (profile, rules, linked account, portfolios, payment ledger) + Redis session/cache. The phone number is freed immediately, so re-signup is allowed right away | JWT |
+| User | `DELETE /api/users/me` | withdraw — **hard delete** of the user + all owned data (profile, rules, linked account, portfolios, payment ledger, device tokens) + Redis session/cache. The phone number is freed immediately, so re-signup is allowed right away | JWT |
+| Notification | `POST /api/users/me/device-token` | register FCM device token (idempotent upsert; transfers ownership on re-login) | JWT |
+| Notification | `DELETE /api/users/me/device-token` | unregister FCM device token on logout (idempotent) | JWT |
 | Portfolio | `GET /api/upbit/portfolios` | realtime holdings via Upbit API + WS market codes | JWT |
 | Payment | `POST /api/payments` | Android payment push ingestion | **HMAC** (permitAll in security, verified by filter/interceptor) |
 | Payment | `GET /api/payments/dashboard` | monthly payment/spare-change dashboard | JWT |
