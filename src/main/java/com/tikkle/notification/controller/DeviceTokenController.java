@@ -35,7 +35,7 @@ public class DeviceTokenController implements DeviceTokenSwagger {
     @DeleteMapping
     public ApiResponse<Void> unregisterToken(@AuthenticationPrincipal CustomUserDetails userDetails,
                                              @Valid @RequestBody DeviceTokenRequest request) {
-        deviceTokenService.unregisterToken(request.fcmToken());
+        deviceTokenService.unregisterToken(userDetails.getUserId(), request.fcmToken());
         return ApiResponse.successWithNoData();
     }
 }

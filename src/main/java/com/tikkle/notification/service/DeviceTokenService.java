@@ -48,14 +48,16 @@ public class DeviceTokenService {
     }
 
     /**
-     * 디바이스 토큰을 멱등하게 해제합니다. 토큰이 없어도 예외 없이 정상 종료합니다.
+     * 디바이스 토큰을 멱등하게 해제합니다. 인증 유저 소유의 토큰만 삭제하며,
+     * 토큰이 없거나 다른 유저 소유이면 예외 없이 정상 종료합니다.
      *
+     * @param userId 로그인한 유저 ID
      * @param fcmToken 해제할 FCM 디바이스 토큰
      */
     @Transactional
-    public void unregisterToken(String fcmToken) {
-        deviceTokenRepository.deleteByFcmToken(fcmToken);
-        log.info("[DeviceTokenService] 디바이스 토큰 해제 완료");
+    public void unregisterToken(Long userId, String fcmToken) {
+        deviceTokenRepository.deleteByFcmTokenAndUserId(fcmToken, userId);
+        log.info("[DeviceTokenService] 디바이스 토큰 해제 완료 - userId: {}", userId);
     }
 
     private User findUserById(Long userId) {
