@@ -68,6 +68,9 @@ dependencies {
     // CoolSMS (Nurigo SDK)
     implementation 'net.nurigo:sdk:4.3.0'
 
+    // Firebase Admin (FCM 푸시 발송)
+    implementation 'com.google.firebase:firebase-admin:9.4.3'
+
     // 테스트 도구
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'

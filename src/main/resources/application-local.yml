@@ -57,6 +57,11 @@ tikkle:
     secret-key: ${PAYMENT_SECRET_KEY}
   encrypt:
     secret-key: ${TIKKLE_ENCRYPT_SECRET_KEY}
+  fcm:
+    # 로컬은 기본 비활성 — 키 없이 기동 가능. 발송을 검증하려면 아래 두 값을 채우고 enabled=true
+    enabled: ${FCM_ENABLED:false}
+    # 서비스 계정 키(JSON)를 base64로 인코딩한 문자열. 리포지토리에 원본 JSON을 두지 않는다.
+    credentials-base64: ${FCM_CREDENTIALS_BASE64:}
 
 app:
   cors:
