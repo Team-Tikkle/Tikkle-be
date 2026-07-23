@@ -1,5 +1,7 @@
 package com.tikkle.payment.scheduler;
 
+import com.tikkle.notification.entity.enums.NotificationType;
+import com.tikkle.notification.service.PushNotificationService;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.payment.sse.SseConnectionManager;
@@ -42,6 +44,7 @@ public class UpbitTradePollingProcessor {
     private final UpbitOrderClient upbitOrderClient;
     private final UpbitPortfolioUpdater portfolioUpdater;
     private final SseConnectionManager sseConnectionManager;
+    private final PushNotificationService pushNotificationService;
 
     /**
      * 개별 이벤트에 대해 업비트 API를 호출하고 결과를 처리합니다.
@@ -132,6 +135,19 @@ public class UpbitTradePollingProcessor {
         if (event != null) {
             event.failInvestment("매수 주문 10분 타임아웃으로 주문 취소. 입금된 원화는 업비트 계좌에 잔류");
         }
+        // 지연 체결 구간이라 SSE는 이미 끊겨 있을 가능성이 높지만, 살아있는 커넥션을 위해 통보한다.
+        // 앱 이탈 상태의 실제 도달은 FCM(TRADE_TIMEOUT)이 담당한다.
+        Map<String, Object> errorData = Map.of(
+                "status", "TRADE_FAILED",
+                "message", "매수 주문 10분 타임아웃으로 취소. 입금된 원화는 업비트 계좌에 잔류"
+        );
+        sseConnectionManager.send(eventId, "TRADE_FAILED", errorData);
+        sseConnectionManager.complete(eventId);
+
+        if (event != null) {
+            pushNotificationService.send(event.getUserId(), NotificationType.TRADE_TIMEOUT,
+                    "10분간 체결되지 않아 주문을 취소했어요. 입금된 원화는 업비트 계좌에 있습니다.", eventId);
+        }
     }
 
     /**
@@ -184,6 +200,11 @@ public class UpbitTradePollingProcessor {
         );
         sseConnectionManager.send(eventId, "SUCCESS", successData);
         sseConnectionManager.complete(eventId);
+
+        // 지연 체결 구간은 SSE가 이미 끊겨 있으므로 FCM으로 체결 완료를 통보한다.
+        String successBody = String.format("%s %s개를 매수했어요.",
+                info.coinName(), totalVolume.stripTrailingZeros().toPlainString());
+        pushNotificationService.send(info.userId(), NotificationType.TRADE_SUCCESS, successBody, eventId);
     }
 
     @Transactional
@@ -191,6 +212,17 @@ public class UpbitTradePollingProcessor {
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event != null) {
             event.failInvestment("업비트 API 키 만료 또는 권한 부족(401/403)");
+        }
+        Map<String, Object> errorData = Map.of(
+                "status", "UPBIT_INVALID_KEY",
+                "message", "업비트 API 키 만료 또는 권한 부족(401/403). 재연동 필요"
+        );
+        sseConnectionManager.send(eventId, "UPBIT_INVALID_KEY", errorData);
+        sseConnectionManager.complete(eventId);
+
+        if (event != null) {
+            pushNotificationService.send(event.getUserId(), NotificationType.UPBIT_INVALID_KEY,
+                    "투자를 계속하려면 업비트 API 키를 다시 연동해 주세요.", eventId);
         }
     }
 

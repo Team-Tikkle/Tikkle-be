@@ -74,6 +74,18 @@ public class SseConnectionManager {
     }
 
     /**
+     * 특정 결제 이벤트에 살아있는 SSE 커넥션이 있는지 확인합니다.
+     * FCM 중복 발송을 억제하는 판정에 사용합니다. complete()가 맵에서 제거하므로,
+     * 억제 판정은 반드시 send()/complete() 호출 이전에 캡처해야 합니다.
+     *
+     * @param eventId 결제 이벤트 ID
+     * @return 활성 커넥션 존재 여부
+     */
+    public boolean isConnected(Long eventId) {
+        return emitters.containsKey(eventId);
+    }
+
+    /**
      * 특정 결제 이벤트의 SSE 연결을 정상적으로 종료(complete)하고 맵에서 제거합니다.
      *
      * @param eventId 결제 이벤트 ID
