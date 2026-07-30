@@ -25,6 +25,7 @@
 | `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
 | `RECOMMENDED_VIDEOS` | 추천 영상 (시딩, 외부 링크) |
 | `DEVICE_TOKENS` | FCM 디바이스 토큰 (결과 알림 발송 대상, 유저당 다중 기기) |
+| `NOTICES` | 공지사항 (관리자 페이지 없음 — DB 직접 INSERT로 운영) |
 
 > **Redis 저장소 (RDB 외)**
 >
@@ -193,6 +194,14 @@ CREATE TABLE `DEVICE_TOKENS` (
     `created_at`        DATETIME        NOT NULL,
     `updated_at`        DATETIME        NOT NULL
 );
+CREATE TABLE `NOTICES` (
+    `id`                BIGINT          NOT NULL    AUTO_INCREMENT,
+    `title`             VARCHAR(200)    NOT NULL,
+    `content`           TEXT            NOT NULL,   -- 플레인 텍스트, `\n\n` 으로 문단 구분
+    `is_pinned`         BOOLEAN         NOT NULL    DEFAULT FALSE,  -- 목록 상단 고정
+    `is_visible`        BOOLEAN         NOT NULL    DEFAULT TRUE,   -- false 면 목록/상세 모두 미노출 (초안 보관용)
+    `published_at`      DATETIME        NOT NULL    -- 앱에 표시되는 게시일시 겸 정렬 기준 (과거 날짜 등록 가능하도록 기본값 없음)
+);
 
 ```
 
@@ -215,6 +224,7 @@ ALTER TABLE `INVESTMENT_TERMS`              ADD CONSTRAINT `PK_INVESTMENT_TERMS`
 ALTER TABLE `BEGINNER_ARTICLES`             ADD CONSTRAINT `PK_BEGINNER_ARTICLES`           PRIMARY KEY (`id`);
 ALTER TABLE `RECOMMENDED_VIDEOS`            ADD CONSTRAINT `PK_RECOMMENDED_VIDEOS`          PRIMARY KEY (`id`);
 ALTER TABLE `DEVICE_TOKENS`                 ADD CONSTRAINT `PK_DEVICE_TOKENS`               PRIMARY KEY (`id`);
+ALTER TABLE `NOTICES`                       ADD CONSTRAINT `PK_NOTICES`                     PRIMARY KEY (`id`);
 
 -- UNIQUE
 ALTER TABLE `USERS`                         ADD CONSTRAINT `UQ_USERS_PHONE_NUMBER`          UNIQUE (`phone_number`);

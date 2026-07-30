@@ -74,7 +74,10 @@ public enum ErrorCode {
 
     // 인사이트 (Insight)
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "INSIGHT-001", "초보자 글을 찾을 수 없습니다."),
-    
+
+    // 공지사항 (Notice)
+    NOTICE_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTICE-001", "공지사항을 찾을 수 없습니다."),
+
     // 시스템/보안 (Security)
     ENCRYPTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SECURITY-001", "데이터 암호화 또는 복호화 중 오류가 발생했습니다."),
     INVALID_ENCRYPTION_KEY(HttpStatus.INTERNAL_SERVER_ERROR, "SECURITY-002", "유효하지 않은 암호화 키 설정입니다.");
