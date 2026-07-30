@@ -80,6 +80,7 @@ com.tikkle
 ├── global      # config, security (JWT/CORS), exception, ApiResponse wrapper, AES256 crypto util
 ├── insight     # investment terms/articles/videos (seeded), Google News RSS fetch, market topics
 ├── investment  # 2-stage AI recommendation, coin metadata, 5-axis risk profile, portfolio entity (no controller — reads go through `upbit`)
+├── notice      # 공지사항 list/detail for the settings screen (read-only; rows are inserted straight into the DB, no admin page)
 ├── notification # FCM device-token register/unregister + push result-notification sending (payment pipeline results)
 ├── payment     # payment push ingestion, fail-fast filter, spare-change calc, order approve/reject, deposit/trade polling, SSE
 ├── settings    # spare-change rules, investment profile, target card, Upbit key, investment on/off
@@ -87,7 +88,7 @@ com.tikkle
 └── user        # user read, withdraw
 ```
 
-Each domain follows: `controller`, `service`, `repository`, `entity` (+`entity/enums`), `dto/request`, `dto/response`, `exception`, `swagger`. Some add `scheduler`, `client`, `filter`, `interceptor`, `sse`, `fetcher`, `seed`, `config`, `util`, `service/component`. `investment` has no `controller`/`swagger`; `notification` has no `exception` (token validation falls back to `COMMON-002`); `global` has no domain layers.
+Each domain follows: `controller`, `service`, `repository`, `entity` (+`entity/enums`), `dto/request`, `dto/response`, `exception`, `swagger`. Some add `scheduler`, `client`, `filter`, `interceptor`, `sse`, `fetcher`, `seed`, `config`, `util`, `service/component`. `investment` has no `controller`/`swagger`; `notification` has no `exception` (token validation falls back to `COMMON-002`); `notice` has no `dto/request` (read-only domain); `global` has no domain layers.
 
 **There is no `onboarding` domain.** First-time setup is done through the `settings` endpoints.
 
@@ -206,6 +207,7 @@ Grouped by domain in `global.exception.ErrorCode`. When adding codes, follow the
 - **INVESTMENT**: `-001` AI recommendation failed (500), `-003` coin not found (404), `-004` coin sync failed (500), `-005` profile not found (404)
 - **UPBIT**: `-001`..`-014` cover order/inquiry/token/market/ticker/auth-param/deposit/invalid-key/candle/account/api-call/cancel failures (mostly 500; `-010` invalid key is 401)
 - **INSIGHT**: `INSIGHT-001` article not found (404)
+- **NOTICE**: `NOTICE-001` notice not found (404) — also returned when the notice exists but `is_visible = false`
 - **SECURITY**: `SECURITY-001` encryption/decryption failed (500), `SECURITY-002` invalid encryption key (500)
 
 ## 10. API Surface
@@ -242,6 +244,8 @@ Grouped by domain in `global.exception.ErrorCode`. When adding codes, follow the
 | Insight | `GET /api/insights/terms` | investment terms | JWT |
 | Insight | `GET /api/insights/articles` `.../{id}` | beginner articles list / detail | JWT |
 | Insight | `GET /api/insights/videos` | recommended videos | JWT |
+| Notice | `GET /api/notices` | 공지사항 list (visible only; pinned first, then newest `publishedAt`) | JWT |
+| Notice | `GET /api/notices/{id}` | 공지사항 detail (hidden notices 404 even by id) | JWT |
 
 Security config: STATELESS, CSRF off, CORS on, JWT filter before `UsernamePasswordAuthenticationFilter`. `PERMIT_ALL_URLS` = `/api/auth/reissue`, `/api/auth/signup`, `/api/auth/login`, `/api/auth/sms/**`, `/api/auth/password/reset-sms/send`, `/api/auth/password/reset-sms/verify`, `/api/auth/password/reset`, `/swagger-ui/**`, `/v3/api-docs/**`; plus `POST /api/payments`. **Only in `local` profile**: `/api/auth/test-token`, `/api/auth/test-signup`, `/api/test/**` are public. (The three `password/**` entries are load-bearing: a user who forgot their password has no JWT, so requiring one made the reset flow unreachable.)
 
