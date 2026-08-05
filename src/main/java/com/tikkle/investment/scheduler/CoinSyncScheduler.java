@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class CoinSyncScheduler {
      * 매일 새벽 4시 및 서버 기동 시 업비트 마켓 리스트를 가져와 DB에 코인 메타데이터(한글/영문명 등)를 갱신합니다.
      * 업비트 응답에서 사라진 코인(상장폐지)은 비활성화하여 시세 조회 대상에서 제외합니다.
      */
+    @Order(1) // AI 매크로 유니버스 생성이 코인 메타데이터를 참조하므로 기동 시 먼저 실행되어야 한다
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul") // 매일 새벽 4시 실행
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
