@@ -78,7 +78,8 @@ public class TargetCoinRecommendationService {
                     List<AiRecommendationDto> macroCandidates = candidateResponse.candidates();
 
                     if (macroCandidates != null && !macroCandidates.isEmpty()) {
-                        List<String> validMarkets = coinRepository.findAll().stream().map(Coin::getMarket).toList();
+                        // 상장폐지된 코인이 섞이면 시세 조회가 통째로 실패하므로 활성 코인만 후보로 남긴다
+                        List<String> validMarkets = coinRepository.findAllByIsActiveTrue().stream().map(Coin::getMarket).toList();
 
                         List<AiRecommendationDto> validCandidates = macroCandidates.stream()
                                 .filter(dto -> validMarkets.contains(dto.market()))
