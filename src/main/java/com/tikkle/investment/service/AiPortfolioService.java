@@ -101,9 +101,15 @@ public class AiPortfolioService {
         String top50CoinsContext = null;
         try {
             top50CoinsContext = getTop50ActiveCoinsContext();
-            log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
         } catch (Exception e) {
-            log.error("[AiPortfolioService] RAG 용 Top 50 코인 리스트 수집 실패 - 전체 조합을 Fallback 처리합니다", e);
+            log.error("[AiPortfolioService] RAG 용 Top 50 코인 리스트 수집 실패", e);
+        }
+
+        if (top50CoinsContext == null || top50CoinsContext.isBlank()) {
+            top50CoinsContext = null;
+            log.error("[AiPortfolioService] RAG 용 Top 50 코인 리스트를 확보하지 못해 전체 조합을 Fallback 처리합니다");
+        } else {
+            log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
         }
 
         int successCount = 0;
@@ -113,6 +119,7 @@ public class AiPortfolioService {
             for (TrendSensitivity trend : TrendSensitivity.values()) {
                 String hashKey = risk.name() + ":" + trend.name();
 
+                // 컨텍스트가 없으면 AI를 호출하지 않는다 (환각 응답이 캐시에 적재되는 것을 막는다)
                 if (top50CoinsContext == null) {
                     failCount++;
                     loadFallbackCandidates(hashKey);
@@ -175,7 +182,11 @@ public class AiPortfolioService {
      */
     private String getTop50ActiveCoinsContext() {
         List<Coin> allCoins = coinRepository.findAllByIsActiveTrue();
-        if (allCoins.isEmpty()) return "Unknown (No coins found in DB)";
+        if (allCoins.isEmpty()) {
+            // 화이트리스트가 빈 채로 프롬프트에 들어가면 AI가 없는 티커를 만들어내므로 컨텍스트 없음으로 처리한다
+            log.error("[AiPortfolioService] 활성 코인이 DB에 없어 RAG 컨텍스트를 생성할 수 없습니다");
+            return null;
+        }
 
         String markets = allCoins.stream()
                 .map(Coin::getMarket)
@@ -188,6 +199,11 @@ public class AiPortfolioService {
                 .sorted((a, b) -> b.accTradePrice24h().compareTo(a.accTradePrice24h()))
                 .limit(50)
                 .toList();
+
+        if (top50Tickers.isEmpty()) {
+            log.error("[AiPortfolioService] 업비트 시세 조회 결과가 비어 RAG 컨텍스트를 생성할 수 없습니다 - activeCoins: {}건", allCoins.size());
+            return null;
+        }
 
         Map<String, String> coinNames = allCoins.stream().collect(Collectors.toMap(Coin::getMarket, Coin::getKoreanName));
         

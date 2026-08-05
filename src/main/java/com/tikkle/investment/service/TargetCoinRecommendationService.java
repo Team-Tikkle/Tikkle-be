@@ -119,8 +119,13 @@ public class TargetCoinRecommendationService {
             }
         }
 
-        Coin targetCoin = coinRepository.findById(targetMarket)
-                .orElseThrow(CoinNotFoundException::new);
+        // 스코어링 경로는 활성 후보군에서만 고르지만 BTC 폴백 경로는 활성 여부를 거치지 않으므로, 최종 타겟을 다시 검증한다
+        String confirmedMarket = targetMarket;
+        Coin targetCoin = coinRepository.findByMarketAndIsActiveTrue(confirmedMarket)
+                .orElseThrow(() -> {
+                    log.error("[TargetCoinRecommendationService] 최종 타겟 코인이 비활성이거나 존재하지 않습니다 - market: {}", confirmedMarket);
+                    return new CoinNotFoundException();
+                });
 
         return new CoinRecommendation(targetMarket, targetCoinName, targetCoin);
     }
