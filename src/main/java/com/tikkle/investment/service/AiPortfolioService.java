@@ -97,22 +97,36 @@ public class AiPortfolioService {
         String ethWeekly = ethCandles.isEmpty() ? "Unknown" : String.format("%.2f%%", ethCandles.get(0).getChangeRate() * 100);
         String weeklyTrend = String.format("BTC 1W Change: %s, ETH 1W Change: %s", btcWeekly, ethWeekly);
         
-        // 2. RAG Context: Top 50 활성 코인 추출
-        // Moved inside the loop to support per-profile fallback
-        
+        // 2. RAG Context: Top 50 활성 코인 추출 (9개 조합이 공유하므로 1회만 조회)
+        String top50CoinsContext = null;
+        try {
+            top50CoinsContext = getTop50ActiveCoinsContext();
+        } catch (Exception e) {
+            log.error("[AiPortfolioService] RAG 용 Top 50 코인 리스트 수집 실패", e);
+        }
+
+        if (top50CoinsContext == null || top50CoinsContext.isBlank()) {
+            top50CoinsContext = null;
+            log.error("[AiPortfolioService] RAG 용 Top 50 코인 리스트를 확보하지 못해 전체 조합을 Fallback 처리합니다");
+        } else {
+            log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
+        }
+
         int successCount = 0;
         int failCount = 0;
-        String top50CoinsContext = null;
 
         for (RiskTolerance risk : RiskTolerance.values()) {
             for (TrendSensitivity trend : TrendSensitivity.values()) {
                 String hashKey = risk.name() + ":" + trend.name();
+
+                // 컨텍스트가 없으면 AI를 호출하지 않는다 (환각 응답이 캐시에 적재되는 것을 막는다)
+                if (top50CoinsContext == null) {
+                    failCount++;
+                    loadFallbackCandidates(hashKey);
+                    continue;
+                }
+
                 try {
-                    if (top50CoinsContext == null) {
-                        top50CoinsContext = getTop50ActiveCoinsContext();
-                        log.info("[AiPortfolioService] 외부 데이터 및 RAG 용 Top 50 코인 리스트 수집 완료");
-                    }
-                    
                     List<AiRecommendationDto> aiCandidates = fetchAiMacroCandidates(
                             risk, trend, fngIndex, btcDom, weeklyTrend, hotNarratives, macroEvents, top50CoinsContext);
                     
@@ -136,20 +150,11 @@ public class AiPortfolioService {
                 } catch (Exception e) {
                     failCount++;
                     log.error("[AiPortfolioService] 매크로 후보군 조회 실패 - hashKey: {}", hashKey, e);
-                    
-                    historyRepository.findTopByProfileHashKeyOrderByIdDesc(hashKey)
-                            .ifPresentOrElse(
-                                    history -> {
-                                        log.warn("[AiPortfolioService] DB에서 이전 추천 데이터(Fallback)를 불러옵니다. hashKey: {}", hashKey);
-                                        String redisKey = "ai:candidates:" + hashKey;
-                                        redisTemplate.opsForValue().set(redisKey, history.getCandidatesJson(), Duration.ofHours(24));
-                                    },
-                                    () -> log.error("[AiPortfolioService] DB에 이전 데이터가 존재하지 않아 Fallback 불가. hashKey: {}", hashKey)
-                            );
+                    loadFallbackCandidates(hashKey);
                 }
             }
         }
-        
+
         if (failCount == 0) {
             log.info("[AiPortfolioService] 9개 조합에 대한 AI 매크로 유니버스 생성 전체 완료 (성공: {}건)", successCount);
         } else {
@@ -158,11 +163,30 @@ public class AiPortfolioService {
     }
 
     /**
+     * 후보군 생성에 실패한 조합에 대해 DB의 직전 추천 내역을 Redis에 다시 적재합니다.
+     */
+    private void loadFallbackCandidates(String hashKey) {
+        historyRepository.findTopByProfileHashKeyOrderByIdDesc(hashKey)
+                .ifPresentOrElse(
+                        history -> {
+                            log.warn("[AiPortfolioService] DB에서 이전 추천 데이터(Fallback)를 불러옵니다. hashKey: {}", hashKey);
+                            String redisKey = "ai:candidates:" + hashKey;
+                            redisTemplate.opsForValue().set(redisKey, history.getCandidatesJson(), Duration.ofHours(24));
+                        },
+                        () -> log.error("[AiPortfolioService] DB에 이전 데이터가 존재하지 않아 Fallback 불가. hashKey: {}", hashKey)
+                );
+    }
+
+    /**
      * 거래대금 기준 상위 50개의 코인 리스트를 생성하여 AI에게 RAG 컨텍스트로 제공합니다.
      */
     private String getTop50ActiveCoinsContext() {
-        List<Coin> allCoins = coinRepository.findAll();
-        if (allCoins.isEmpty()) return "Unknown (No coins found in DB)";
+        List<Coin> allCoins = coinRepository.findAllByIsActiveTrue();
+        if (allCoins.isEmpty()) {
+            // 화이트리스트가 빈 채로 프롬프트에 들어가면 AI가 없는 티커를 만들어내므로 컨텍스트 없음으로 처리한다
+            log.error("[AiPortfolioService] 활성 코인이 DB에 없어 RAG 컨텍스트를 생성할 수 없습니다");
+            return null;
+        }
 
         String markets = allCoins.stream()
                 .map(Coin::getMarket)
@@ -175,6 +199,11 @@ public class AiPortfolioService {
                 .sorted((a, b) -> b.accTradePrice24h().compareTo(a.accTradePrice24h()))
                 .limit(50)
                 .toList();
+
+        if (top50Tickers.isEmpty()) {
+            log.error("[AiPortfolioService] 업비트 시세 조회 결과가 비어 RAG 컨텍스트를 생성할 수 없습니다 - activeCoins: {}건", allCoins.size());
+            return null;
+        }
 
         Map<String, String> coinNames = allCoins.stream().collect(Collectors.toMap(Coin::getMarket, Coin::getKoreanName));
         

@@ -78,7 +78,8 @@ public class TargetCoinRecommendationService {
                     List<AiRecommendationDto> macroCandidates = candidateResponse.candidates();
 
                     if (macroCandidates != null && !macroCandidates.isEmpty()) {
-                        List<String> validMarkets = coinRepository.findAll().stream().map(Coin::getMarket).toList();
+                        // 상장폐지된 코인이 섞이면 시세 조회가 통째로 실패하므로 활성 코인만 후보로 남긴다
+                        List<String> validMarkets = coinRepository.findAllByIsActiveTrue().stream().map(Coin::getMarket).toList();
 
                         List<AiRecommendationDto> validCandidates = macroCandidates.stream()
                                 .filter(dto -> validMarkets.contains(dto.market()))
@@ -118,8 +119,13 @@ public class TargetCoinRecommendationService {
             }
         }
 
-        Coin targetCoin = coinRepository.findById(targetMarket)
-                .orElseThrow(CoinNotFoundException::new);
+        // 스코어링 경로는 활성 후보군에서만 고르지만 BTC 폴백 경로는 활성 여부를 거치지 않으므로, 최종 타겟을 다시 검증한다
+        String confirmedMarket = targetMarket;
+        Coin targetCoin = coinRepository.findByMarketAndIsActiveTrue(confirmedMarket)
+                .orElseThrow(() -> {
+                    log.error("[TargetCoinRecommendationService] 최종 타겟 코인이 비활성이거나 존재하지 않습니다 - market: {}", confirmedMarket);
+                    return new CoinNotFoundException();
+                });
 
         return new CoinRecommendation(targetMarket, targetCoinName, targetCoin);
     }
