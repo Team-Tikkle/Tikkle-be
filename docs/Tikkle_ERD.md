@@ -19,7 +19,7 @@
 | `PAYMENT_CATEGORY_MAPPING` | 가맹점 키워드 → 카테고리 분류 사전 (전역 캐시, AI 학습 결과 누적) |
 | `AI_RECOMMENDATION_HISTORY` | 12시간 주기 AI 추천 15종목 유니버스 이력 (Risk x Trend 9개 조합별 캐싱용) |
 | `PORTFOLIOS` | 보유 종목 현황 |
-| `COIN_METADATA` | 업비트 마켓(코인) 메타데이터 (마켓코드/한글명/영문명, 매일 동기화) |
+| `COIN_METADATA` | 업비트 마켓(코인) 메타데이터 (마켓코드/한글명/영문명/상장여부, 매일 동기화) |
 | `MARKET_TOPICS` | 투데이 마켓 토픽 (Google News RSS 수집) |
 | `INVESTMENT_TERMS` | 투자 용어집 (시딩) |
 | `BEGINNER_ARTICLES` | 초보자 가이드 글 (시딩, 앱 내부 렌더링) |
@@ -151,6 +151,7 @@ CREATE TABLE `COIN_METADATA` (
     `market`        VARCHAR(20)     NOT NULL,   -- PK, 예: KRW-BTC
     `korean_name`   VARCHAR(100)    NOT NULL,
     `english_name`  VARCHAR(100)    NOT NULL,
+    `is_active`     BOOLEAN         NOT NULL    DEFAULT TRUE,   -- 업비트 상장 여부. 상장폐지 시 FALSE (행은 삭제하지 않음)
     `updated_at`    DATETIME        NOT NULL
 );
 
@@ -269,7 +270,7 @@ PAYMENT_EVENTS (N) ──> COIN_METADATA (1)  - target_coin_market FK (실시간
 
 PAYMENT_CATEGORY_MAPPING  - 전역 키워드→카테고리 사전 (유저 무관, AI 분류 결과 누적 캐시)
 AI_RECOMMENDATION_HISTORY - AI 매크로 유니버스 후보군 (12시간 주기 9개 성향 조합별 캐싱)
-COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화)
+COIN_METADATA             - 업비트 마켓 메타데이터 (매일 동기화, 상장폐지는 is_active=FALSE 소프트 삭제)
 
 인사이트 (독립 테이블, FK 없음)
  ├── MARKET_TOPICS          외부 RSS 주기 수집
