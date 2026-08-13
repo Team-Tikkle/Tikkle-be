@@ -14,6 +14,7 @@ public enum NotificationType {
     TRADE_SUCCESS("매수 체결 완료 🎉", "tikkle://payments"),
     TRADE_TIMEOUT("매수가 취소됐어요", "tikkle://payments"),
     DEPOSIT_FAILED("투자가 취소됐어요", "tikkle://payments"),
+    DEPOSIT_TIMEOUT("2차 인증 시간이 지났어요", "tikkle://payments"),
     TRADE_FAILED("매수에 실패했어요", "tikkle://payments"),
     UPBIT_INVALID_KEY("업비트 연동이 만료됐어요", "tikkle://settings/api-key"),
     ORDER_EXPIRED("투자 기회가 만료됐어요", "tikkle://payments");

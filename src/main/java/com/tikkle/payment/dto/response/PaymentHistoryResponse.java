@@ -55,10 +55,15 @@ public record PaymentHistoryResponse(
             viewStatus = PaymentViewStatus.PENDING;
             expiredAt = event.getCreatedAt().plusHours(24);
         } else if (event.getStatus() == PaymentStatus.PENDING_DEPOSIT) {
-            // 업비트 2차 인증 입금 요청 시 유효시간 3.5분으로 설정 (SSE 타임아웃과 동일하게)
-            viewStatus = PaymentViewStatus.PENDING;
-            expiredAt = event.getDepositRequestedAt() != null 
+            // 승인이 끝난 건이므로 재승인 대상이 아니다. 유효시간은 3.5분(SSE 타임아웃과 동일)
+            viewStatus = PaymentViewStatus.IN_PROGRESS;
+            expiredAt = event.getDepositRequestedAt() != null
                     ? event.getDepositRequestedAt().plusSeconds(210) : null;
+        } else if (event.getStatus() == PaymentStatus.PENDING_TRADE) {
+            // 매수 주문 접수 후 체결 대기. 10분 경과 시 주문 취소
+            viewStatus = PaymentViewStatus.IN_PROGRESS;
+            expiredAt = event.getTradeRequestedAt() != null
+                    ? event.getTradeRequestedAt().plusMinutes(10) : null;
         } else if (event.getStatus() == PaymentStatus.INVESTED) {
             viewStatus = PaymentViewStatus.INVESTED;
             investedVolume = event.getInvestedVolume();
@@ -66,7 +71,8 @@ public record PaymentHistoryResponse(
         } else if (event.getStatus() == PaymentStatus.NOT_INVESTED || event.getStatus() == PaymentStatus.FAILED) {
             viewStatus = PaymentViewStatus.CANCELED;
         } else {
-            viewStatus = PaymentViewStatus.PENDING;
+            // 알 수 없는 상태를 PENDING으로 내보내면 앱이 승인 버튼을 노출하므로 진행 중으로 처리한다
+            viewStatus = PaymentViewStatus.IN_PROGRESS;
         }
 
         String targetCoinMarket = event.getTargetCoin() != null ? event.getTargetCoin().getMarket() : null;

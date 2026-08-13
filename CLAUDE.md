@@ -230,10 +230,11 @@ Grouped by domain in `global.exception.ErrorCode`. When adding codes, follow the
 | Payment | `POST /api/payments` | Android payment push ingestion | **HMAC** (permitAll in security, verified by filter/interceptor) |
 | Payment | `GET /api/payments/dashboard` | monthly payment/spare-change dashboard | JWT |
 | Payment | `GET /api/payments` | paged payment feed | JWT |
+| Payment | `GET /api/payments/in-progress` | in-flight events (`PENDING_DEPOSIT`/`PENDING_TRADE`) so the app can restore the screen and re-subscribe SSE after leaving for 2FA | JWT |
 | Payment | `PATCH /api/payments/{id}/category` | correct a payment's category | JWT |
 | Order | `POST /api/payments/{eventId}/approve` | approve the buy → triggers Upbit KRW deposit (2FA) | JWT |
 | Order | `POST /api/payments/{eventId}/reject` | reject the buy → NOT_INVESTED | JWT |
-| Order | `GET /api/payments/{eventId}/stream` | SSE stream of the buy pipeline result | JWT |
+| Order | `GET /api/payments/{eventId}/stream` | SSE stream of the buy pipeline result; re-subscribable, replays the current state once on connect | JWT |
 | Settings | `GET /api/settings` | rules + profile + linked account + investment on/off | JWT |
 | Settings | `PATCH /api/settings/spare-change-rules` | change per-category rules | JWT |
 | Settings | `PATCH /api/settings/profile` | change 5-axis investment profile | JWT |
@@ -260,6 +261,8 @@ Security config: STATELESS, CSRF off, CORS on, JWT filter before `UsernamePasswo
 3. **2-tier categorization + spare-change** (FEAT-SYS-003) — keyword dictionary (`PAYMENT_CATEGORY_MAPPING`) HIT, else a **synchronous** Gemini call whose result is written back to the dictionary; apply the user's rule; **0원 or < 5,100원 → `NOT_INVESTED` + ledger insert + `IGNORE_*` action type** (early exit).
 4. **Target coin** (FEAT-SYS-006) — 2-stage quant engine: Stage 1 (12h AI universe of 15 per Risk×Trend combo) + Stage 2 (payment-time scoring over live price, theme prefs, meme acceptance, buy history); ~3s latency budget. Result saved as `PENDING_PURCHASE` and returned to the app, which raises its own local notification.
 5. **Approve → deposit → trade** (FEAT-SYS-004/005) — `POST /approve` requests an Upbit **KRW deposit with 2FA** (`two_factor_provider`) → `PENDING_DEPOSIT` → `UpbitDepositPollingScheduler` (3s) sees the deposit land and places the buy order → `PENDING_TRADE` → `UpbitTradePollingScheduler` (10s) sees the fill → `INVESTED` + portfolio update + SSE. Unapproved for 24h → `NOT_INVESTED`. Upbit 401 anywhere → `FAILED` + `UPBIT_INVALID_KEY` SSE event.
+
+> **The 2FA step happens in another app** (KakaoTalk/Naver/Hana), so leaving Tikkle during `PENDING_DEPOSIT` is the normal path and the SSE connection always drops. Don't treat a dropped stream as an error: the app re-subscribes via `GET /api/payments/in-progress` → `/stream`, and results that land while disconnected are delivered by FCM. `PaymentViewStatus.IN_PROGRESS` (not `PENDING`) marks already-approved events so the app doesn't offer the approve button again.
 
 > `POST /api/payments` never calls Upbit — the first Upbit call for a payment happens at `/approve`.
 

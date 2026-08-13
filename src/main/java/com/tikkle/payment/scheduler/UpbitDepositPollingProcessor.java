@@ -135,16 +135,27 @@ public class UpbitDepositPollingProcessor {
 
     @Transactional
     public void handleTimeout(Long eventId) {
+        // 2차 인증은 카카오·네이버 등 외부 앱에서 완료하므로 이 구간의 SSE는 대부분 끊겨 있다.
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
+
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event != null) {
             event.revertToPendingPurchase("업비트 입금 2차 인증 미완료로 타임아웃(210초). PENDING_PURCHASE로 복구");
         }
         sseConnectionManager.send(eventId, "TIMEOUT", "업비트 2차 인증 미완료로 입금 대기 타임아웃(210초). 결제 건은 PENDING_PURCHASE로 복구되어 재승인 가능");
         sseConnectionManager.complete(eventId);
+
+        if (!wasConnected) {
+            notifyByFcm(eventId, NotificationType.DEPOSIT_TIMEOUT,
+                    "2차 인증 시간이 지나 투자가 승인 대기 상태로 돌아갔어요. 다시 승인해 주세요.");
+        }
     }
 
     @Transactional
     public void handleTradeResult(Long eventId, UpbitTradeService.TradeResult result, String coinName) {
+        // 2차 인증 직후 체결되는 구간이라 사용자는 대개 카카오·네이버 앱에 있고 SSE는 끊겨 있다.
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
+
         PaymentEvent event = paymentEventRepository.findById(eventId).orElse(null);
         if (event == null) return;
 
@@ -168,6 +179,11 @@ public class UpbitDepositPollingProcessor {
             );
             sseConnectionManager.send(eventId, "SUCCESS", successData);
             sseConnectionManager.complete(eventId);
+
+            if (!wasConnected) {
+                notifyByFcm(eventId, NotificationType.TRADE_SUCCESS, String.format("%s %s개를 매수했어요.",
+                        coinName, result.executedVolume().stripTrailingZeros().toPlainString()));
+            }
         }
     }
 
@@ -208,6 +224,7 @@ public class UpbitDepositPollingProcessor {
 
     @Transactional
     public void handleGeneralError(Long eventId, String errorMessage) {
+        boolean wasConnected = sseConnectionManager.isConnected(eventId);
         orderApprovalService.markAsFailed(eventId, "매수 처리 중 예기치 못한 오류: " + errorMessage);
         Map<String, Object> errorData = Map.of(
                 "status", "FAILED",
@@ -215,6 +232,11 @@ public class UpbitDepositPollingProcessor {
         );
         sseConnectionManager.send(eventId, "FAILED", errorData);
         sseConnectionManager.complete(eventId);
+
+        if (!wasConnected) {
+            notifyByFcm(eventId, NotificationType.TRADE_FAILED,
+                    "투자 처리 중 오류가 발생해 매수를 완료하지 못했어요. 결제 내역에서 확인해 주세요.");
+        }
     }
 
     @Transactional
