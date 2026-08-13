@@ -324,8 +324,6 @@ stateDiagram-v2
 
 SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 커버한다. 지연 체결·10분 타임아웃·24시간 만료처럼 **SSE가 이미 끊긴 뒤 확정되는 결과**, 그리고 앱을 떠난 상태에서 도착하는 실패는 서버가 **FCM**으로 단독 발송한다. SSE와 FCM은 경쟁이 아니라 **역할 분담**이다.
 
-| `NotificationType` | 발송 지점(코드) | 대응 SSE 이벤트 | SSE 억제 |
-| --- | --- | --- | --- |
 **승인 이후 결제 건이 끝나는 경로는 아래가 전부이고, 모든 경로가 FCM 대상이다.** 어느 하나라도 빠지면 사용자는 결과를 통보받지 못한 채 방치된다.
 
 | `NotificationType` | 발송 지점(코드) | 대응 SSE 이벤트 | SSE 억제 |
@@ -342,9 +340,10 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 | `UPBIT_INVALID_KEY` | `UpbitTradePollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | 미적용 |
 | `ORDER_EXPIRED` | `PendingOrderExpirationScheduler.expireOldPendingOrders` | (없음) | 미적용 |
 
-- **억제 규칙**: SSE 커넥션이 살아있으면(사용자가 화면 대기 중) 동일 이벤트의 FCM은 보내지 않는다. `SseConnectionManager.isConnected(eventId)`로 판정하며, `complete()`가 맵에서 제거하므로 판정은 반드시 `send()` **이전에 캡처**한다.
+- **억제 규칙**: SSE **발송에 실제로 성공했으면** 동일 이벤트의 FCM은 보내지 않는다. `SseConnectionManager.send()`의 **반환값**으로 판정한다.
+- **커넥션 존재 여부로 판정하면 안 된다.** 서버는 다음 쓰기를 시도할 때 비로소 클라이언트의 끊김을 알게 되므로, 앱을 떠난 직후에는 emitter가 잠시 맵에 남아 "연결됨"으로 보인다. 그 상태에서 발송이 `IOException`으로 실패해도 FCM이 억제되어 결과가 유실된다. **하필 입금을 확인한 폴링 주기가 곧 최종 결과를 보내는 주기**여서 가장 중요한 이벤트가 이 창에 걸린다. 이 때문에 `isConnected()`는 제거했다.
 - **입금 210초 타임아웃**(`UpbitDepositPollingProcessor.handleTimeout`)도 FCM 대상이다. 2차 인증은 카카오·네이버 앱에서 완료하므로 이 구간의 사용자는 대부분 티끌 앱을 떠나 있고, SSE는 끊겨 있다. "사용자가 화면 앞에 있으므로 SSE만으로 충분하다"는 초기 가정은 성립하지 않아 인증을 놓친 사용자가 아무 통보도 받지 못했다. `PENDING_PURCHASE`로 복구되어 재승인이 가능하므로 알림 본문은 재승인을 안내한다.
-- **억제 규칙의 한계(알려진 이슈)**: `isConnected`는 TCP 커넥션의 생존만 판정하므로, 앱이 백그라운드로 내려갔는데 소켓이 잠시 유지되는 구간에서는 "연결됨"으로 판정되어 FCM이 억제될 수 있다. 그 사이 확정된 결과는 아무도 보지 않는 화면으로만 간다. 확실한 해법은 서버가 항상 FCM을 보내고 FE가 `eventId` 기준으로 중복을 제거하는 것이지만, 현재는 "FE에 중복 처리 부담을 주지 않는다"는 방침을 유지한다.
+- **남은 한계(알려진 이슈)**: `send()` 성공은 소켓에 써 넣는 데 성공했다는 뜻이지 앱이 실제로 화면에 표시했다는 보장은 아니다. 확실한 해법은 서버가 항상 FCM을 보내고 FE가 `eventId` 기준으로 중복을 제거하는 것이지만, 현재는 "FE에 중복 처리 부담을 주지 않는다"는 방침을 유지한다.
 - **발송이 생략되는 두 경우는 INFO로 로깅한다** — `tikkle.fcm.enabled=false`(빈 없음), 디바이스 토큰 0건. 생략되면 사용자에게 아무 흔적도 남지 않으므로, 로그가 없으면 "코드 누락인지 환경 문제인지" 구분할 수 없다.
 - **발송 3원칙**: ① 트랜잭션 커밋 이후 발송(`afterCommit`, 롤백 시 허위 알림 방지) ② 발송 실패는 상위로 전파하지 않고 로깅만(결제 파이프라인 비차단) ③ FCM이 무효 판정한 토큰(`UNREGISTERED`/`INVALID_ARGUMENT`)은 즉시 정리.
 - **비활성 스위치**: `tikkle.fcm.enabled=false`(로컬 기본값)이면 `FirebaseMessaging` 빈이 없어 발송은 no-op이 된다. 페이로드·딥링크 상세 계약은 `Tikkle_notification_spec.md` §7 참조.
