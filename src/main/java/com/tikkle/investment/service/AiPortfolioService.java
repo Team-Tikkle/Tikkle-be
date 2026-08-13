@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class AiPortfolioService {
+    private static final int RESPONSE_PREVIEW_LENGTH = 500;
+
     private final ChatClient chatClient;
     private final AlternativeClient alternativeClient;
     private final CoinGeckoClient coinGeckoClient;
@@ -276,18 +278,34 @@ public class AiPortfolioService {
                         .reduce("", String::concat)
                         .block();
                 
-                if (responseText != null) {
-                    int startIndex = responseText.indexOf('{');
-                    int endIndex = responseText.lastIndexOf('}');
-                    if (startIndex != -1 && endIndex != -1 && startIndex <= endIndex) {
-                        responseText = responseText.substring(startIndex, endIndex + 1);
-                    } else {
-                        throw new RuntimeException("JSON 형식의 응답이 아닙니다.");
-                    }
+                if (responseText == null) {
+                    log.error("[AiPortfolioService] AI 응답이 null - risk: {}, trend: {}", risk.name(), trend.name());
+                    throw new RuntimeException("JSON 형식의 응답이 아닙니다.");
                 }
 
-                AiCandidateResponse response = objectMapper.readValue(responseText, AiCandidateResponse.class);
-                        
+                int startIndex = responseText.indexOf('{');
+                int endIndex = responseText.lastIndexOf('}');
+                if (startIndex != -1 && endIndex != -1 && startIndex <= endIndex) {
+                    responseText = responseText.substring(startIndex, endIndex + 1);
+                } else {
+                    // 원문을 남기지 않으면 빈 응답인지 다른 형식인지 구분할 수 없어 원인 추적이 불가능하다
+                    log.error("[AiPortfolioService] AI 응답에 JSON이 없음 - risk: {}, trend: {}, length: {}, preview: {}",
+                            risk.name(), trend.name(), responseText.length(), preview(responseText));
+                    throw new RuntimeException("JSON 형식의 응답이 아닙니다.");
+                }
+
+                AiCandidateResponse response;
+                try {
+                    response = objectMapper.readValue(responseText, AiCandidateResponse.class);
+                } catch (Exception e) {
+                    // 스트림이 중간에 끊겨 절단된 JSON은 위 브레이스 검사를 통과하므로 여기서 걸린다.
+                    // 원문 없이는 절단인지 스키마 불일치인지 구분할 수 없다.
+                    log.error("[AiPortfolioService] AI 응답 JSON 파싱 실패 - risk: {}, trend: {}, length: {}, preview: {}",
+                            risk.name(), trend.name(), responseText.length(), preview(responseText));
+                    throw e;
+                }
+
+
                 log.info("[AiPortfolioService] AI 후보군 생성 완료 - candidatesSize: {}, risk: {}, trend: {}", 
                         response.candidates().size(), risk.name(), trend.name());
                 return response.candidates();
@@ -309,10 +327,25 @@ public class AiPortfolioService {
     }
 
     private void logFetchResult(String dataName, String dataValue) {
-        if (dataValue == null || dataValue.startsWith("Unknown")) {
+        // 빈 문자열도 수집 실패다. 성공으로 찍히면 데이터가 없는 채로 프롬프트가 구성된 것을 눈치챌 수 없다
+        if (dataValue == null || dataValue.isBlank() || dataValue.startsWith("Unknown")) {
             log.warn("[AiPortfolioService] 외부 API 수집 실패 - {}: {}", dataName, dataValue);
         } else {
             log.info("[AiPortfolioService] 외부 API 수집 성공 - {}: {}", dataName, dataValue);
         }
+    }
+
+    /**
+     * AI 응답 원문을 로그에 남기기 위해 앞부분만 잘라냅니다.
+     * 전문을 남기면 프롬프트 컨텍스트까지 섞여 로그가 비대해지므로 원인 판별에 필요한 만큼만 남깁니다.
+     */
+    private String preview(String responseText) {
+        // 공백만 있는 응답을 그대로 찍으면 로그에서 빈 응답과 구분되지 않는다
+        if (responseText.isBlank()) {
+            return "(빈 응답)";
+        }
+        return responseText.length() <= RESPONSE_PREVIEW_LENGTH
+                ? responseText
+                : responseText.substring(0, RESPONSE_PREVIEW_LENGTH) + "...(생략)";
     }
 }

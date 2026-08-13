@@ -266,7 +266,7 @@ Security config: STATELESS, CSRF off, CORS on, JWT filter before `UsernamePasswo
 >
 > `POST /api/payments` never calls Upbit — the first Upbit call for a payment happens at `/approve`.
 
-**Schedulers** (no distributed lock — single instance assumed):
+**Schedulers** (no distributed lock — single instance assumed). `SchedulingConfig` provides a dedicated `TaskScheduler` (pool 5, `tikkle-sched-*`) because Spring's default pool size of 1 lets one slow job stall every other scheduler — long jobs (`AiPortfolioScheduler`, `MarketTopicScheduler` startup run) are additionally `@Async` so they release the scheduler thread immediately:
 - `CoinSyncScheduler` — 04:00 KST — sync Upbit coin metadata
 - `AiPortfolioScheduler` — 02:00 / 14:00 KST — generate AI recommendation candidates per profile combo
 - `MarketTopicScheduler` — 07:00 / 18:00 KST — collect market topics from Google News RSS
