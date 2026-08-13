@@ -263,7 +263,7 @@ Security config: STATELESS, CSRF off, CORS on, JWT filter before `UsernamePasswo
 5. **Approve → deposit → trade** (FEAT-SYS-004/005) — `POST /approve` requests an Upbit **KRW deposit with 2FA** (`two_factor_provider`) → `PENDING_DEPOSIT` → `UpbitDepositPollingScheduler` (3s) sees the deposit land and places the buy order → `PENDING_TRADE` → `UpbitTradePollingScheduler` (10s) sees the fill → `INVESTED` + portfolio update + SSE. Unapproved for 24h → `NOT_INVESTED`. Upbit 401 anywhere → `FAILED` + `UPBIT_INVALID_KEY` SSE event.
 
 > **The 2FA step happens in another app** (KakaoTalk/Naver/Hana), so leaving Tikkle during `PENDING_DEPOSIT` is the normal path and the SSE connection always drops. Don't treat a dropped stream as an error: the app re-subscribes via `GET /api/payments/in-progress` → `/stream`, and results that land while disconnected are delivered by FCM. `PaymentViewStatus.IN_PROGRESS` (not `PENDING`) marks already-approved events so the app doesn't offer the approve button again.
-
+>
 > `POST /api/payments` never calls Upbit — the first Upbit call for a payment happens at `/approve`.
 
 **Schedulers** (no distributed lock — single instance assumed):

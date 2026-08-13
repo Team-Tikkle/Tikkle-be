@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PaymentHistoryService {
     private final PaymentEventRepository paymentEventRepository;
 
@@ -42,7 +43,6 @@ public class PaymentHistoryService {
      * @param month 조회할 월(yyyy-MM 형식)
      * @return 대시보드 통계 결과 DTO
      */
-    @Transactional(readOnly = true)
     public PaymentDashboardResponse getDashboard(Long userId, String month) {
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -88,7 +88,6 @@ public class PaymentHistoryService {
      * @param pageable 페이징 정보
      * @return 결제 내역 피드 결과(Slice)
      */
-    @Transactional(readOnly = true)
     public Slice<PaymentHistoryResponse> getHistoryFeed(Long userId, String status, String month, Pageable pageable) {
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -109,7 +108,6 @@ public class PaymentHistoryService {
      * @param userId 사용자 ID
      * @return 진행 중인 결제 건 목록 (최신순, 없으면 빈 목록)
      */
-    @Transactional(readOnly = true)
     public List<InProgressPaymentResponse> getInProgressPayments(Long userId) {
         List<PaymentEvent> events = paymentEventRepository.findInProgress(
                 userId, List.of(PaymentStatus.PENDING_DEPOSIT, PaymentStatus.PENDING_TRADE));
