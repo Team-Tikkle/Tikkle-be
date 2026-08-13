@@ -20,8 +20,6 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     Optional<PaymentEvent> findByIdAndUserId(Long id, Long userId);
 
-    boolean existsByIdAndUserId(Long id, Long userId);
-
     // 회원 탈퇴 시 원장 일괄 삭제
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM PaymentEvent p WHERE p.userId = :userId")
@@ -53,6 +51,15 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, Long
 
     @Query("SELECT p.targetCoin.market FROM PaymentEvent p WHERE p.userId = :userId AND p.status = com.tikkle.payment.entity.enums.PaymentStatus.INVESTED ORDER BY p.createdAt DESC")
     List<String> findRecentPurchasedMarkets(@Param("userId") Long userId, Pageable pageable);
+
+    // 앱 재진입 시 진행 중인 건 복구용 — 승인 이후(입금·체결) 단계만 조회
+    @EntityGraph(attributePaths = {"targetCoin"})
+    @Query("SELECT p FROM PaymentEvent p " +
+            "WHERE p.userId = :userId AND p.status IN :statuses " +
+            "ORDER BY p.createdAt DESC, p.id DESC")
+    List<PaymentEvent> findInProgress(
+            @Param("userId") Long userId,
+            @Param("statuses") List<PaymentStatus> statuses);
 
     @EntityGraph(attributePaths = {"targetCoin"})
     @Query("SELECT p FROM PaymentEvent p " +

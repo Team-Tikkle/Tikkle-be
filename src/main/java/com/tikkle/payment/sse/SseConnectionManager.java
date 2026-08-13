@@ -26,21 +26,30 @@ public class SseConnectionManager {
      * @return 생성된 SseEmitter 객체
      */
     public SseEmitter createEmitter(Long eventId) {
+        // 앱 이탈 후 재구독하는 경우 이전 커넥션이 맵에 남아있으므로 먼저 정리한다
+        SseEmitter previous = emitters.remove(eventId);
+        if (previous != null) {
+            log.info("[SseConnectionManager] 이전 SSE 커넥션 정리 후 재연결 - eventId: {}", eventId);
+            previous.complete();
+        }
+
         // 타임아웃 3분 30초 (업비트 2차인증 유효시간 3분 고려하여 넉넉히)
         SseEmitter emitter = new SseEmitter(210000L);
         emitters.put(eventId, emitter);
 
+        // 콜백은 비동기로 실행되므로, 재연결로 이미 교체된 뒤에 늦게 도착한 콜백이
+        // 새 커넥션을 지우지 않도록 자기 자신이 맵에 남아있을 때만 제거한다.
         emitter.onCompletion(() -> {
             log.info("[SseConnectionManager] SSE 커넥션 완료 - eventId: {}", eventId);
-            emitters.remove(eventId);
+            emitters.remove(eventId, emitter);
         });
         emitter.onTimeout(() -> {
             log.warn("[SseConnectionManager] SSE 커넥션 타임아웃 - eventId: {}", eventId);
-            emitters.remove(eventId);
+            emitters.remove(eventId, emitter);
         });
         emitter.onError((e) -> {
             log.error("[SseConnectionManager] SSE 커넥션 에러 - eventId: {}", eventId, e);
-            emitters.remove(eventId);
+            emitters.remove(eventId, emitter);
         });
 
         // 클라이언트 최초 연결 시 더미 데이터 발송하여 타임아웃 방지
@@ -66,7 +75,7 @@ public class SseConnectionManager {
                         .data(data));
             } catch (IOException e) {
                 log.error("[SseConnectionManager] SSE 발송 실패 - eventId: {}, name: {}", eventId, name, e);
-                emitters.remove(eventId);
+                emitters.remove(eventId, emitter);
             }
         } else {
             log.warn("[SseConnectionManager] 활성화된 SSE 커넥션이 없습니다 - eventId: {}", eventId);
@@ -91,10 +100,9 @@ public class SseConnectionManager {
      * @param eventId 결제 이벤트 ID
      */
     public void complete(Long eventId) {
-        SseEmitter emitter = emitters.get(eventId);
+        SseEmitter emitter = emitters.remove(eventId);
         if (emitter != null) {
             emitter.complete();
-            emitters.remove(eventId);
         }
     }
 }

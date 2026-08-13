@@ -215,15 +215,20 @@ stateDiagram-v2
 
 ### 7.2 프론트엔드 노출 상태 매핑 (`PaymentViewStatus`)
 
-결제 내역 API는 내부 6개 상태를 3개로 축약해 내려준다.
+결제 내역 API는 내부 6개 상태를 4개로 축약해 내려준다.
 
-| 내부 상태 | FE 노출 | `expiredAt` (승인 마감) | 추가 필드 |
+| 내부 상태 | FE 노출 | `expiredAt` (해당 단계 마감) | 추가 필드 |
 | --- | --- | --- | --- |
 | `PENDING_PURCHASE` | `PENDING` | 생성 시각 + **24시간** | 추천 코인 정보 |
-| `PENDING_DEPOSIT` | `PENDING` | 입금 요청 시각 + **210초** | — |
-| `PENDING_TRADE` | `PENDING` | 없음 | — |
+| `PENDING_DEPOSIT` | `IN_PROGRESS` | 입금 요청 시각 + **210초** | — |
+| `PENDING_TRADE` | `IN_PROGRESS` | 주문 접수 시각 + **10분** | — |
 | `INVESTED` | `INVESTED` | — | 체결 수량·단가 |
 | `NOT_INVESTED` / `FAILED` | `CANCELED` | — | — |
+
+> **`PENDING`과 `IN_PROGRESS`를 반드시 구분할 것.** `PENDING`만이 승인/거절 가능한 상태다.
+> 이전에는 승인 이후 단계(`PENDING_DEPOSIT`/`PENDING_TRADE`)도 `PENDING`으로 내려가, 앱이 이미 승인된 건에
+> 승인 버튼을 계속 노출했고 사용자가 누르면 `PAYMENT-006`이 발생했다. `IN_PROGRESS`에서는 승인/거절 버튼을
+> 숨기고 진행 상태만 표시한다.
 
 ---
 
@@ -254,6 +259,17 @@ stateDiagram-v2
 - 헤더: `Accept: text/event-stream`, `Authorization: Bearer {JWT}`
 - 구독 전 소유권 검증(타인 건은 `PAYMENT-004`) 후 emitter 등록. **연결 유지 시간 210초**(업비트 2차 인증 3분 + 여유)
 - approve가 `200 OK`로 떨어지는 **즉시** 구독할 것 (2차 인증 완료가 매우 빠를 수 있음)
+- **재구독 가능하며, 재구독이 정상 경로다.** 2차 인증은 카카오·네이버 등 외부 앱에서 완료하므로 이 구간에서 앱 이탈은 필연이고, 그때 SSE는 반드시 끊긴다. 앱 복귀 시 `GET /api/payments/in-progress`로 진행 중인 `eventId`를 얻어 다시 구독하면 된다.
+- 서버는 구독 직후 `CONNECTED`에 이어 **현재 상태 스냅샷을 1회 발송**한다(§9). 끊겨 있던 동안 확정된 결과가 그대로 전달되며, 이미 종료된 건이면 최종 이벤트를 보내고 연결을 즉시 닫으므로 210초를 헛되이 기다리지 않는다.
+- 같은 `eventId`로 다시 구독하면 서버가 이전 커넥션을 `complete()` 하고 교체한다(좀비 커넥션 누적 방지).
+
+### 8.4 `GET /api/payments/in-progress` — 진행 중인 건 조회
+
+- 승인 이후 아직 끝나지 않은 건(`PENDING_DEPOSIT`, `PENDING_TRADE`)을 최신순 배열로 반환. 없으면 빈 배열
+- 앱 재진입(onResume) 시 호출해 화면을 복구하고, 반환된 `eventId`로 §8.3을 재구독하는 것이 표준 복구 절차다
+- 응답 필드: `eventId`, `status`(내부 상태 그대로), `merchant`, `amount`, `spareChange`, `targetCoinMarket`, `targetCoinName`, `expiresAt`, `createdAt`
+- `expiresAt`은 **현재 단계**의 마감 시각이다 (`PENDING_DEPOSIT` → 입금 요청 + 210초, `PENDING_TRADE` → 주문 접수 + 10분). 남은 시간 표시에 그대로 쓸 수 있다
+- `PENDING_PURCHASE`(승인 대기)는 포함하지 않는다. 그건 진행 중인 건이 아니라 대기 목록이며 결제 피드가 담당한다
 
 ---
 
@@ -272,6 +288,20 @@ stateDiagram-v2
 | `TIMEOUT` | **최종** | 210초 내 2차 인증 미완료. **결제 건은 `PENDING_PURCHASE`로 복구되어 재승인 가능** | 시간 초과 안내 (§11.1 참고) |
 | `UPBIT_INVALID_KEY` | **최종** | 진행 중 키 만료/권한 박탈 감지 → `FAILED` | 재연동 유도 → 업비트 계정 관리 화면 |
 | `FAILED` | **최종** | 그 외 예기치 못한 서버 오류 → `FAILED` | 일반 실패 안내 |
+| `CLOSED` | **최종** | 재구독했으나 이미 `NOT_INVESTED`로 종료된 건 (거절·24시간 만료) | 진행 화면을 닫고 결제 내역으로 이동 |
+
+**구독 직후 상태 스냅샷**
+
+재구독이 정상 경로이므로(§8.3), 서버는 `CONNECTED` 직후 결제 건의 현재 상태를 아래 규칙으로 **1회 더** 발송한다. 이벤트 이름과 data 형태는 위 표와 완전히 동일하므로 FE는 별도 분기 없이 기존 핸들러로 처리하면 된다.
+
+| 구독 시점의 내부 상태 | 발송 이벤트 | 연결 |
+| --- | --- | --- |
+| `PENDING_DEPOSIT` | `PROCESSING` | 유지 (이후 폴링이 계속 발송) |
+| `PENDING_PURCHASE` | `TIMEOUT` | 즉시 종료 — 승인 건이 없거나 210초 타임아웃으로 복구된 상태이므로 재승인 안내 |
+| `PENDING_TRADE` | `PENDING_TRADE` | 즉시 종료 |
+| `INVESTED` | `SUCCESS` | 즉시 종료 |
+| `FAILED` | `FAILED` | 즉시 종료 |
+| `NOT_INVESTED` | `CLOSED` | 즉시 종료 |
 
 **데이터 예시**
 
@@ -288,7 +318,7 @@ stateDiagram-v2
 { "status": "TRADE_FAILED", "message": "업비트 매수 주문 접수 실패. 입금된 원화는 업비트 계좌에 잔류" }
 ```
 
-> `CONNECTED` / `PROCESSING`의 data는 JSON이 아닌 **평문 문자열**이므로 무조건 `JSON.parse` 하지 말 것. (현재 FE는 두 이벤트를 파싱 없이 무시하도록 구현되어 있다.)
+> `CONNECTED` / `PROCESSING` / `TIMEOUT`의 data는 JSON이 아닌 **평문 문자열**이므로 무조건 `JSON.parse` 하지 말 것. 나머지 이벤트는 위 예시와 같은 JSON 객체다. (현재 FE는 `CONNECTED`/`PROCESSING`을 파싱 없이 무시하도록 구현되어 있다.)
 
 ### 9.1 FCM 결과 알림 (SSE 보완)
 
@@ -296,16 +326,26 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 
 | `NotificationType` | 발송 지점(코드) | 대응 SSE 이벤트 | SSE 억제 |
 | --- | --- | --- | --- |
-| `TRADE_SUCCESS` | `UpbitTradePollingProcessor.handleSettledOrder` | `SUCCESS` | 미적용(지연 구간, 사실상 항상 끊김) |
+**승인 이후 결제 건이 끝나는 경로는 아래가 전부이고, 모든 경로가 FCM 대상이다.** 어느 하나라도 빠지면 사용자는 결과를 통보받지 못한 채 방치된다.
+
+| `NotificationType` | 발송 지점(코드) | 대응 SSE 이벤트 | SSE 억제 |
+| --- | --- | --- | --- |
+| `TRADE_SUCCESS` | `UpbitDepositPollingProcessor.handleTradeResult` (즉시 체결) | `SUCCESS` | **적용** |
+| `TRADE_FAILED` | `UpbitDepositPollingProcessor.handleTradeFailed` | `TRADE_FAILED` | **적용** |
+| `TRADE_FAILED` | `UpbitDepositPollingProcessor.handleGeneralError` | `FAILED` | **적용** |
+| `DEPOSIT_FAILED` | `UpbitDepositPollingProcessor.handleDepositFailed` | `DEPOSIT_FAILED` | **적용** |
+| `DEPOSIT_TIMEOUT` | `UpbitDepositPollingProcessor.handleTimeout` | `TIMEOUT` | **적용** |
+| `UPBIT_INVALID_KEY` | `UpbitDepositPollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | **적용** |
+| `TRADE_SUCCESS` | `UpbitTradePollingProcessor.handleSettledOrder` (지연 체결) | `SUCCESS` | 미적용(지연 구간, 사실상 항상 끊김) |
+| `TRADE_FAILED` | `UpbitTradePollingProcessor.handleSettledOrder` (체결 수량 0 / targetCoin 누락) | `TRADE_FAILED` | 미적용 |
 | `TRADE_TIMEOUT` | `UpbitTradePollingProcessor.handleTimeout` | `TRADE_FAILED` | 미적용 |
 | `UPBIT_INVALID_KEY` | `UpbitTradePollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | 미적용 |
-| `DEPOSIT_FAILED` | `UpbitDepositPollingProcessor.handleDepositFailed` | `DEPOSIT_FAILED` | **적용** |
-| `TRADE_FAILED` | `UpbitDepositPollingProcessor.handleTradeFailed` | `TRADE_FAILED` | **적용** |
-| `UPBIT_INVALID_KEY` | `UpbitDepositPollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | **적용** |
 | `ORDER_EXPIRED` | `PendingOrderExpirationScheduler.expireOldPendingOrders` | (없음) | 미적용 |
 
 - **억제 규칙**: SSE 커넥션이 살아있으면(사용자가 화면 대기 중) 동일 이벤트의 FCM은 보내지 않는다. `SseConnectionManager.isConnected(eventId)`로 판정하며, `complete()`가 맵에서 제거하므로 판정은 반드시 `send()` **이전에 캡처**한다.
-- **입금 210초 타임아웃**(`UpbitDepositPollingProcessor.handleTimeout`)은 FCM 대상이 **아니다**. `PENDING_PURCHASE`로 복구되어 재승인 가능하고 사용자가 화면 앞에 있으므로 SSE `TIMEOUT`만으로 충분하다.
+- **입금 210초 타임아웃**(`UpbitDepositPollingProcessor.handleTimeout`)도 FCM 대상이다. 2차 인증은 카카오·네이버 앱에서 완료하므로 이 구간의 사용자는 대부분 티끌 앱을 떠나 있고, SSE는 끊겨 있다. "사용자가 화면 앞에 있으므로 SSE만으로 충분하다"는 초기 가정은 성립하지 않아 인증을 놓친 사용자가 아무 통보도 받지 못했다. `PENDING_PURCHASE`로 복구되어 재승인이 가능하므로 알림 본문은 재승인을 안내한다.
+- **억제 규칙의 한계(알려진 이슈)**: `isConnected`는 TCP 커넥션의 생존만 판정하므로, 앱이 백그라운드로 내려갔는데 소켓이 잠시 유지되는 구간에서는 "연결됨"으로 판정되어 FCM이 억제될 수 있다. 그 사이 확정된 결과는 아무도 보지 않는 화면으로만 간다. 확실한 해법은 서버가 항상 FCM을 보내고 FE가 `eventId` 기준으로 중복을 제거하는 것이지만, 현재는 "FE에 중복 처리 부담을 주지 않는다"는 방침을 유지한다.
+- **발송이 생략되는 두 경우는 INFO로 로깅한다** — `tikkle.fcm.enabled=false`(빈 없음), 디바이스 토큰 0건. 생략되면 사용자에게 아무 흔적도 남지 않으므로, 로그가 없으면 "코드 누락인지 환경 문제인지" 구분할 수 없다.
 - **발송 3원칙**: ① 트랜잭션 커밋 이후 발송(`afterCommit`, 롤백 시 허위 알림 방지) ② 발송 실패는 상위로 전파하지 않고 로깅만(결제 파이프라인 비차단) ③ FCM이 무효 판정한 토큰(`UNREGISTERED`/`INVALID_ARGUMENT`)은 즉시 정리.
 - **비활성 스위치**: `tikkle.fcm.enabled=false`(로컬 기본값)이면 `FirebaseMessaging` 빈이 없어 발송은 no-op이 된다. 페이로드·딥링크 상세 계약은 `Tikkle_notification_spec.md` §7 참조.
 
@@ -321,9 +361,10 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 | --- | --- |
 | 그 외 (대기 중) | SSE `PROCESSING` 발송 후 다음 주기 대기 |
 | `ACCEPTED` | 즉시 시장가 매수 실행 (§10.2) |
-| `REJECTED` / `CANCELED` | `FAILED` 마킹 + SSE `DEPOSIT_FAILED` (출금된 원화 없음) |
-| **210초 경과** | **`PENDING_PURCHASE`로 복구**(재승인 가능) + SSE `TIMEOUT` |
-| 업비트 401/403 | `FAILED` + SSE `UPBIT_INVALID_KEY` |
+| `REJECTED` / `CANCELED` | `FAILED` 마킹 + SSE `DEPOSIT_FAILED` + FCM `DEPOSIT_FAILED` (출금된 원화 없음) |
+| **210초 경과** | **`PENDING_PURCHASE`로 복구**(재승인 가능) + SSE `TIMEOUT` + FCM `DEPOSIT_TIMEOUT` |
+| 업비트 401/403 | `FAILED` + SSE `UPBIT_INVALID_KEY` + FCM `UPBIT_INVALID_KEY` |
+| 그 외 예기치 못한 오류 | `FAILED` + SSE `FAILED` + FCM `TRADE_FAILED` |
 
 ### 10.2 시장가 매수 — `UpbitTradeService`
 
@@ -331,7 +372,7 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 2. **멱등 주문**: 주문 identifier로 `tikkle-{eventId}` 고정값을 사용. 요청 실패 시 identifier로 재조회해 실제 접수 여부를 확인한 뒤에만 실패로 확정 → 동일 결제 건이 업비트에 중복 주문되지 않음
 3. **퀵 체결 확인**: 0.5초 간격 × 최대 10회(약 5초) 주문 상태 폴링
    - 시장가 매수는 부분 체결 후 잔량이 `cancel` 되는 것이 정상 흐름이므로 **`done`과 `cancel` 모두 체결 확인 대상**이며, 개별 체결 내역(trades)의 수량·금액을 합산해 평균 단가를 계산한다
-   - 체결 확인 → `INVESTED` + `PORTFOLIOS` 갱신 + SSE `SUCCESS` + 연결 종료
+   - 체결 확인 → `INVESTED` + `PORTFOLIOS` 갱신 + SSE `SUCCESS` + FCM `TRADE_SUCCESS`(연결이 끊겨 있을 때) + 연결 종료
    - 5초 내 미확인 → `PENDING_TRADE` 전이 + SSE `PENDING_TRADE` + 연결 종료 (이후는 §10.3)
 4. **주문 접수 후에는 예외를 밖으로 던지지 않는다.** uuid를 잃으면 사용자의 코인이 유실되므로, 체결 확인 중 오류가 나도 `PENDING_TRADE`로 전환해 스케줄러가 이어서 추적한다.
 
@@ -341,10 +382,13 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 
 | 상황 | 처리 |
 | --- | --- |
-| `done`/`cancel` + 체결 수량 > 0 | 부분 체결 포함 합산 → `INVESTED` + 포트폴리오 갱신 (+ 연결이 살아있으면 SSE `SUCCESS`) |
-| `done`/`cancel` + 체결 수량 0 | `FAILED` (원화는 업비트 잔류) |
-| **10분 경과** | 주문 강제 취소 후 `FAILED` — 시장 변동성에 물리는 것 방지. **취소된 원화는 환불되지 않고 업비트 계좌에 보관** |
-| 업비트 401/403 | `FAILED` (키 만료) |
+| `done`/`cancel` + 체결 수량 > 0 | 부분 체결 포함 합산 → `INVESTED` + 포트폴리오 갱신 + SSE `SUCCESS` + FCM `TRADE_SUCCESS` |
+| `done`/`cancel` + 체결 수량 0 | `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_FAILED` (원화는 업비트 잔류) |
+| `targetCoin` 정보 누락 | `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_FAILED` (원화는 업비트 잔류) |
+| **10분 경과** | 주문 강제 취소 후 `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_TIMEOUT` — 시장 변동성에 물리는 것 방지. **취소된 원화는 환불되지 않고 업비트 계좌에 보관** |
+| 업비트 401/403 | `FAILED` + SSE `UPBIT_INVALID_KEY` + FCM `UPBIT_INVALID_KEY` |
+
+> **원화가 업비트에 남는 실패는 반드시 통보한다.** 이전에는 체결 수량 0 / `targetCoin` 누락 두 경로가 SSE도 FCM도 없이 조용히 `FAILED`로만 끝나, 사용자가 자기 원화가 업비트에 있다는 사실을 알 방법이 없었다.
 
 ### 10.4 스케줄러 요약
 
@@ -376,6 +420,8 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 ### 11.1 알려진 이슈 / 개선 후보
 
 - **TIMEOUT 처리 FE-BE 불일치**: 백엔드는 2차 인증 타임아웃 시 건을 `PENDING_PURCHASE`로 복구해 재승인이 가능하지만, 현재 FE(`PaymentReviewView`)는 `TIMEOUT` 수신 시 해당 건을 로컬에서 '취소'로 표시한다. 목록을 새로고침하면 다시 '대기 중'으로 보이므로, FE가 TIMEOUT을 "재시도 가능" UX로 바꾸는 것이 정합적이다.
+- **FE 재구독 미구현 (BE 준비 완료)**: 2차 인증 구간의 앱 이탈은 정상 경로이므로 FE는 앱 재진입(onResume) 시 ① `GET /api/payments/in-progress` 호출 → ② 진행 중인 건이 있으면 해당 화면 복구 → ③ 그 `eventId`로 `/stream` 재구독, 의 순서를 구현해야 한다. 서버는 구독 직후 상태 스냅샷을 보내므로 끊겨 있던 동안의 결과가 유실되지 않는다.
+- **승인 버튼 노출 조건**: 결제 피드에서 승인/거절 버튼은 `status == PENDING`일 때만 노출할 것. `IN_PROGRESS`는 이미 승인된 건이라 요청하면 `PAYMENT-006`이 떨어진다.
 - **업비트 키 사전 점검**: 앱 부팅 시 `GET /api/users/me`의 `hasUpbitKey: false`를 감지하면 재연동을 선제 안내할 수 있다 (온보딩 화면의 키 만료 재연동 모드로 연결됨).
 
 ---

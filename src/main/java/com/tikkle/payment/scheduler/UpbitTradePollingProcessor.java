@@ -162,6 +162,7 @@ public class UpbitTradePollingProcessor {
         if (info.targetMarket() == null || info.coinName() == null) {
             log.error("[UpbitTradePollingProcessor] targetCoin 정보 누락 - eventId: {}", eventId);
             event.failInvestment("targetCoin 정보 누락으로 체결 반영 불가");
+            notifyTradeFailed(eventId, info.userId(), "매수 처리에 실패했어요. 입금된 원화는 업비트 계좌에 있습니다.");
             return;
         }
 
@@ -180,6 +181,7 @@ public class UpbitTradePollingProcessor {
         if (totalVolume.compareTo(BigDecimal.ZERO) == 0) {
             log.warn("[UpbitTradePollingProcessor] 주문 종료(state={}) 이나 체결 수량 0 - eventId: {}", state, eventId);
             event.failInvestment("주문 state=" + state + " 이나 체결 수량 0. 입금된 원화는 업비트 계좌에 잔류");
+            notifyTradeFailed(eventId, info.userId(), "매수가 체결되지 않았어요. 입금된 원화는 업비트 계좌에 있습니다.");
             return;
         }
 
@@ -205,6 +207,21 @@ public class UpbitTradePollingProcessor {
         String successBody = String.format("%s %s개를 매수했어요.",
                 info.coinName(), totalVolume.stripTrailingZeros().toPlainString());
         pushNotificationService.send(info.userId(), NotificationType.TRADE_SUCCESS, successBody, eventId);
+    }
+
+    /**
+     * 체결 반영 없이 실패로 끝나는 경로에 결과를 통보합니다.
+     * 이 경로들은 입금된 원화가 업비트 계좌에 남으므로, 돈의 위치를 반드시 사용자에게 알려야 합니다.
+     */
+    private void notifyTradeFailed(Long eventId, Long userId, String body) {
+        Map<String, Object> errorData = Map.of(
+                "status", "TRADE_FAILED",
+                "message", body
+        );
+        sseConnectionManager.send(eventId, "TRADE_FAILED", errorData);
+        sseConnectionManager.complete(eventId);
+
+        pushNotificationService.send(userId, NotificationType.TRADE_FAILED, body, eventId);
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.tikkle.payment.service;
 
 
 import com.tikkle.global.exception.InvalidInputValueException;
+import com.tikkle.payment.dto.response.InProgressPaymentResponse;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
@@ -98,6 +99,24 @@ public class PaymentHistoryService {
         Slice<PaymentEvent> events = paymentEventRepository.findHistoryFeed(userId, startOfMonth, endOfMonth, mappedStatuses, pageable);
 
         return events.map(PaymentHistoryResponse::from);
+    }
+
+    /**
+     * 매수 승인 이후 아직 끝나지 않은 결제 건을 조회합니다.
+     * 2차 인증을 위해 앱을 벗어났다 돌아온 사용자가 진행 중인 건의 화면을 복구하고
+     * 해당 eventId로 SSE를 재구독할 수 있게 하는 용도입니다.
+     *
+     * @param userId 사용자 ID
+     * @return 진행 중인 결제 건 목록 (최신순, 없으면 빈 목록)
+     */
+    @Transactional(readOnly = true)
+    public List<InProgressPaymentResponse> getInProgressPayments(Long userId) {
+        List<PaymentEvent> events = paymentEventRepository.findInProgress(
+                userId, List.of(PaymentStatus.PENDING_DEPOSIT, PaymentStatus.PENDING_TRADE));
+
+        return events.stream()
+                .map(InProgressPaymentResponse::from)
+                .toList();
     }
 
     /**
