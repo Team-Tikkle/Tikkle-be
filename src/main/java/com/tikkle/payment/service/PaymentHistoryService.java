@@ -2,6 +2,7 @@ package com.tikkle.payment.service;
 
 
 import com.tikkle.global.exception.InvalidInputValueException;
+import com.tikkle.payment.dto.response.InProgressPaymentResponse;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.entity.PaymentEvent;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PaymentHistoryService {
     private final PaymentEventRepository paymentEventRepository;
 
@@ -41,7 +43,6 @@ public class PaymentHistoryService {
      * @param month 조회할 월(yyyy-MM 형식)
      * @return 대시보드 통계 결과 DTO
      */
-    @Transactional(readOnly = true)
     public PaymentDashboardResponse getDashboard(Long userId, String month) {
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -87,7 +88,6 @@ public class PaymentHistoryService {
      * @param pageable 페이징 정보
      * @return 결제 내역 피드 결과(Slice)
      */
-    @Transactional(readOnly = true)
     public Slice<PaymentHistoryResponse> getHistoryFeed(Long userId, String status, String month, Pageable pageable) {
         YearMonth yearMonth = parseMonth(month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -98,6 +98,23 @@ public class PaymentHistoryService {
         Slice<PaymentEvent> events = paymentEventRepository.findHistoryFeed(userId, startOfMonth, endOfMonth, mappedStatuses, pageable);
 
         return events.map(PaymentHistoryResponse::from);
+    }
+
+    /**
+     * 매수 승인 이후 아직 끝나지 않은 결제 건을 조회합니다.
+     * 2차 인증을 위해 앱을 벗어났다 돌아온 사용자가 진행 중인 건의 화면을 복구하고
+     * 해당 eventId로 SSE를 재구독할 수 있게 하는 용도입니다.
+     *
+     * @param userId 사용자 ID
+     * @return 진행 중인 결제 건 목록 (최신순, 없으면 빈 목록)
+     */
+    public List<InProgressPaymentResponse> getInProgressPayments(Long userId) {
+        List<PaymentEvent> events = paymentEventRepository.findInProgress(
+                userId, List.of(PaymentStatus.PENDING_DEPOSIT, PaymentStatus.PENDING_TRADE));
+
+        return events.stream()
+                .map(InProgressPaymentResponse::from)
+                .toList();
     }
 
     /**

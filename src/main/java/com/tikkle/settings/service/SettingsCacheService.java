@@ -29,10 +29,10 @@ public class SettingsCacheService {
      * Redis에서 유저 설정을 조회하고, 캐시 미스 시 DB에서 복구한다.
      */
     public Map<String, String> getUserSettings(Long userId) {
-        String redisKey = "user:settings:" + userId;
+        String redisKey = SettingsCacheManager.USER_SETTINGS_CACHE_PREFIX + userId;
         Map<Object, Object> rawSettings = redisTemplate.opsForHash().entries(redisKey);
 
-        if (rawSettings != null && !rawSettings.isEmpty() && rawSettings.containsKey("targetCardCompany")) {
+        if (rawSettings != null && !rawSettings.isEmpty()) {
             Map<String, String> settings = new HashMap<>();
             rawSettings.forEach((k, v) -> settings.put(String.valueOf(k), String.valueOf(v)));
             return settings;
@@ -54,8 +54,13 @@ public class SettingsCacheService {
         }
 
         Map<String, String> cacheData = new HashMap<>();
-        cacheData.put("targetCardCompany", account.getTargetCardCompany());
-        cacheData.put("targetCardLast4", account.getTargetCardLast4());
+        // 타겟 카드 미등록 상태면 필드를 넣지 않는다(결제 시 타겟 카드 불일치로 처리됨)
+        if (account.getTargetCardCompany() != null) {
+            cacheData.put("targetCardCompany", account.getTargetCardCompany());
+        }
+        if (account.getTargetCardLast4() != null) {
+            cacheData.put("targetCardLast4", account.getTargetCardLast4());
+        }
         cacheData.put("isInvestmentEnabled", String.valueOf(account.isInvestmentEnabled()));
         rules.forEach(rule -> {
             if (rule.getCategory() != null) {

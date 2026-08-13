@@ -6,6 +6,7 @@ import com.tikkle.payment.exception.InvalidPaymentStatusException;
 import com.tikkle.payment.exception.PaymentEventNotFoundException;
 import com.tikkle.payment.exception.UpbitTradeException;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.payment.sse.SseConnectionManager;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.upbit.dto.response.UpbitDepositResponse;
 import com.tikkle.user.entity.LinkedAccount;
@@ -18,6 +19,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 매수 승인 및 거절 비즈니스 로직을 처리하는 서비스입니다.
@@ -29,6 +34,7 @@ public class OrderApprovalService {
     private final PaymentEventRepository paymentEventRepository;
     private final LinkedAccountRepository linkedAccountRepository;
     private final UpbitDepositClient upbitDepositClient;
+    private final SseConnectionManager sseConnectionManager;
 
     /**
      * 대기 중인 결제 건에 대해 매수를 승인하고, 업비트 API를 통해 원화 입금을 요청(2차 인증 발송)합니다.
@@ -85,18 +91,71 @@ public class OrderApprovalService {
     }
 
     /**
-     * SSE 구독 전에 해당 결제 건이 요청자 본인의 것인지 검증합니다.
+     * 결제 진행 상황 SSE를 구독합니다.
      * 남의 결제 건 존재 여부가 드러나지 않도록 소유자가 아니면 없는 건과 동일하게 처리합니다.
+     *
+     * <p>2차 인증은 카카오·네이버 등 외부 앱에서 완료하므로 이 구간에서 앱 이탈은 정상 경로이고,
+     * 그때 SSE는 반드시 끊깁니다. 따라서 구독 직후 현재 상태를 1회 내려보내
+     * 끊겨 있는 동안 발생한 변화를 복구할 수 있게 합니다.
      *
      * @param userId 사용자 ID
      * @param eventId 구독할 결제 이벤트 ID
+     * @return 결제 진행 상황을 전달하는 SseEmitter
      */
     @Transactional(readOnly = true)
-    public void validateEventOwnership(Long userId, Long eventId) {
-        if (!paymentEventRepository.existsByIdAndUserId(eventId, userId)) {
-            log.warn("[OrderApprovalService] 타인의 결제 건 구독 시도 차단 - userId: {}, eventId: {}", userId, eventId);
-            throw new PaymentEventNotFoundException();
+    public SseEmitter subscribe(Long userId, Long eventId) {
+        PaymentEvent event = paymentEventRepository.findByIdAndUserId(eventId, userId)
+                .orElseThrow(() -> {
+                    log.warn("[OrderApprovalService] 타인의 결제 건 구독 시도 차단 - userId: {}, eventId: {}", userId, eventId);
+                    return new PaymentEventNotFoundException();
+                });
+
+        SseEmitter emitter = sseConnectionManager.createEmitter(eventId);
+        publishCurrentStatus(event);
+        return emitter;
+    }
+
+    /**
+     * 구독 직후 결제 건의 현재 상태를 1회 발송합니다.
+     * 이미 종료된 건이면 최종 이벤트를 보내고 연결을 즉시 닫아, 클라이언트가 210초를 헛되이 대기하지 않게 합니다.
+     */
+    private void publishCurrentStatus(PaymentEvent event) {
+        Long eventId = event.getId();
+        log.info("[OrderApprovalService] SSE 구독 시점 상태 스냅샷 발송 - eventId: {}, status: {}", eventId, event.getStatus());
+
+        // data 형태는 기존 발송 지점과 동일하게 맞춘다. TIMEOUT/PROCESSING만 평문 문자열, 나머지는 JSON.
+        switch (event.getStatus()) {
+            case PENDING_DEPOSIT -> sseConnectionManager.send(eventId, "PROCESSING", "업비트 입금 2차 인증 대기 중");
+            case PENDING_PURCHASE -> sendFinal(eventId, "TIMEOUT",
+                    "진행 중인 승인 건이 없습니다. 결제 건은 PENDING_PURCHASE 상태로 재승인 가능");
+            case PENDING_TRADE -> sendFinal(eventId, "PENDING_TRADE", Map.of(
+                    "status", "PENDING_TRADE",
+                    "message", "주문 접수됨. 체결 결과는 결제 내역 재조회 또는 푸시 알림으로 확인 필요"));
+            case INVESTED -> sendInvested(event);
+            case FAILED -> sendFinal(eventId, "FAILED", Map.of(
+                    "status", "FAILED",
+                    "message", "매수가 실패로 종료된 결제 건"));
+            case NOT_INVESTED -> sendFinal(eventId, "CLOSED", Map.of(
+                    "status", "CLOSED",
+                    "message", "투자가 진행되지 않고 종료된 결제 건"));
         }
+    }
+
+    private void sendFinal(Long eventId, String name, Object data) {
+        sseConnectionManager.send(eventId, name, data);
+        sseConnectionManager.complete(eventId);
+    }
+
+    private void sendInvested(PaymentEvent event) {
+        Map<String, Object> successData = new LinkedHashMap<>();
+        successData.put("status", "SUCCESS");
+        successData.put("message", "시장가 매수 체결 완료");
+        successData.put("targetCoinName", event.getTargetCoin() != null ? event.getTargetCoin().getKoreanName() : "코인");
+        successData.put("investedVolume", event.getInvestedVolume());
+        successData.put("investedPrice", event.getInvestedPrice());
+
+        sseConnectionManager.send(event.getId(), "SUCCESS", successData);
+        sseConnectionManager.complete(event.getId());
     }
 
     /**

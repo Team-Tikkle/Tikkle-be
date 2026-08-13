@@ -58,15 +58,16 @@ public class PushNotificationService {
 
     private void doSend(Long userId, NotificationType type, String body, Long eventId) {
         try {
+            // 발송이 생략되면 사용자에게 아무 흔적도 남지 않으므로, 그 사유는 INFO로 남겨 원인 추적이 가능하게 한다.
             FirebaseMessaging messaging = firebaseMessagingProvider.getIfAvailable();
             if (messaging == null) {
-                log.debug("[PushNotificationService] FCM 비활성화 상태 - 발송 생략 userId: {}, type: {}", userId, type);
+                log.info("[PushNotificationService] FCM 발송 생략 - reason: FCM 비활성화(tikkle.fcm.enabled=false), userId: {}, type: {}", userId, type);
                 return;
             }
 
             List<DeviceToken> deviceTokens = deviceTokenRepository.findByUserId(userId);
             if (deviceTokens.isEmpty()) {
-                log.debug("[PushNotificationService] 등록된 디바이스 토큰 없음 - 발송 생략 userId: {}", userId);
+                log.info("[PushNotificationService] FCM 발송 생략 - reason: 등록된 디바이스 토큰 없음(앱의 토큰 등록 미완료), userId: {}, type: {}", userId, type);
                 return;
             }
 

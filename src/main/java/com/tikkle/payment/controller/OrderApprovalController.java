@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.http.MediaType;
-import com.tikkle.payment.sse.SseConnectionManager;
 
 import com.tikkle.global.security.CustomUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +23,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 @RequestMapping("/api/payments/{eventId}")
 public class OrderApprovalController implements OrderApprovalSwagger {
     private final OrderApprovalService orderApprovalService;
-    private final SseConnectionManager sseConnectionManager;
 
     /**
      * 대기 중인 결제 건에 대해 매수를 승인합니다.
@@ -55,8 +53,7 @@ public class OrderApprovalController implements OrderApprovalSwagger {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long eventId
     ) {
-        orderApprovalService.validateEventOwnership(userDetails.getUserId(), eventId);
-        return sseConnectionManager.createEmitter(eventId);
+        return orderApprovalService.subscribe(userDetails.getUserId(), eventId);
     }
 
     /**

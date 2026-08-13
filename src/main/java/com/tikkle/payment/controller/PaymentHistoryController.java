@@ -2,6 +2,7 @@ package com.tikkle.payment.controller;
 
 import com.tikkle.global.security.CustomUserDetails;
 import com.tikkle.global.response.ApiResponse;
+import com.tikkle.payment.dto.response.InProgressPaymentResponse;
 import com.tikkle.payment.dto.response.PaymentDashboardResponse;
 import com.tikkle.payment.dto.response.PaymentHistoryResponse;
 import com.tikkle.payment.service.PaymentHistoryService;
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
 import com.tikkle.payment.dto.request.CategoryUpdateRequest;
+
+import java.util.List;
 
 /**
  * 결제 내역 조회 및 대시보드 관련 API 엔드포인트를 제공하는 컨트롤러입니다.
@@ -67,6 +70,20 @@ public class PaymentHistoryController implements PaymentHistorySwagger {
     ) {
         Slice<PaymentHistoryResponse> response = paymentHistoryService.getHistoryFeed(userDetails.getUserId(), status, month, pageable);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 매수 승인 이후 아직 끝나지 않은 결제 건을 조회합니다.
+     *
+     * @param userDetails 인증된 사용자 정보
+     * @return 진행 중인 결제 건 목록
+     */
+    @Override
+    @GetMapping("/in-progress")
+    public ApiResponse<List<InProgressPaymentResponse>> getInProgressPayments(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ApiResponse.success(paymentHistoryService.getInProgressPayments(userDetails.getUserId()));
     }
 
     /**
