@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class AiPortfolioService {
+    private static final int RESPONSE_PREVIEW_LENGTH = 500;
+
     private final ChatClient chatClient;
     private final AlternativeClient alternativeClient;
     private final CoinGeckoClient coinGeckoClient;
@@ -282,6 +284,9 @@ public class AiPortfolioService {
                     if (startIndex != -1 && endIndex != -1 && startIndex <= endIndex) {
                         responseText = responseText.substring(startIndex, endIndex + 1);
                     } else {
+                        // 원문을 남기지 않으면 빈 응답인지 다른 형식인지 구분할 수 없어 원인 추적이 불가능하다
+                        log.error("[AiPortfolioService] AI 응답에 JSON이 없음 - risk: {}, trend: {}, length: {}, preview: {}",
+                                risk.name(), trend.name(), responseText.length(), preview(responseText));
                         throw new RuntimeException("JSON 형식의 응답이 아닙니다.");
                     }
                 }
@@ -309,10 +314,24 @@ public class AiPortfolioService {
     }
 
     private void logFetchResult(String dataName, String dataValue) {
-        if (dataValue == null || dataValue.startsWith("Unknown")) {
+        // 빈 문자열도 수집 실패다. 성공으로 찍히면 데이터가 없는 채로 프롬프트가 구성된 것을 눈치챌 수 없다
+        if (dataValue == null || dataValue.isBlank() || dataValue.startsWith("Unknown")) {
             log.warn("[AiPortfolioService] 외부 API 수집 실패 - {}: {}", dataName, dataValue);
         } else {
             log.info("[AiPortfolioService] 외부 API 수집 성공 - {}: {}", dataName, dataValue);
         }
+    }
+
+    /**
+     * AI 응답 원문을 로그에 남기기 위해 앞부분만 잘라냅니다.
+     * 전문을 남기면 프롬프트 컨텍스트까지 섞여 로그가 비대해지므로 원인 판별에 필요한 만큼만 남깁니다.
+     */
+    private String preview(String responseText) {
+        if (responseText.isEmpty()) {
+            return "(빈 응답)";
+        }
+        return responseText.length() <= RESPONSE_PREVIEW_LENGTH
+                ? responseText
+                : responseText.substring(0, RESPONSE_PREVIEW_LENGTH) + "...(생략)";
     }
 }

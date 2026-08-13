@@ -52,17 +52,21 @@ public class UpbitDepositPollingProcessor {
             EventInfo info = self.getEventInfo(eventId);
             if (info == null) return;
 
-            // 1. 타임아웃 검사 (210초)
             LocalDateTime baseTime = info.depositRequestedAt() != null ? info.depositRequestedAt() : info.createdAt();
-            if (baseTime.plusSeconds(TIMEOUT_SECONDS).isBefore(LocalDateTime.now())) {
-                log.warn("[UpbitDepositPollingProcessor] 입금 대기 타임아웃 - eventId: {}", eventId);
-                self.handleTimeout(eventId);
+            boolean expired = baseTime.plusSeconds(TIMEOUT_SECONDS).isBefore(LocalDateTime.now());
+
+            // 계좌 정보가 없으면 입금 상태를 확인할 방법이 없으므로 경과 시간만으로 판단한다
+            if (info.account() == null) {
+                if (expired) {
+                    log.warn("[UpbitDepositPollingProcessor] 입금 대기 타임아웃(계좌 정보 없음) - eventId: {}", eventId);
+                    self.handleTimeout(eventId);
+                }
                 return;
             }
 
-            if (info.account() == null) return;
-
-            // 2. 입금 상태 조회 (외부 API - 트랜잭션 없음)
+            // 1. 입금 상태 조회 (외부 API - 트랜잭션 없음)
+            // 타임아웃 판정보다 먼저 조회한다. 폴링이 다른 작업에 밀려 지연되면 실제로 도착한 입금까지
+            // 조회 없이 타임아웃 처리되고, 사용자가 재승인하면 원화가 이중 입금된다.
             log.info("[UpbitDepositPollingProcessor] 업비트 입금 상태 조회 API 폴링 시작 - eventId: {}, depositUuid: {}", eventId, info.depositUuid());
             UpbitDepositResponse response = upbitDepositClient.getDepositDetails(
                     info.depositUuid(),
@@ -71,8 +75,11 @@ public class UpbitDepositPollingProcessor {
             );
             log.info("[UpbitDepositPollingProcessor] 업비트 입금 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, response.state());
 
-            // 3. 상태가 ACCEPTED 인 경우 매수 체결 진행
+            // 2. 상태가 ACCEPTED 인 경우 매수 체결 진행. 경과 시간과 무관하게 입금이 도착했으면 진행한다
             if ("ACCEPTED".equalsIgnoreCase(response.state())) {
+                if (expired) {
+                    log.warn("[UpbitDepositPollingProcessor] 타임아웃 경과 후 입금 도착 확인, 매수 진행 - eventId: {}", eventId);
+                }
                 log.info("[UpbitDepositPollingProcessor] 입금 완료 확인, 매수 진행 - eventId: {}", eventId);
 
                 String targetMarket = info.targetMarket() != null ? info.targetMarket() : DEFAULT_FALLBACK_MARKET;
@@ -83,6 +90,10 @@ public class UpbitDepositPollingProcessor {
             } else if ("REJECTED".equalsIgnoreCase(response.state()) || "CANCELED".equalsIgnoreCase(response.state())) {
                 log.warn("[UpbitDepositPollingProcessor] 입금 거절/취소 - eventId: {}, state: {}", eventId, response.state());
                 self.handleDepositFailed(eventId);
+            } else if (expired) {
+                // 3. 입금이 도착하지 않은 채 210초가 지났을 때만 타임아웃 처리한다
+                log.warn("[UpbitDepositPollingProcessor] 입금 대기 타임아웃 - eventId: {}, state: {}", eventId, response.state());
+                self.handleTimeout(eventId);
             } else {
                 sseConnectionManager.send(eventId, "PROCESSING", "업비트 입금 2차 인증 대기 중");
             }
