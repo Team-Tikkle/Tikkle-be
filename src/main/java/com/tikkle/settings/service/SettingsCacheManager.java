@@ -1,47 +1,21 @@
 package com.tikkle.settings.service;
 
-import com.tikkle.settings.entity.CategorySpareChangeRule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 /**
- * 설정 변경을 결제 경로용 Redis 캐시에 반영한다.
- * 온보딩이 warm-up 하는 단일 Hash 키({@code user:settings:{userId}})를 재사용하며,
- * Hash 전체를 덮어쓰지 않고 변경된 필드만 갱신한다(targetCardLast4 등 보존).
+ * 결제 경로용 사용자 설정 캐시({@code user:settings:{userId}})를 무효화하는 컴포넌트입니다.
+ * 설정이 변경되면 캐시를 부분 갱신하지 않고 삭제하며, 이후 첫 결제 시 {@link SettingsCacheService}가 DB에서 재생성합니다.
  */
 @Component
 @RequiredArgsConstructor
 public class SettingsCacheManager {
     private final RedisTemplate<String, String> redisTemplate;
 
-    private static final String USER_SETTINGS_CACHE_PREFIX = "user:settings:";
-
-    public void updateSpareChangeRules(Long userId, List<CategorySpareChangeRule> rules) {
-        String cacheKey = cacheKey(userId);
-        rules.forEach(rule ->
-                redisTemplate.opsForHash().put(cacheKey, rule.getCategory().name(), rule.getRuleType().name())
-        );
-    }
-
-    public void updateInvestmentStatus(Long userId, boolean isEnabled) {
-        String cacheKey = cacheKey(userId);
-        redisTemplate.opsForHash().put(cacheKey, "isInvestmentEnabled", String.valueOf(isEnabled));
-    }
-
-    public void updateKbankAccount(Long userId, String targetCardLast4) {
-        String cacheKey = cacheKey(userId);
-        redisTemplate.opsForHash().put(cacheKey, "targetCardCompany", "KBANK");
-        redisTemplate.opsForHash().put(cacheKey, "targetCardLast4", targetCardLast4);
-    }
+    static final String USER_SETTINGS_CACHE_PREFIX = "user:settings:";
 
     public void evict(Long userId) {
-        redisTemplate.delete(cacheKey(userId));
-    }
-
-    private String cacheKey(Long userId) {
-        return USER_SETTINGS_CACHE_PREFIX + userId;
+        redisTemplate.delete(USER_SETTINGS_CACHE_PREFIX + userId);
     }
 }

@@ -101,22 +101,20 @@ public class SettingsService {
         Map<PaymentCategory, CategorySpareChangeRule> existing = categorySpareChangeRuleRepository.findByUserId(userId).stream()
                 .collect(Collectors.toMap(CategorySpareChangeRule::getCategory, Function.identity()));
 
-        List<CategorySpareChangeRule> changed = new ArrayList<>();
         for (UpdateSpareChangeRulesRequest.RuleItem item : request.rules()) {
             CategorySpareChangeRule rule = existing.get(item.category());
             if (rule != null) {
                 rule.change(item.ruleType());
             } else {
-                rule = categorySpareChangeRuleRepository.save(CategorySpareChangeRule.builder()
+                categorySpareChangeRuleRepository.save(CategorySpareChangeRule.builder()
                         .user(userRepository.getReferenceById(userId))
                         .category(item.category())
                         .ruleType(item.ruleType())
                         .build());
             }
-            changed.add(rule);
         }
 
-        syncAfterCommit(() -> settingsCacheManager.updateSpareChangeRules(userId, changed));
+        evictCacheAfterCommit(userId);
     }
 
     /**
@@ -153,7 +151,7 @@ public class SettingsService {
                 .orElseThrow(LinkedAccountNotFoundException::new);
 
         account.updateKbankInfo("KBANK", request.targetCardLast4());
-        syncAfterCommit(() -> settingsCacheManager.updateKbankAccount(userId, request.targetCardLast4()));
+        evictCacheAfterCommit(userId);
     }
 
     /**
@@ -191,17 +189,18 @@ public class SettingsService {
         LinkedAccount account = linkedAccountRepository.findByUserId(userId)
                 .orElseThrow(LinkedAccountNotFoundException::new);
         account.updateInvestmentStatus(request.isInvestmentEnabled());
-        syncAfterCommit(() -> settingsCacheManager.updateInvestmentStatus(userId, request.isInvestmentEnabled()));
+        evictCacheAfterCommit(userId);
     }
 
-    private void syncAfterCommit(Runnable action) {
+    // DB 커밋 이후에만 캐시를 무효화한다(롤백 시 멀쩡한 캐시를 지우지 않도록)
+    private void evictCacheAfterCommit(Long userId) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 try {
-                    action.run();
+                    settingsCacheManager.evict(userId);
                 } catch (Exception e) {
-                    log.error("커밋 후 설정 캐시 동기화에 실패했습니다. DB 변경은 이미 반영되었습니다.", e);
+                    log.error("[SettingsService] 커밋 후 설정 캐시 무효화 실패 - userId: {}", userId, e);
                 }
             }
         });
