@@ -43,9 +43,14 @@ spring:
       api-key: ${DEEPSEEK_API_KEY}
       base-url: https://api.deepseek.com
       chat:
-        model: deepseek-v4-pro
-        max-tokens: 8192
-        timeout: 7m
+        model: deepseek-v4-flash
+        max-tokens: 16384
+        timeout: 5m
+        extra-body:
+          thinking:
+            type: disabled
+        response-format:
+          type: json_object
 
 jwt:
   secret: ${JWT_SECRET}
