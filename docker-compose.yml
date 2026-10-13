@@ -1,17 +1,22 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
     container_name: tikkle-redis
+    # AOF 를 켠다. refresh_token 이 Redis 에 있어서, 영속화 없이 컨테이너가
+    # 재시작하면 전 사용자가 로그아웃된다.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
 
   app:
-    # GitHub Actions가 빌드해서 올릴 도커 이미지 경로
-    image: asia-northeast3-docker.pkg.dev/project-4c111968-8a40-4fc9-b55/tikkle-repo/tikkle-be:latest
+    # deploy-remote.sh 가 .env 에 IMAGE_URI 를 써 넣는다 (ECR 이미지 경로).
+    image: ${IMAGE_URI}
     container_name: tikkle-be
+    # 외부 노출은 Nginx 가 담당한다. 앱은 루프백에만 바인딩해
+    # 보안그룹이 잘못 열려도 8080 이 직접 노출되지 않게 한다.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     # 서버에 생성될 .env 파일의 환경 변수를 읽어옴
     env_file:
       - .env
@@ -21,3 +26,6 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
+
+volumes:
+  redis-data:
