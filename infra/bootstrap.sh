@@ -107,8 +107,9 @@ cat <<'EOF'
        cd /home/ec2-user/Tikkle-be
        ./infra/deploy-remote.sh <ECR_IMAGE_URI>
 
-  3) 배포 후 반드시 코인 메타데이터를 채울 것.
-     COIN_METADATA 가 비어 있으면 AI 추천이 FK 제약으로 실패한다.
-     (CoinSyncScheduler 는 04:00 KST 에만 돈다)
+  3) 코인 메타데이터는 앱 기동 직후 자동으로 채워진다 (수동 작업 불필요).
+     CoinSyncScheduler 가 04:00 KST 와 ApplicationReadyEvent 에 모두 돈다.
+     비어 있으면 AI 추천이 FK 제약으로 실패하므로 배포 후 "동기화 완료" 로그만 확인할 것:
+       cd /home/ec2-user/Tikkle-be && docker compose logs app | grep CoinSyncScheduler
 
 EOF
