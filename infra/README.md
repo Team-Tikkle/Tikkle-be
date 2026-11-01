@@ -257,12 +257,20 @@ Nginx 설정 배치 → certbot 으로 TLS 발급.
 
 `main` 에 푸시하면 GitHub Actions 가 빌드 → ECR 푸시 → SSM 배포까지 수행한다.
 
-### ⚠️ 배포 직후 반드시: 코인 메타데이터 채우기
+### 코인 메타데이터는 기동 시 자동으로 채워진다
 
 `COIN_METADATA` 가 비어 있으면 `PAYMENT_EVENTS.target_coin_market` 의 FK 제약
-때문에 AI 추천이 실패한다. `CoinSyncScheduler` 는 **04:00 KST 에만** 돈다.
+때문에 AI 추천이 실패한다. `CoinSyncScheduler.syncCoinMetadata()` 는 매일 04:00 KST
+외에 **앱 기동 직후(`ApplicationReadyEvent`)에도** 돌기 때문에 수동 작업은 필요 없다.
 
-첫 배포가 04:00 이전이면 스케줄러를 기다리지 말고 수동으로 동기화를 트리거할 것.
+배포 후 로그로 확인만 한다 (2026-10-14 첫 배포에서 870건이 채워짐).
+
+```bash
+cd /home/ec2-user/Tikkle-be && docker compose logs app | grep CoinSyncScheduler
+```
+
+`동기화 완료 - 신규: …` 가 보이면 정상이다. `동기화 실패` 나 `비어 있어 동기화를 중단` 이 보이면
+업비트 호출 문제이므로 원인을 확인한 뒤 앱 컨테이너를 재시작하면 다시 동기화한다.
 
 ### 검증
 
