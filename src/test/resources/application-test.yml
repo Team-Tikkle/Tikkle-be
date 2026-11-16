@@ -1,0 +1,43 @@
+# 테스트 전용 설정. 아래 값은 전부 테스트용 가짜 값이며 실제 서비스의 키가 아니다.
+# DB·Redis 접속 정보는 Testcontainers 가 띄운 컨테이너에서 자동으로 주입된다(@ServiceConnection).
+spring:
+  jpa:
+    hibernate:
+      # 컨테이너 DB는 실행할 때마다 새로 뜬다. 지우는 단계 없이 만들기만 한다
+      ddl-auto: create-only
+  ai:
+    google:
+      genai:
+        api-key: test-only-gemini-api-key
+        chat:
+          model: "gemini-2.5-flash"
+    openai:
+      api-key: test-only-deepseek-api-key
+      base-url: https://api.deepseek.com
+      chat:
+        model: deepseek-v4-flash
+
+jwt:
+  secret: test-only-jwt-secret-0123456789-0123456789-0123456789-0123456789
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
+
+tikkle:
+  payment:
+    secret-key: test-only-payment-signature-key
+  encrypt:
+    # AES-256 키는 정확히 32바이트여야 한다
+    secret-key: test-only-encrypt-key-32-bytes!!
+  fcm:
+    enabled: false
+    credentials-base64: ""
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173
+
+coolsms:
+  api:
+    key: test-only-coolsms-key
+    secret: test-only-coolsms-secret
+  sender-number: "01000000000"
