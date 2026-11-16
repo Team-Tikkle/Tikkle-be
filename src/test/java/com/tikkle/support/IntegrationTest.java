@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({TestcontainersConfig.class, DatabaseCleaner.class})
+@Import({TestcontainersConfig.class, DatabaseCleaner.class, TestDataFactory.class})
 public abstract class IntegrationTest {
 
     @MockitoBean
@@ -63,6 +63,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected MockMvc mockMvc;
+
+    @Autowired
+    protected TestDataFactory testData;
 
     @Autowired
     private DatabaseCleaner databaseCleaner;
