@@ -73,7 +73,15 @@ dependencies {
 
     // 테스트 도구
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.security:spring-security-test'
+
+    // 테스트용 MySQL·Redis 컨테이너
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+
+    // 업비트 API 대역 서버 (실행 클래스패스의 okhttp 와 같은 버전)
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -81,6 +89,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 운영은 메인 클래스에서 시간대를 KST 로 고정한다. 테스트는 메인 클래스를 거치지 않으므로 여기서 맞춘다.
+    systemProperty 'user.timezone', 'Asia/Seoul'
 }
 
 jar {
