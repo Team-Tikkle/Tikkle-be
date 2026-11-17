@@ -95,6 +95,25 @@ class TestEnvironmentTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("대역 서버는 경로별로 정한 응답을 호출 순서와 무관하게 돌려주고 마지막 응답을 되풀이한다")
+    void mockServerAnswersByRoute() {
+        UpbitMockServer.stubJson("GET", "/v1/deposit?uuid=deposit-a", 200, """
+                {"uuid": "deposit-a", "state": "PROCESSING"}
+                """);
+        UpbitMockServer.stubJson("GET", "/v1/deposit?uuid=deposit-a", 200, """
+                {"uuid": "deposit-a", "state": "ACCEPTED"}
+                """);
+        UpbitMockServer.stubJson("GET", "/v1/deposit?uuid=deposit-b", 200, """
+                {"uuid": "deposit-b", "state": "REJECTED"}
+                """);
+
+        assertThat(upbitDepositClient.getDepositDetails("deposit-b", ACCESS_KEY, SECRET_KEY).state()).isEqualTo("REJECTED");
+        assertThat(upbitDepositClient.getDepositDetails("deposit-a", ACCESS_KEY, SECRET_KEY).state()).isEqualTo("PROCESSING");
+        assertThat(upbitDepositClient.getDepositDetails("deposit-a", ACCESS_KEY, SECRET_KEY).state()).isEqualTo("ACCEPTED");
+        assertThat(upbitDepositClient.getDepositDetails("deposit-a", ACCESS_KEY, SECRET_KEY).state()).isEqualTo("ACCEPTED");
+    }
+
+    @Test
     @DisplayName("업비트가 401을 주면 키 오류 예외가 난다")
     void mapsUnauthorizedToInvalidKey() {
         UpbitMockServer.enqueueJson(401, """

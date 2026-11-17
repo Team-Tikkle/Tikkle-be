@@ -1,6 +1,8 @@
 package com.tikkle.support;
 
 import com.tikkle.global.security.jwt.JwtProvider;
+import com.tikkle.investment.entity.Coin;
+import com.tikkle.investment.repository.CoinRepository;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
@@ -11,12 +13,15 @@ import com.tikkle.user.entity.enums.TwoFactorProvider;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import com.tikkle.user.repository.UserRepository;
 import org.springframework.boot.test.context.TestComponent;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 테스트에 필요한 사용자·연동 계정·결제 이벤트를 만들어 저장하고, 인증 헤더를 발급합니다.
+ * 테스트에 필요한 사용자·연동 계정·코인·결제 이벤트를 만들어 저장하고, 인증 헤더를 발급합니다.
  * 값은 전부 테스트용 가짜 값입니다.
  */
 @TestComponent
@@ -28,6 +33,7 @@ public class TestDataFactory {
     private final UserRepository userRepository;
     private final LinkedAccountRepository linkedAccountRepository;
     private final PaymentEventRepository paymentEventRepository;
+    private final CoinRepository coinRepository;
     private final JwtProvider jwtProvider;
 
     // 전화번호는 UNIQUE 라서 테스트마다 겹치지 않게 번호를 올린다
@@ -36,10 +42,12 @@ public class TestDataFactory {
     public TestDataFactory(UserRepository userRepository,
                            LinkedAccountRepository linkedAccountRepository,
                            PaymentEventRepository paymentEventRepository,
+                           CoinRepository coinRepository,
                            JwtProvider jwtProvider) {
         this.userRepository = userRepository;
         this.linkedAccountRepository = linkedAccountRepository;
         this.paymentEventRepository = paymentEventRepository;
+        this.coinRepository = coinRepository;
         this.jwtProvider = jwtProvider;
     }
 
@@ -82,6 +90,38 @@ public class TestDataFactory {
                 .transactionId("tx-" + UUID.randomUUID())
                 .status(status)
                 .build());
+    }
+
+    public Coin createCoin(String market, String koreanName) {
+        return coinRepository.save(Coin.builder()
+                .market(market)
+                .koreanName(koreanName)
+                .englishName(market)
+                .build());
+    }
+
+    /**
+     * 매수 주문이 접수돼 체결을 기다리는 결제 이벤트를 만듭니다.
+     * 주문 접수 시각은 지금으로부터 elapsed 만큼 전으로 맞춥니다.
+     */
+    public PaymentEvent createPendingTradeEvent(Long userId, Coin targetCoin, String tradeUuid, Duration elapsed) {
+        PaymentEvent event = PaymentEvent.builder()
+                .userId(userId)
+                .cardCompany("KBANK")
+                .cardNumberLast4("1234")
+                .merchant("스타벅스")
+                .rawMerchant("스타벅스 강남점")
+                .amount(4500)
+                .spareChange(5500)
+                .category(PaymentCategory.CAFE)
+                .transactionId("tx-" + UUID.randomUUID())
+                .status(PaymentStatus.PENDING_PURCHASE)
+                .targetCoin(targetCoin)
+                .build();
+        event.updateToPendingTrade(tradeUuid);
+        // 접수 시각을 바꾸는 메서드가 엔티티에 없어 필드에 직접 넣는다
+        ReflectionTestUtils.setField(event, "tradeRequestedAt", LocalDateTime.now().minus(elapsed));
+        return paymentEventRepository.save(event);
     }
 
     public String bearerToken(Long userId) {
