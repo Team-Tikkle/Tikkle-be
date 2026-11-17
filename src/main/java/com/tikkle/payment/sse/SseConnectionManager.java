@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -60,7 +59,7 @@ public class SseConnectionManager {
 
     /**
      * 특정 결제 이벤트에 대해 SSE 이벤트를 발송하고, 실제 발송 여부를 반환합니다.
-     * 발송 실패 시 해당 커넥션은 관리 맵에서 제거됩니다.
+     * 발송 실패 시 해당 커넥션은 관리 맵에서 제거됩니다. 발송 실패는 예외로 전파하지 않습니다.
      *
      * <p>호출부는 이 반환값으로 FCM 대체 발송 여부를 판단해야 합니다.
      * 커넥션 존재 여부(맵에 남아있는지)만으로 판단하면, 클라이언트가 이미 떠났지만
@@ -84,7 +83,9 @@ public class SseConnectionManager {
                     .name(name)
                     .data(data));
             return true;
-        } catch (IOException e) {
+        } catch (Exception e) {
+            // 끊긴 연결은 IOException, 이미 완료된 연결은 IllegalStateException 으로 실패한다.
+            // 어느 쪽이든 "전달하지 못했다"일 뿐이므로 밖으로 던지지 않는다. 던지면 호출부의 상태 반영까지 깨진다.
             log.error("[SseConnectionManager] SSE 발송 실패 - eventId: {}, name: {}", eventId, name, e);
             emitters.remove(eventId, emitter);
             return false;

@@ -18,6 +18,9 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "PAYMENT_EVENTS")
 public class PaymentEvent {
+    // reason 컬럼의 길이 (길이를 지정하지 않은 문자열 컬럼의 기본값)
+    private static final int REASON_MAX_LENGTH = 255;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -108,19 +111,32 @@ public class PaymentEvent {
 
     public void skipInvestment(String reason) {
         this.status = PaymentStatus.NOT_INVESTED;
-        this.reason = reason;
+        this.reason = fitReasonLength(reason);
     }
 
     public void failInvestment(String reason) {
         this.status = PaymentStatus.FAILED;
-        this.reason = reason;
+        this.reason = fitReasonLength(reason);
     }
 
     public void revertToPendingPurchase(String reason) {
         this.status = PaymentStatus.PENDING_PURCHASE;
-        this.reason = reason;
+        this.reason = fitReasonLength(reason);
         this.depositUuid = null;
         this.depositRequestedAt = null;
+    }
+
+    // 사유에 예외 메시지가 붙으면 컬럼 길이를 넘을 수 있다. 넘으면 UPDATE 자체가 실패해 상태를 기록하지 못하므로 잘라서 저장한다
+    private static String fitReasonLength(String reason) {
+        if (reason == null || reason.length() <= REASON_MAX_LENGTH) {
+            return reason;
+        }
+        int end = REASON_MAX_LENGTH;
+        // 이모지 같은 2칸 문자의 앞쪽만 남으면 저장할 수 없는 문자가 되므로 한 칸 더 줄인다
+        if (Character.isHighSurrogate(reason.charAt(end - 1))) {
+            end--;
+        }
+        return reason.substring(0, end);
     }
 
     public void updateCategory(PaymentCategory category) {
