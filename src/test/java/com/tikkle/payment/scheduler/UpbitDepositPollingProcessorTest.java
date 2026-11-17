@@ -6,11 +6,13 @@ import com.tikkle.notification.entity.enums.NotificationType;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentStatus;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.payment.sse.SseConnectionManager;
 import com.tikkle.support.IntegrationTest;
 import com.tikkle.support.UpbitMockServer;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.TwoFactorProvider;
 import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -81,14 +83,26 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
     @Autowired
     private PortfolioRepository portfolioRepository;
 
+    @Autowired
+    private SseConnectionManager sseConnectionManager;
+
     private User user;
     private Coin coin;
+    private Long eventIdWithConnection;
 
     @BeforeEach
     void setUp() {
         user = testData.createUser();
         testData.createLinkedAccount(user, TwoFactorProvider.KAKAO);
         coin = testData.createCoin(MARKET, "비트코인");
+    }
+
+    @AfterEach
+    void removeLeftoverConnection() {
+        // 연결 관리자는 모든 테스트가 함께 쓰므로, 테스트가 만든 연결을 남기지 않는다
+        if (eventIdWithConnection != null) {
+            sseConnectionManager.complete(eventIdWithConnection);
+        }
     }
 
     @ParameterizedTest(name = "입금 요청 뒤 {0}초")
@@ -233,6 +247,31 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
         assertThat(requestsTo("POST", "/v1/orders")).isEmpty();
     }
 
+    @Test
+    @DisplayName("닫힌 SSE 연결이 남아 있어도 2차 인증을 기다리는 건을 실패로 만들지 않는다")
+    void keepsWaitingWhenSseConnectionIsAlreadyClosed() {
+        PaymentEvent event = pendingDeposit(BEFORE_TIMEOUT);
+        leaveClosedConnection(event);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 200, DEPOSIT_WAITING);
+
+        depositPollingProcessor.processEvent(event.getId());
+
+        assertStillPendingDeposit(event);
+    }
+
+    @Test
+    @DisplayName("닫힌 SSE 연결이 남아 있어도 체결된 매수를 투자 완료로 기록하고 푸시로 알린다")
+    void recordsInvestmentWhenSseConnectionIsAlreadyClosed() {
+        PaymentEvent event = pendingDeposit(BEFORE_TIMEOUT);
+        leaveClosedConnection(event);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 200, DEPOSIT_ACCEPTED);
+        stubOrderFilled();
+
+        depositPollingProcessor.processEvent(event.getId());
+
+        assertInvested(event);
+    }
+
     private PaymentEvent pendingDeposit(Duration elapsed) {
         return testData.createPendingDepositEvent(user.getId(), coin, DEPOSIT_UUID, elapsed);
     }
@@ -240,6 +279,15 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
     private void stubOrderFilled() {
         UpbitMockServer.stubJson("POST", "/v1/orders", 201, ORDER_ACCEPTED);
         UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_DONE_FILLED);
+    }
+
+    /**
+     * 이미 닫혔지만 연결 관리자에 아직 남아 있는 SSE 연결을 만듭니다.
+     * 연결이 닫히면 관리자에서 지우는 콜백이 비동기로 돌기 때문에, 닫힌 직후에는 이런 상태가 잠시 생깁니다.
+     */
+    private void leaveClosedConnection(PaymentEvent event) {
+        eventIdWithConnection = event.getId();
+        sseConnectionManager.createEmitter(event.getId()).complete();
     }
 
     private PaymentEvent reload(PaymentEvent event) {
