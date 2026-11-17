@@ -4,8 +4,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | 2.0 |
-| 최종 수정일 | 2026-07-18 |
+| 문서 버전 | 2.1 |
+| 최종 수정일 | 2026-11-18 |
 | 작성 기준 | 백엔드 코드(`com.tikkle.payment` / `upbit` / `investment`) 및 `Tikkle_requirements.md`(FEAT-SYS-001~006) 대조 |
 | 대체 문서 | 구 `payment_flow.md`(초기 설계서), 구 `auto_trade_flow_final.md`(FE 연동 가이드) — 본 문서로 통합 |
 
@@ -194,8 +194,8 @@ stateDiagram-v2
     PENDING_DEPOSIT --> PENDING_PURCHASE : 2차 인증 타임아웃(210초)<br>→ 재승인 가능 상태로 복구
     PENDING_DEPOSIT --> FAILED : 입금 거절/취소, 키 만료, 서버 오류
 
-    PENDING_TRADE --> INVESTED : 체결 확인 (10초 폴링)
-    PENDING_TRADE --> FAILED : 10분 미체결 → 주문 취소<br>/ 체결 수량 0 / 키 만료
+    PENDING_TRADE --> INVESTED : 체결 확인 (10초 폴링)<br>10분 뒤 취소한 주문의 부분 체결분 포함
+    PENDING_TRADE --> FAILED : 10분 미체결 → 주문 취소<br>/ 체결 수량 0 / 키 만료<br>/ 20분간 주문 상태 확인 불가
 
     INVESTED --> [*]
     FAILED --> [*]
@@ -269,6 +269,7 @@ stateDiagram-v2
 - 앱 재진입(onResume) 시 호출해 화면을 복구하고, 반환된 `eventId`로 §8.3을 재구독하는 것이 표준 복구 절차다
 - 응답 필드: `eventId`, `status`(내부 상태 그대로), `merchant`, `amount`, `spareChange`, `targetCoinMarket`, `targetCoinName`, `expiresAt`, `createdAt`
 - `expiresAt`은 **현재 단계**의 마감 시각이다 (`PENDING_DEPOSIT` → 입금 요청 + 210초, `PENDING_TRADE` → 주문 접수 + 10분). 남은 시간 표시에 그대로 쓸 수 있다
+- `PENDING_TRADE` 건은 업비트 주문 조회·취소가 계속 실패하면 `expiresAt`이 지난 뒤에도 최대 10분간 진행 중으로 남을 수 있다 (§10.3). 이 경우 `expiresAt`은 과거 시각이다
 - `PENDING_PURCHASE`(승인 대기)는 포함하지 않는다. 그건 진행 중인 건이 아니라 대기 목록이며 결제 피드가 담당한다
 
 ---
@@ -287,7 +288,7 @@ stateDiagram-v2
 | `TRADE_FAILED` | **최종** | 매수 주문 접수 실패. **원화는 업비트 계좌에 잔류** — 반드시 고지 | 매수 실패 화면 + 원화 보관 안내 |
 | `TIMEOUT` | **최종** | 210초 내 2차 인증 미완료. **결제 건은 `PENDING_PURCHASE`로 복구되어 재승인 가능** | 시간 초과 안내 (§11.1 참고) |
 | `UPBIT_INVALID_KEY` | **최종** | 진행 중 키 만료/권한 박탈 감지 → `FAILED` | 재연동 유도 → 업비트 계정 관리 화면 |
-| `FAILED` | **최종** | 그 외 예기치 못한 서버 오류 → `FAILED` | 일반 실패 안내 |
+| `FAILED` | **최종** | 그 외 예기치 못한 서버 오류, 또는 매수 주문의 결과를 끝내 확인하지 못한 경우(§10.3) → `FAILED`. 원화 위치를 단정하지 않는다 | 일반 실패 안내 |
 | `CLOSED` | **최종** | 재구독했으나 이미 `NOT_INVESTED`로 종료된 건 (거절·24시간 만료) | 진행 화면을 닫고 결제 내역으로 이동 |
 
 **구독 직후 상태 스냅샷**
@@ -337,6 +338,7 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 | `TRADE_SUCCESS` | `UpbitTradePollingProcessor.handleSettledOrder` (지연 체결) | `SUCCESS` | 미적용(지연 구간, 사실상 항상 끊김) |
 | `TRADE_FAILED` | `UpbitTradePollingProcessor.handleSettledOrder` (체결 수량 0 / targetCoin 누락) | `TRADE_FAILED` | 미적용 |
 | `TRADE_TIMEOUT` | `UpbitTradePollingProcessor.handleTimeout` | `TRADE_FAILED` | 미적용 |
+| `TRADE_FAILED` | `UpbitTradePollingProcessor.handleUnconfirmed` (주문 상태 확인 불가) | `FAILED` | 미적용 |
 | `UPBIT_INVALID_KEY` | `UpbitTradePollingProcessor.handleInvalidKeyError` | `UPBIT_INVALID_KEY` | 미적용 |
 | `ORDER_EXPIRED` | `PendingOrderExpirationScheduler.expireOldPendingOrders` | (없음) | 미적용 |
 
@@ -381,12 +383,22 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 
 `PENDING_TRADE` 상태의 건을 계속 추적한다. FE 연결은 이미 끊긴 상태일 수 있으며, 결과는 원장에 반영되고 앱은 결제 내역 재조회로 확인한다.
 
+> **판정은 항상 주문 상태 조회 결과로 한다.** 10분 타임아웃은 아직 체결되지 않은 주문을 취소하는 시점일 뿐이다. 경과 시간만으로 먼저 끊으면, 폴링이 밀리거나 서버가 재시작되어 10분 뒤에 건을 봤을 때 **이미 체결된 주문까지 조회 없이 실패로 기록**되어 코인은 매수됐는데 원장에는 없는 상태가 된다. 입금 폴링(§10.1)과 같은 원칙이다.
+>
+> **조회나 취소가 실패하면 실패로 확정하지 않는다.** 주문의 실제 상태를 모르는 채로 "원화는 업비트에 있다"고 알릴 수 없기 때문이다. 상태를 그대로 두고 다음 주기에 다시 시도하며, 타임아웃 뒤 10분이 더 지나도록(주문 접수 + 20분) 확인되지 않으면 확인 불가로 종결한다.
+
 | 상황 | 처리 |
 | --- | --- |
-| `done`/`cancel` + 체결 수량 > 0 | 부분 체결 포함 합산 → `INVESTED` + 포트폴리오 갱신 + SSE `SUCCESS` + FCM `TRADE_SUCCESS` |
+| `done`/`cancel` + 체결 수량 > 0 | 부분 체결 포함 합산 → `INVESTED` + 포트폴리오 갱신 + SSE `SUCCESS` + FCM `TRADE_SUCCESS`. **10분이 지난 뒤에 발견해도 체결로 반영한다** |
 | `done`/`cancel` + 체결 수량 0 | `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_FAILED` (원화는 업비트 잔류) |
 | `targetCoin` 정보 누락 | `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_FAILED` (원화는 업비트 잔류) |
-| **10분 경과** | 주문 강제 취소 후 `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_TIMEOUT` — 시장 변동성에 물리는 것 방지. **취소된 원화는 환불되지 않고 업비트 계좌에 보관** |
+| 미체결 + 10분 전 | 다음 주기 대기 |
+| **미체결 + 10분 경과** | 주문 취소를 요청한 뒤 **다시 조회**한다 — 시장 변동성에 물리는 것 방지 |
+| ↳ 재조회: 체결 수량 > 0 | 취소 전에 체결된 분량을 합산 → `INVESTED` (위 첫 행과 같은 처리) |
+| ↳ 재조회: 체결 수량 0 | `FAILED` + SSE `TRADE_FAILED` + FCM `TRADE_TIMEOUT`. **취소된 원화는 환불되지 않고 업비트 계좌에 보관** |
+| ↳ 재조회: 취소가 아직 반영되지 않음 | 다음 주기에 다시 확인 |
+| 주문 조회·취소 실패 (5xx·429·타임아웃 등) | 상태를 바꾸지 않고 다음 주기에 재시도. 조회가 실패하면 취소도 요청하지 않는다 |
+| **20분 경과 + 여전히 확인 불가** | `FAILED`(사유: 주문 상태 확인 불가) + SSE `FAILED` + FCM `TRADE_FAILED`(업비트 앱에서 주문 내역을 확인하도록 안내). 체결됐는지, 미체결 주문이 남아 있는지 알 수 없으므로 **원화 위치를 단정하지 않는다** |
 | 업비트 401/403 | `FAILED` + SSE `UPBIT_INVALID_KEY` + FCM `UPBIT_INVALID_KEY` |
 
 > **원화가 업비트에 남는 실패는 반드시 통보한다.** 이전에는 체결 수량 0 / `targetCoin` 누락 두 경로가 SSE도 FCM도 없이 조용히 `FAILED`로만 끝나, 사용자가 자기 원화가 업비트에 있다는 사실을 알 방법이 없었다.
@@ -396,7 +408,7 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 | 스케줄러 | 주기 | 역할 |
 | --- | --- | --- |
 | `UpbitDepositPollingScheduler` | 3초 | `PENDING_DEPOSIT` 입금 확인 → 매수 실행 |
-| `UpbitTradePollingScheduler` | 10초 | `PENDING_TRADE` 체결 추적 (10분 타임아웃) |
+| `UpbitTradePollingScheduler` | 10초 | `PENDING_TRADE` 체결 추적 (10분 미체결 시 주문 취소, 20분까지 확인 재시도) |
 | `PendingOrderExpirationScheduler` | 매시 정각 | 24시간 경과한 `PENDING_PURCHASE` → `NOT_INVESTED` |
 | `AiPortfolioScheduler` | 02:00 / 14:00 KST | 성향 조합별 AI 추천 유니버스 생성 (DeepSeek) |
 | `CoinSyncScheduler` | 04:00 KST | 업비트 코인 메타데이터 동기화 |
@@ -425,6 +437,7 @@ SSE는 사용자가 승인 화면에서 대기하는 **최대 3분 구간**만 �
 | 매수 주문 접수 실패 (`TRADE_FAILED`) | `FAILED` | **업비트 계좌 잔류** | 업비트에서 직접 매수/출금 안내 **(필수 고지)** |
 | 10분 미체결 → 주문 취소 | `FAILED` | **업비트 계좌 잔류** | 결제 내역에서 취소 확인 |
 | 체결 수량 0 | `FAILED` | **업비트 계좌 잔류** | 〃 |
+| 매수 주문 상태 확인 불가 (20분간 조회·취소 실패) | `FAILED` | **단정할 수 없음** — 체결됐으면 코인으로, 아니면 업비트 계좌의 원화나 미체결 주문으로 남아 있다 | 업비트 앱에서 주문 내역 확인 안내 |
 | 진행 중 키 만료 (`UPBIT_INVALID_KEY`) | `FAILED` | 단계에 따라 상이 | 업비트 재연동 유도 |
 | 24시간 미승인 | `NOT_INVESTED` | 케이뱅크 (이동 없음) | 만료 표시 |
 
