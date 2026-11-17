@@ -51,11 +51,24 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
     private static final String ORDER_WAIT_UNFILLED = """
             {"uuid": "order-uuid-1", "state": "wait", "market": "KRW-BTC", "trades": []}
             """;
+    private static final String ORDER_WAIT_PARTIALLY_FILLED = """
+            {"uuid": "order-uuid-1", "state": "wait", "market": "KRW-BTC", "trades": [
+              {"market": "KRW-BTC", "uuid": "trade-1", "price": "75000000", "volume": "0.00004", "funds": "3000", "side": "bid"}
+            ]}
+            """;
+    private static final String ORDER_CANCEL_PARTIALLY_FILLED = """
+            {"uuid": "order-uuid-1", "state": "cancel", "market": "KRW-BTC", "trades": [
+              {"market": "KRW-BTC", "uuid": "trade-1", "price": "75000000", "volume": "0.00004", "funds": "3000", "side": "bid"}
+            ]}
+            """;
     private static final String ORDER_CANCEL_UNFILLED = """
             {"uuid": "order-uuid-1", "state": "cancel", "market": "KRW-BTC", "trades": []}
             """;
     private static final String CANCEL_ACCEPTED = """
             {"uuid": "order-uuid-1", "state": "wait", "market": "KRW-BTC"}
+            """;
+    private static final String CANCEL_REJECTED = """
+            {"error": {"name": "order_not_found", "message": "주문을 찾지 못했습니다."}}
             """;
     private static final String SERVER_ERROR = """
             {"error": {"name": "server_error", "message": "일시적인 오류입니다."}}
@@ -135,6 +148,34 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("타임아웃이 지난 뒤에 봤더라도 이미 체결된 주문은 투자 완료로 기록하고 취소를 요청하지 않는다")
+    void settlesFilledOrderFoundAfterTimeout() {
+        PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_DONE_FILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 400, CANCEL_REJECTED);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertInvested(event, "0.00007", "75000000");
+        assertThat(cancelRequestCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("타임아웃이 지나도록 일부만 체결된 주문은 취소한 뒤 체결분을 투자 완료로 기록한다")
+    void settlesPartialFillAfterCancellingOnTimeout() {
+        PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_WAIT_PARTIALLY_FILLED);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_CANCEL_PARTIALLY_FILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 200, CANCEL_ACCEPTED);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertInvested(event, "0.00004", "75000000");
+        assertThat(UpbitMockServer.receivedRequests()).extracting(RecordedRequest::getMethod)
+                .containsExactly("GET", "DELETE", "GET");
+    }
+
+    @Test
     @DisplayName("타임아웃이 지나도록 체결되지 않은 주문은 취소하고 타임아웃 실패로 기록한다")
     void failsWithTimeoutWhenUnfilledOrderIsCancelled() {
         PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
@@ -149,6 +190,43 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
         assertThat(saved.getReason()).contains("10분 타임아웃");
         verify(pushNotificationService).send(eq(user.getId()), eq(NotificationType.TRADE_TIMEOUT), anyString(), eq(event.getId()));
         assertThat(cancelRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("타임아웃 뒤 주문 취소가 실패하면 실패로 확정하지 않고 다음 주기를 기다린다")
+    void keepsWaitingWhenCancelFailsAfterTimeout() {
+        PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_WAIT_UNFILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 500, SERVER_ERROR);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertStillPendingTrade(event);
+    }
+
+    @Test
+    @DisplayName("타임아웃 뒤 취소를 요청했지만 아직 반영되지 않았으면 다음 주기를 기다린다")
+    void keepsWaitingWhenCancelIsNotReflectedYet() {
+        PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_WAIT_UNFILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 200, CANCEL_ACCEPTED);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertStillPendingTrade(event);
+    }
+
+    @Test
+    @DisplayName("타임아웃 뒤 주문 조회가 실패하면 취소를 요청하지 않고 다음 주기를 기다린다")
+    void keepsWaitingWithoutCancellingWhenInquiryFailsAfterTimeout() {
+        PaymentEvent event = pendingTrade(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 500, SERVER_ERROR);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 200, CANCEL_ACCEPTED);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertStillPendingTrade(event);
+        assertThat(cancelRequestCount()).isZero();
     }
 
     @ParameterizedTest(name = "주문 접수 뒤 {0}분")

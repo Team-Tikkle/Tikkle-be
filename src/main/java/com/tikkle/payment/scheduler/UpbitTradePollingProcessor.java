@@ -10,6 +10,8 @@ import com.tikkle.upbit.dto.response.UpbitOrderResponse;
 import com.tikkle.upbit.service.UpbitPortfolioUpdater;
 import com.tikkle.upbit.service.UpbitTradeService.TradeResult;
 import com.tikkle.upbit.exception.UpbitInvalidKeyException;
+import com.tikkle.upbit.exception.UpbitOrderCancelFailedException;
+import com.tikkle.upbit.exception.UpbitOrderInquiryFailedException;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.repository.LinkedAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,10 @@ public class UpbitTradePollingProcessor {
     /**
      * 개별 이벤트에 대해 업비트 API를 호출하고 결과를 처리합니다.
      * 트랜잭션은 API 호출 외부(또는 분리된 메서드)에서 관리되도록 하여 DB 락을 방지합니다.
+     *
+     * <p>판정은 항상 주문 상태 조회 결과로 합니다. 타임아웃(10분)은 아직 체결되지 않은 주문을 취소하는 시점일 뿐이므로,
+     * 타임아웃이 지난 뒤에 발견한 주문도 이미 체결됐으면 체결로 반영합니다.
+     * 조회나 취소가 실패하면 주문의 실제 상태를 알 수 없으므로 실패로 확정하지 않고 다음 주기에 다시 시도합니다.
      */
     public void processEvent(Long eventId) {
         EventInfo info = self.getEventInfo(eventId);
@@ -62,46 +68,55 @@ public class UpbitTradePollingProcessor {
         String accessKey = info.account().getUpbitAccessKey();
         String secretKey = info.account().getUpbitSecretKey();
 
-        // 1. 타임아웃 검사 (10분) - 외부 API(취소) 호출 포함
         LocalDateTime baseTime = info.tradeRequestedAt() != null ? info.tradeRequestedAt() : info.createdAt();
-        if (baseTime.plusMinutes(TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
-            log.warn("[UpbitTradePollingProcessor] 매수 대기 타임아웃(10분) - eventId: {}, uuid: {}", eventId, info.tradeUuid());
+        boolean timedOut = baseTime.plusMinutes(TIMEOUT_MINUTES).isBefore(LocalDateTime.now());
 
-            try {
-                upbitOrderClient.cancelOrder(info.tradeUuid(), accessKey, secretKey);
-            } catch (UpbitInvalidKeyException e) {
-                log.error("[UpbitTradePollingProcessor] 주문 취소 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
-                self.handleInvalidKeyError(eventId);
+        try {
+            // 1. 주문 상태 조회 (트랜잭션 없음)
+            log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 폴링 시작 - eventId: {}, tradeUuid: {}", eventId, info.tradeUuid());
+            UpbitOrderResponse orderDetails = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
+            log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, orderDetails.state());
+
+            // 2. 시장가 매수는 부분 체결 후 잔량이 cancel 되는 것이 정상 흐름이므로 done/cancel 모두 체결 확인 대상이다
+            if (isClosed(orderDetails)) {
+                self.handleSettledOrder(eventId, info, orderDetails, orderDetails.state());
                 return;
-            } catch (Exception e) {
-                log.error("[UpbitTradePollingProcessor] 주문 취소 API 실패 - eventId: {}", eventId, e);
             }
 
-            self.handleTimeout(eventId);
-            return;
-        }
+            // 3. 아직 체결되지 않았고 타임아웃 전이면 다음 주기에 다시 조회한다
+            if (!timedOut) return;
 
-        // 2. 외부 API 호출 (트랜잭션 없음)
-        log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 폴링 시작 - eventId: {}, tradeUuid: {}", eventId, info.tradeUuid());
-        UpbitOrderResponse orderDetails;
-        try {
-            orderDetails = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
+            // 4. 체결되지 않은 채 타임아웃이 지났으면 주문을 취소하고, 그 사이 체결된 분량이 있는지 다시 조회한다
+            log.warn("[UpbitTradePollingProcessor] 매수 대기 타임아웃(10분), 주문 취소 요청 - eventId: {}, uuid: {}", eventId, info.tradeUuid());
+            upbitOrderClient.cancelOrder(info.tradeUuid(), accessKey, secretKey);
+
+            UpbitOrderResponse cancelledOrder = upbitOrderClient.getOrderDetails(info.tradeUuid(), accessKey, secretKey);
+            if (!isClosed(cancelledOrder)) {
+                log.info("[UpbitTradePollingProcessor] 주문 취소가 아직 반영되지 않음, 다음 주기에 재확인 - eventId: {}, state: {}", eventId, cancelledOrder.state());
+                return;
+            }
+
+            if (hasFilledVolume(cancelledOrder)) {
+                self.handleSettledOrder(eventId, info, cancelledOrder, cancelledOrder.state());
+            } else {
+                self.handleTimeout(eventId);
+            }
         } catch (UpbitInvalidKeyException e) {
-            log.error("[UpbitTradePollingProcessor] 주문 상태 조회 중 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
+            log.error("[UpbitTradePollingProcessor] 업비트 인증 키 만료/권한 없음 - eventId: {}", eventId);
             self.handleInvalidKeyError(eventId);
-            return;
-        } catch (Exception e) {
-            log.error("[UpbitTradePollingProcessor] 주문 상태 조회 실패 - eventId: {}", eventId, e);
-            return;
+        } catch (UpbitOrderInquiryFailedException | UpbitOrderCancelFailedException e) {
+            log.error("[UpbitTradePollingProcessor] 주문 상태 확인 실패, 다음 주기에 재시도 - eventId: {}, timedOut: {}", eventId, timedOut, e);
         }
+    }
 
-        String state = orderDetails.state();
-        log.info("[UpbitTradePollingProcessor] 업비트 주문 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, state);
+    private boolean isClosed(UpbitOrderResponse order) {
+        return "done".equals(order.state()) || "cancel".equals(order.state());
+    }
 
-        // 3. 시장가 매수는 부분 체결 후 잔량이 cancel 되는 것이 정상 흐름이므로 done/cancel 모두 체결 확인 대상이다
-        if ("done".equals(state) || "cancel".equals(state)) {
-            self.handleSettledOrder(eventId, info, orderDetails, state);
-        }
+    private boolean hasFilledVolume(UpbitOrderResponse order) {
+        if (order.trades() == null) return false;
+        return order.trades().stream()
+                .anyMatch(trade -> trade.volume() != null && new BigDecimal(trade.volume()).signum() > 0);
     }
 
     @Transactional(readOnly = true)
