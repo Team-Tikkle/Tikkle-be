@@ -40,9 +40,10 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
     private static final String ORDER_UUID = "order-uuid-1";
     private static final String ORDER_PATH = "/v1/order?uuid=" + ORDER_UUID;
 
-    // 2차 인증 타임아웃은 입금 요청 뒤 210초다
+    // 2차 인증 타임아웃은 입금 요청 뒤 210초, 확인 재시도 기한은 그 뒤 10분이다
     private static final Duration BEFORE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration AFTER_TIMEOUT = Duration.ofSeconds(300);
+    private static final Duration AFTER_RETRY_LIMIT = Duration.ofSeconds(900);
 
     private static final String DEPOSIT_WAITING = """
             {"type": "deposit", "uuid": "deposit-uuid-1", "currency": "KRW", "state": "PROCESSING", "amount": "5500"}
@@ -63,6 +64,9 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
             """;
     private static final String SERVER_ERROR = """
             {"error": {"name": "server_error", "message": "일시적인 오류입니다."}}
+            """;
+    private static final String TOO_MANY_REQUESTS = """
+            {"error": {"name": "too_many_requests", "message": "요청 수 제한을 초과했습니다."}}
             """;
     private static final String INVALID_KEY = """
             {"error": {"name": "invalid_access_key", "message": "잘못된 엑세스 키입니다."}}
@@ -174,6 +178,59 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
         assertThat(saved.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(saved.getReason()).contains("401");
         verify(pushNotificationService).send(eq(user.getId()), eq(NotificationType.UPBIT_INVALID_KEY), anyString(), eq(event.getId()));
+    }
+
+    @ParameterizedTest(name = "업비트 응답 {0}")
+    @DisplayName("입금 상태 조회가 일시적으로 실패하면 실패로 확정하지 않고 다음 주기를 기다린다")
+    @ValueSource(ints = {500, 503, 429})
+    void keepsWaitingWhenInquiryFails(int status) {
+        PaymentEvent event = pendingDeposit(BEFORE_TIMEOUT);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, status, status == 429 ? TOO_MANY_REQUESTS : SERVER_ERROR);
+
+        depositPollingProcessor.processEvent(event.getId());
+
+        assertStillPendingDeposit(event);
+    }
+
+    @Test
+    @DisplayName("타임아웃이 지난 뒤에도 입금 상태 조회가 실패하면 승인 대기로 되돌리지 않고 다음 주기를 기다린다")
+    void keepsWaitingWhenInquiryFailsAfterTimeout() {
+        PaymentEvent event = pendingDeposit(AFTER_TIMEOUT);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 500, SERVER_ERROR);
+
+        depositPollingProcessor.processEvent(event.getId());
+
+        assertStillPendingDeposit(event);
+    }
+
+    @Test
+    @DisplayName("입금 상태 조회가 실패했다가 회복되면 회복된 조회 결과로 매수를 진행한다")
+    void buysAfterInquiryRecovers() {
+        PaymentEvent event = pendingDeposit(BEFORE_TIMEOUT);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 500, SERVER_ERROR);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 200, DEPOSIT_ACCEPTED);
+        stubOrderFilled();
+
+        depositPollingProcessor.processEvent(event.getId());
+        assertStillPendingDeposit(event);
+
+        depositPollingProcessor.processEvent(event.getId());
+        assertInvested(event);
+    }
+
+    @Test
+    @DisplayName("재시도 기한이 지나도록 입금 상태 조회가 실패하면 확인 불가로 종결하고 업비트에서 확인하라고 알린다")
+    void closesAsUnconfirmedWhenInquiryKeepsFailing() {
+        PaymentEvent event = pendingDeposit(AFTER_RETRY_LIMIT);
+        UpbitMockServer.stubJson("GET", DEPOSIT_PATH, 500, SERVER_ERROR);
+
+        depositPollingProcessor.processEvent(event.getId());
+
+        PaymentEvent saved = reload(event);
+        assertThat(saved.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(saved.getReason()).contains("확인하지 못해");
+        verify(pushNotificationService).send(eq(user.getId()), eq(NotificationType.DEPOSIT_FAILED), contains("확인하지 못해"), eq(event.getId()));
+        assertThat(requestsTo("POST", "/v1/orders")).isEmpty();
     }
 
     private PaymentEvent pendingDeposit(Duration elapsed) {

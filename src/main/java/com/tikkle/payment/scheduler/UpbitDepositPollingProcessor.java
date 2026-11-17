@@ -8,6 +8,7 @@ import com.tikkle.payment.service.OrderApprovalService;
 import com.tikkle.payment.sse.SseConnectionManager;
 import com.tikkle.upbit.client.UpbitDepositClient;
 import com.tikkle.upbit.dto.response.UpbitDepositResponse;
+import com.tikkle.upbit.exception.UpbitDepositInquiryFailedException;
 import com.tikkle.upbit.exception.UpbitInvalidKeyException;
 import com.tikkle.upbit.exception.UpbitOrderFailedException;
 import com.tikkle.upbit.service.UpbitTradeService;
@@ -34,6 +35,8 @@ import java.util.Map;
 public class UpbitDepositPollingProcessor {
     private static final String DEFAULT_FALLBACK_MARKET = "KRW-BTC";
     private static final int TIMEOUT_SECONDS = 210;
+    // 타임아웃이 지난 뒤에도 입금 상태를 확인하지 못할 때 재시도를 이어가는 시간
+    private static final int RETRY_GRACE_SECONDS = 600;
 
     @Lazy
     @Autowired
@@ -53,7 +56,9 @@ public class UpbitDepositPollingProcessor {
             if (info == null) return;
 
             LocalDateTime baseTime = info.depositRequestedAt() != null ? info.depositRequestedAt() : info.createdAt();
-            boolean expired = baseTime.plusSeconds(TIMEOUT_SECONDS).isBefore(LocalDateTime.now());
+            LocalDateTime now = LocalDateTime.now();
+            boolean expired = baseTime.plusSeconds(TIMEOUT_SECONDS).isBefore(now);
+            boolean retryExpired = baseTime.plusSeconds(TIMEOUT_SECONDS + RETRY_GRACE_SECONDS).isBefore(now);
 
             // 계좌 정보가 없으면 입금 상태를 확인할 방법이 없으므로 경과 시간만으로 판단한다
             if (info.account() == null) {
@@ -68,11 +73,20 @@ public class UpbitDepositPollingProcessor {
             // 타임아웃 판정보다 먼저 조회한다. 폴링이 다른 작업에 밀려 지연되면 실제로 도착한 입금까지
             // 조회 없이 타임아웃 처리되고, 사용자가 재승인하면 원화가 이중 입금된다.
             log.info("[UpbitDepositPollingProcessor] 업비트 입금 상태 조회 API 폴링 시작 - eventId: {}, depositUuid: {}", eventId, info.depositUuid());
-            UpbitDepositResponse response = upbitDepositClient.getDepositDetails(
-                    info.depositUuid(),
-                    info.account().getUpbitAccessKey(),
-                    info.account().getUpbitSecretKey()
-            );
+            UpbitDepositResponse response;
+            try {
+                response = upbitDepositClient.getDepositDetails(
+                        info.depositUuid(),
+                        info.account().getUpbitAccessKey(),
+                        info.account().getUpbitSecretKey()
+                );
+            } catch (UpbitDepositInquiryFailedException e) {
+                // 조회 실패(5xx·429·타임아웃 등)는 입금의 실제 상태를 알 수 없다는 뜻이다. 사용자가 2차 인증을 마치면
+                // 원화는 입금되므로 여기서 실패로 확정하지 않고 다음 주기에 다시 조회한다.
+                log.error("[UpbitDepositPollingProcessor] 입금 상태 조회 실패 - eventId: {}, expired: {}, retryExpired: {}", eventId, expired, retryExpired, e);
+                if (retryExpired) self.handleUnconfirmed(eventId);
+                return;
+            }
             log.info("[UpbitDepositPollingProcessor] 업비트 입금 상태 조회 API 응답 수신 - eventId: {}, state: {}", eventId, response.state());
 
             // 2. 상태가 ACCEPTED 인 경우 매수 체결 진행. 경과 시간과 무관하게 입금이 도착했으면 진행한다
@@ -240,6 +254,27 @@ public class UpbitDepositPollingProcessor {
             notifyByFcm(eventId, NotificationType.TRADE_FAILED,
                     "투자 처리 중 오류가 발생해 매수를 완료하지 못했어요. 결제 내역에서 확인해 주세요.");
         }
+    }
+
+    /**
+     * 재시도 기한이 지나도록 입금 상태를 확인하지 못한 건을 종결합니다.
+     * 사용자가 2차 인증을 마쳤는지 알 수 없으므로 원화의 위치를 단정하지 않고 업비트에서 확인하도록 안내합니다.
+     * 승인 대기로 되돌리지 않는 것은, 입금이 실제로 이뤄졌다면 재승인이 이중 입금이 되기 때문입니다.
+     */
+    @Transactional
+    public void handleUnconfirmed(Long eventId) {
+        log.error("[UpbitDepositPollingProcessor] 재시도 기한 초과, 입금 상태 확인 불가로 종결 - eventId: {}", eventId);
+        orderApprovalService.markAsFailed(eventId, "입금 상태를 확인하지 못해 종결. 2차 인증을 마쳤다면 원화가 업비트에 입금됐을 수 있음");
+        Map<String, Object> errorData = Map.of(
+                "status", "FAILED",
+                "message", "입금 상태를 확인하지 못해 종결. 업비트에서 입금 내역 확인 필요"
+        );
+        sseConnectionManager.send(eventId, "FAILED", errorData);
+        sseConnectionManager.complete(eventId);
+
+        // 일반 실패 화면에는 입금 내역을 확인하라는 안내가 없으므로, SSE 전달 여부와 무관하게 푸시로 알린다.
+        notifyByFcm(eventId, NotificationType.DEPOSIT_FAILED,
+                "입금 여부를 확인하지 못해 투자를 중단했어요. 2차 인증을 마쳤다면 업비트에서 입금 내역을 확인해 주세요.");
     }
 
     @Transactional
