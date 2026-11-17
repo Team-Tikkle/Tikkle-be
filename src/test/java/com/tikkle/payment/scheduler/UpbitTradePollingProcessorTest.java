@@ -39,9 +39,10 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
     private static final String TRADE_UUID = "order-uuid-1";
     private static final String ORDER_PATH = "/v1/order?uuid=" + TRADE_UUID;
 
-    // 타임아웃은 주문 접수 뒤 10분이다
+    // 타임아웃은 주문 접수 뒤 10분, 확인 재시도 기한은 그 뒤 10분이다
     private static final Duration BEFORE_TIMEOUT = Duration.ofMinutes(3);
     private static final Duration AFTER_TIMEOUT = Duration.ofMinutes(11);
+    private static final Duration AFTER_RETRY_LIMIT = Duration.ofMinutes(21);
 
     private static final String ORDER_DONE_FILLED = """
             {"uuid": "order-uuid-1", "state": "done", "market": "KRW-BTC", "trades": [
@@ -229,6 +230,42 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
         assertThat(cancelRequestCount()).isZero();
     }
 
+    @Test
+    @DisplayName("재시도 기한이 지나도록 주문 조회가 실패하면 확인 불가로 종결하고 업비트에서 확인하라고 알린다")
+    void closesAsUnconfirmedWhenInquiryKeepsFailing() {
+        PaymentEvent event = pendingTrade(AFTER_RETRY_LIMIT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 500, SERVER_ERROR);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertClosedAsUnconfirmed(event);
+        assertThat(cancelRequestCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("재시도 기한이 지나도록 주문 취소가 실패하면 확인 불가로 종결한다")
+    void closesAsUnconfirmedWhenCancelKeepsFailing() {
+        PaymentEvent event = pendingTrade(AFTER_RETRY_LIMIT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_WAIT_UNFILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 500, SERVER_ERROR);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertClosedAsUnconfirmed(event);
+    }
+
+    @Test
+    @DisplayName("재시도 기한이 지나도록 취소가 반영되지 않으면 확인 불가로 종결한다")
+    void closesAsUnconfirmedWhenCancelIsNeverReflected() {
+        PaymentEvent event = pendingTrade(AFTER_RETRY_LIMIT);
+        UpbitMockServer.stubJson("GET", ORDER_PATH, 200, ORDER_WAIT_UNFILLED);
+        UpbitMockServer.stubJson("DELETE", ORDER_PATH, 200, CANCEL_ACCEPTED);
+
+        tradePollingProcessor.processEvent(event.getId());
+
+        assertClosedAsUnconfirmed(event);
+    }
+
     @ParameterizedTest(name = "주문 접수 뒤 {0}분")
     @DisplayName("업비트가 401을 주면 실패로 기록하고 키를 다시 연동하라고 알린다")
     @ValueSource(ints = {3, 11})
@@ -280,4 +317,11 @@ class UpbitTradePollingProcessorTest extends IntegrationTest {
         verifyNoInteractions(pushNotificationService);
     }
 
+    private void assertClosedAsUnconfirmed(PaymentEvent event) {
+        PaymentEvent saved = reload(event);
+        assertThat(saved.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(saved.getReason()).contains("확인하지 못해");
+        assertThat(portfolioRepository.findByUserIdAndMarket(user.getId(), MARKET)).isEmpty();
+        verify(pushNotificationService).send(eq(user.getId()), eq(NotificationType.TRADE_FAILED), contains("확인하지 못했어요"), eq(event.getId()));
+    }
 }
