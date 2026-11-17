@@ -92,6 +92,43 @@ class PaymentEventTest {
     }
 
     @Test
+    @DisplayName("사유가 255자를 넘으면 컬럼 길이에 맞게 앞 255자만 남긴다")
+    void truncatesReasonLongerThanColumn() {
+        String longReason = "가".repeat(300);
+        PaymentEvent failed = pendingDepositEvent();
+        PaymentEvent skipped = pendingPurchaseEvent();
+        PaymentEvent reverted = pendingDepositEvent();
+
+        failed.failInvestment(longReason);
+        skipped.skipInvestment(longReason);
+        reverted.revertToPendingPurchase(longReason);
+
+        assertThat(failed.getReason()).isEqualTo("가".repeat(255));
+        assertThat(skipped.getReason()).isEqualTo("가".repeat(255));
+        assertThat(reverted.getReason()).isEqualTo("가".repeat(255));
+    }
+
+    @Test
+    @DisplayName("사유를 자르는 자리에 이모지가 걸리면 반쪽 문자를 남기지 않는다")
+    void doesNotSplitSurrogatePairWhenTruncatingReason() {
+        PaymentEvent event = pendingDepositEvent();
+
+        event.failInvestment("가".repeat(254) + "😀" + "나");
+
+        assertThat(event.getReason()).isEqualTo("가".repeat(254));
+    }
+
+    @Test
+    @DisplayName("255자인 사유는 자르지 않는다")
+    void keepsReasonThatFitsColumn() {
+        PaymentEvent event = pendingDepositEvent();
+
+        event.failInvestment("가".repeat(255));
+
+        assertThat(event.getReason()).hasSize(255);
+    }
+
+    @Test
     @DisplayName("카테고리를 바꿔도 상태와 잔돈은 그대로다")
     void updatesCategoryOnly() {
         PaymentEvent event = pendingPurchaseEvent();

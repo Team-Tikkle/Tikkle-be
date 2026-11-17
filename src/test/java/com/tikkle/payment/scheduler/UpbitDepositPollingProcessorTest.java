@@ -272,6 +272,18 @@ class UpbitDepositPollingProcessorTest extends IntegrationTest {
         assertInvested(event);
     }
 
+    @Test
+    @DisplayName("예기치 못한 오류의 메시지가 길어도 실패 기록이 저장된다")
+    void storesFailureEvenWhenErrorMessageIsLong() {
+        PaymentEvent event = pendingDeposit(BEFORE_TIMEOUT);
+
+        depositPollingProcessor.handleGeneralError(event.getId(), "오류".repeat(150));
+
+        PaymentEvent saved = reload(event);
+        assertThat(saved.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(saved.getReason()).startsWith("매수 처리 중 예기치 못한 오류").hasSize(255);
+    }
+
     private PaymentEvent pendingDeposit(Duration elapsed) {
         return testData.createPendingDepositEvent(user.getId(), coin, DEPOSIT_UUID, elapsed);
     }
