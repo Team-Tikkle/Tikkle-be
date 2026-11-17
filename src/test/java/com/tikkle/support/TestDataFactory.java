@@ -101,11 +101,31 @@ public class TestDataFactory {
     }
 
     /**
+     * 승인돼 업비트 원화 입금(2차 인증)을 기다리는 결제 이벤트를 만듭니다.
+     * 입금 요청 시각은 지금으로부터 elapsed 만큼 전으로 맞춥니다.
+     */
+    public PaymentEvent createPendingDepositEvent(Long userId, Coin targetCoin, String depositUuid, Duration elapsed) {
+        PaymentEvent event = approvablePaymentEvent(userId, targetCoin);
+        event.updateToPendingDeposit(depositUuid);
+        // 요청 시각을 바꾸는 메서드가 엔티티에 없어 필드에 직접 넣는다
+        ReflectionTestUtils.setField(event, "depositRequestedAt", LocalDateTime.now().minus(elapsed));
+        return paymentEventRepository.save(event);
+    }
+
+    /**
      * 매수 주문이 접수돼 체결을 기다리는 결제 이벤트를 만듭니다.
      * 주문 접수 시각은 지금으로부터 elapsed 만큼 전으로 맞춥니다.
      */
     public PaymentEvent createPendingTradeEvent(Long userId, Coin targetCoin, String tradeUuid, Duration elapsed) {
-        PaymentEvent event = PaymentEvent.builder()
+        PaymentEvent event = approvablePaymentEvent(userId, targetCoin);
+        event.updateToPendingTrade(tradeUuid);
+        // 접수 시각을 바꾸는 메서드가 엔티티에 없어 필드에 직접 넣는다
+        ReflectionTestUtils.setField(event, "tradeRequestedAt", LocalDateTime.now().minus(elapsed));
+        return paymentEventRepository.save(event);
+    }
+
+    private PaymentEvent approvablePaymentEvent(Long userId, Coin targetCoin) {
+        return PaymentEvent.builder()
                 .userId(userId)
                 .cardCompany("KBANK")
                 .cardNumberLast4("1234")
@@ -118,10 +138,6 @@ public class TestDataFactory {
                 .status(PaymentStatus.PENDING_PURCHASE)
                 .targetCoin(targetCoin)
                 .build();
-        event.updateToPendingTrade(tradeUuid);
-        // 접수 시각을 바꾸는 메서드가 엔티티에 없어 필드에 직접 넣는다
-        ReflectionTestUtils.setField(event, "tradeRequestedAt", LocalDateTime.now().minus(elapsed));
-        return paymentEventRepository.save(event);
     }
 
     public String bearerToken(Long userId) {
