@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -102,6 +104,46 @@ class PaymentIngestIdempotencyTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("PAYMENT-009"));
 
         assertThat(savedEvents()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("중복으로 거절된 요청은 첫 요청이 남긴 처리 표시를 지우지 않는다")
+    void keepsKeyAfterDuplicateRejection() throws Exception {
+        testData.createCoin(BITCOIN_MARKET, "비트코인");
+
+        send(AMOUNT_TO_INVEST).andExpect(status().isOk());
+        send(AMOUNT_TO_INVEST).andExpect(status().isConflict());
+
+        assertThat(hasTransactionKey()).isTrue();
+    }
+
+    @Test
+    @DisplayName("미투자로 끝난 결제와 같은 요청은 세 번째에도 중복(PAYMENT-009)으로 거절한다")
+    void rejectsThirdRequestAfterNotInvested() throws Exception {
+        send(AMOUNT_BELOW_MINIMUM).andExpect(status().isOk());
+        send(AMOUNT_BELOW_MINIMUM).andExpect(status().isConflict());
+
+        send(AMOUNT_BELOW_MINIMUM)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT-009"));
+
+        assertThat(savedEvents()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("승인 대기로 저장된 결제와 같은 요청은 세 번째에도 중복으로 거절하고 코인 추천을 다시 하지 않는다")
+    void rejectsThirdRequestWithoutRunningRecommendationAgain() throws Exception {
+        testData.createCoin(BITCOIN_MARKET, "비트코인");
+
+        send(AMOUNT_TO_INVEST).andExpect(status().isOk());
+        send(AMOUNT_TO_INVEST).andExpect(status().isConflict());
+
+        send(AMOUNT_TO_INVEST)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT-009"));
+
+        assertThat(savedEvents()).hasSize(1);
+        verify(targetCoinRecommendationService, times(1)).recommendCoin(owner.getId());
     }
 
     @Test

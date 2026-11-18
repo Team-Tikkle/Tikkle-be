@@ -72,6 +72,7 @@ public class PaymentService {
     /**
      * 결제 스크래핑 요청을 처리하는 메인 파이프라인 메서드입니다.
      * 중복 결제 검증, AI 카테고리 분류, 잔돈 규칙 적용, 타겟 코인 추천 후 결제 이벤트를 영속화합니다.
+     * 중복으로 거절한 요청은 멱등 키를 그대로 두고, 처리하지 못했거나 업무 규칙으로 거절한 요청만 키를 지웁니다.
      * 
      * @param request 안드로이드에서 수신된 결제 정보 DTO
      * @return 결제 처리 결과 및 추천 코인 정보 DTO
@@ -80,27 +81,27 @@ public class PaymentService {
         // 1단계: 결제 검증
         String redisTxKey = "payment:tx:" + request.transactionId();
 
+        // 같은 거래를 먼저 받은 요청이 있으면 그 요청이 남긴 키를 건드리지 않고 끝낸다
+        Boolean isFirstRequest = redisTemplate.opsForValue()
+                .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
+
+        if (Boolean.FALSE.equals(isFirstRequest)) {
+            log.info("[PaymentService] 중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
+            throw new DuplicatePaymentException();
+        }
+
         try {
-            Boolean isFirstRequest = redisTemplate.opsForValue()
-                    .setIfAbsent(redisTxKey, "Y", 24, TimeUnit.HOURS);
-
-            if (Boolean.FALSE.equals(isFirstRequest)) {
-                log.info("[PaymentService] 중복 결제 요청 조기 종료 (Redis Hit) - transactionId: {}", request.transactionId());
-                throw new DuplicatePaymentException();
-            }
-
             // Redis에서 유저 설정 통째로 가져오기
             Map<String, String> userSettings = settingsCacheService.getUserSettings(request.userId());
 
             String isInvestmentEnabled = userSettings.get("isInvestmentEnabled");
             if ("false".equals(isInvestmentEnabled)) {
                 log.info("[PaymentService] 자동 투자가 비활성화되어 결제 처리 조기 종료 - userId: {}", request.userId());
-                redisTemplate.delete(redisTxKey);
                 throw new InvestmentDisabledException();
             }
 
             // 타겟 카드 매칭 검증
-            validateTargetCard(request, userSettings, redisTxKey);
+            validateTargetCard(request, userSettings);
 
             // 2단계: 카테고리 분류
             ClassificationResult classification = classifyMerchant(request.merchant());
@@ -139,6 +140,7 @@ public class PaymentService {
                     classification.keyword(), request.amount(), spareChange,
                     recommendation.market(), recommendation.coinName());
         } catch (Exception e) {
+            // 처리하지 못했거나 업무 규칙으로 거절한 요청은 키를 지워, 같은 요청이 다시 오면 다시 판정한다
             log.error("[PaymentService] 결제 처리 중 오류 발생, Redis 캐시 정리 - transactionId: {}", request.transactionId(), e);
             redisTemplate.delete(redisTxKey);
             throw e;
@@ -148,7 +150,7 @@ public class PaymentService {
     /**
      * 타겟 카드 매칭 검증. 불일치 시 예외 발생.
      */
-    private void validateTargetCard(PaymentScrapingRequest request, Map<String, String> userSettings, String redisTxKey) {
+    private void validateTargetCard(PaymentScrapingRequest request, Map<String, String> userSettings) {
         String targetCardCompany = userSettings.get("targetCardCompany");
         String targetCardLast4 = userSettings.get("targetCardLast4");
 
@@ -157,7 +159,6 @@ public class PaymentService {
                 !request.cardNumberLast4().equals(targetCardLast4)) {
             log.info("[PaymentService] 타겟 카드 불일치 또는 온보딩 정보 부재 - userId: {}, requestCard: {} {}",
                     request.userId(), request.cardCompany(), request.cardNumberLast4());
-            redisTemplate.delete(redisTxKey);
             throw new CardMismatchException();
         }
     }
