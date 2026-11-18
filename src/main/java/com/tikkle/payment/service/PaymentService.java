@@ -39,6 +39,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class PaymentService {
+    // PAYMENT_EVENTS.merchant 컬럼 길이. 분류 키워드는 이 컬럼에 저장된다
+    private static final int KEYWORD_MAX_LENGTH = 100;
+
     private final PaymentEventRepository paymentEventRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final PaymentCategoryMappingRepository paymentCategoryMappingRepository;
@@ -175,20 +178,36 @@ public class PaymentService {
 
         // Phase 2: AI 분류
         AiClassificationResponse aiResponse = aiClassificationService.classify(merchant);
+        String keyword = fitKeywordLength(aiResponse.keyword());
 
         // 분류 결과 저장
         try {
             paymentCategoryMappingRepository.save(
                     PaymentCategoryMapping.builder()
-                            .keyword(aiResponse.keyword())
+                            .keyword(keyword)
                             .category(aiResponse.category())
                             .build()
             );
         } catch (DataIntegrityViolationException e) {
-            log.info("[PaymentService] 이미 다른 요청에서 매핑 데이터를 저장했습니다 - keyword: {}", aiResponse.keyword());
+            log.info("[PaymentService] 이미 다른 요청에서 매핑 데이터를 저장했습니다 - keyword: {}", keyword);
         }
 
-        return new ClassificationResult(aiResponse.keyword(), aiResponse.category());
+        return new ClassificationResult(keyword, aiResponse.category());
+    }
+
+    /**
+     * AI가 돌려준 키워드는 길이가 정해져 있지 않다. 원장 컬럼보다 길면 저장이 실패하므로 컬럼 길이에 맞게 자른다.
+     */
+    private static String fitKeywordLength(String keyword) {
+        if (keyword.length() <= KEYWORD_MAX_LENGTH) {
+            return keyword;
+        }
+        int end = KEYWORD_MAX_LENGTH;
+        // 이모지 같은 2칸 문자의 앞쪽만 남으면 저장할 수 없는 문자가 되므로 한 칸 더 줄인다
+        if (Character.isHighSurrogate(keyword.charAt(end - 1))) {
+            end--;
+        }
+        return keyword.substring(0, end);
     }
 
     /**
