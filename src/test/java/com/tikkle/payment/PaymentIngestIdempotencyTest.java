@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.util.List;
@@ -51,6 +52,9 @@ class PaymentIngestIdempotencyTest extends IntegrationTest {
 
     @Autowired
     private PaymentIngestRequests ingestRequests;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private User owner;
     private LinkedAccount account;
@@ -147,6 +151,55 @@ class PaymentIngestIdempotencyTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("처리 표시가 사라진 뒤 같은 요청이 와도, 원장에 미투자로 저장된 건이면 중복으로 거절하고 표시를 다시 남긴다")
+    void rejectsDuplicateOfNotInvestedEventWhenKeyIsLost() throws Exception {
+        send(AMOUNT_BELOW_MINIMUM).andExpect(status().isOk());
+        deleteTransactionKey();
+
+        send(AMOUNT_BELOW_MINIMUM)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT-009"));
+
+        assertThat(savedEvents()).hasSize(1);
+        assertThat(hasTransactionKey()).isTrue();
+    }
+
+    @Test
+    @DisplayName("처리 표시가 사라진 뒤 같은 요청이 와도, 원장에 승인 대기로 저장된 건이면 중복으로 거절하고 표시를 다시 남긴다")
+    void rejectsDuplicateOfPendingPurchaseEventWhenKeyIsLost() throws Exception {
+        testData.createCoin(BITCOIN_MARKET, "비트코인");
+
+        send(AMOUNT_TO_INVEST).andExpect(status().isOk());
+        deleteTransactionKey();
+
+        send(AMOUNT_TO_INVEST)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT-009"));
+
+        assertThat(savedEvents()).hasSize(1);
+        assertThat(hasTransactionKey()).isTrue();
+    }
+
+    @Test
+    @DisplayName("원장 저장이 유니크가 아닌 제약 위반으로 실패하면 중복으로 응답하지 않고 처리 표시를 지운다")
+    void doesNotTreatOtherConstraintViolationAsDuplicate() throws Exception {
+        testData.createCoin(BITCOIN_MARKET, "비트코인");
+
+        // 승인 대기 건은 사유가 비어 있다. 사유 컬럼을 잠시 NOT NULL 로 바꿔 유니크가 아닌 제약 위반을 만든다
+        jdbcTemplate.execute("ALTER TABLE payment_events MODIFY reason VARCHAR(255) NOT NULL");
+        try {
+            send(AMOUNT_TO_INVEST)
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.code").value("COMMON-001"));
+        } finally {
+            jdbcTemplate.execute("ALTER TABLE payment_events MODIFY reason VARCHAR(255) NULL");
+        }
+
+        assertThat(savedEvents()).isEmpty();
+        assertThat(hasTransactionKey()).isFalse();
+    }
+
+    @Test
     @DisplayName("등록한 카드와 다른 카드의 결제는 다시 보내도 같은 거절(PAYMENT-008)을 받고 원장과 처리 표시가 남지 않는다")
     void rejectsCardMismatchEveryTime() throws Exception {
         String body = ingestRequests.body(owner.getId(), "KBANK", "9999", MERCHANT, AMOUNT_TO_INVEST, TRANSACTION_ID);
@@ -211,5 +264,9 @@ class PaymentIngestIdempotencyTest extends IntegrationTest {
 
     private boolean hasTransactionKey() {
         return Boolean.TRUE.equals(redisTemplate.hasKey(TX_KEY_PREFIX + TRANSACTION_ID));
+    }
+
+    private void deleteTransactionKey() {
+        redisTemplate.delete(TX_KEY_PREFIX + TRANSACTION_ID);
     }
 }

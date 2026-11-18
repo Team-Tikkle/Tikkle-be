@@ -22,6 +22,7 @@ import com.tikkle.payment.service.component.SpareChangeCalculator;
 import com.tikkle.settings.service.SettingsCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -128,17 +129,15 @@ public class PaymentService {
             // 4단계: 코인 추천 후 응답
             CoinRecommendation recommendation = targetCoinRecommendationService.recommendCoin(request.userId());
 
-            PaymentEvent savedEvent = self.saveEvent(request, classification.keyword(), spareChange,
+            PaymentEvent savedEvent = saveEventOrRejectDuplicate(request, classification.keyword(), spareChange,
                     PaymentStatus.PENDING_PURCHASE, null, classification.category(), recommendation.coin());
-
-            if (savedEvent == null) {
-                log.info("[PaymentService] 동시성 중복 결제 감지 (DB Constraint Violation) - transactionId: {}", request.transactionId());
-                throw new DuplicatePaymentException();
-            }
 
             return new PaymentScrapingResponse(savedEvent.getId(), PaymentActionType.PENDING_PURCHASE,
                     classification.keyword(), request.amount(), spareChange,
                     recommendation.market(), recommendation.coinName());
+        } catch (DuplicatePaymentException e) {
+            // 원장에 이미 있는 거래다. 방금 선점한 키를 남겨 다음 중복 요청이 Redis 단계에서 끝나게 한다
+            throw e;
         } catch (Exception e) {
             // 처리하지 못했거나 업무 규칙으로 거절한 요청은 키를 지워, 같은 요청이 다시 오면 다시 판정한다
             log.error("[PaymentService] 결제 처리 중 오류 발생, Redis 캐시 정리 - transactionId: {}", request.transactionId(), e);
@@ -198,39 +197,51 @@ public class PaymentService {
     private PaymentScrapingResponse handleNotInvested(PaymentScrapingRequest request, ClassificationResult classification,
                                                       int spareChange, String reason, PaymentActionType actionType) {
         // NOT_INVESTED 이벤트도 코인 추천 없이 저장
-        self.saveEvent(request, classification.keyword(), spareChange, PaymentStatus.NOT_INVESTED, reason, classification.category(), null);
+        saveEventOrRejectDuplicate(request, classification.keyword(), spareChange, PaymentStatus.NOT_INVESTED, reason, classification.category(), null);
         return new PaymentScrapingResponse(null, actionType, classification.keyword(), request.amount(), spareChange, null, null);
     }
 
+    /**
+     * 결제 이벤트를 저장하고, 같은 거래가 원장에 이미 있으면(유니크 제약 위반) 중복 요청으로 거절한다.
+     * 제약 위반이 나면 저장 트랜잭션은 롤백 전용이 되어, 그 안에서 예외를 잡아도 커밋 단계에서 다시 실패한다.
+     * 그래서 트랜잭션이 끝난 뒤인 여기서 잡는다. 유니크가 아닌 제약 위반은 중복이 아니므로 그대로 던진다.
+     */
+    private PaymentEvent saveEventOrRejectDuplicate(PaymentScrapingRequest request, String keyword, Integer spareChange,
+                                                    PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
+        try {
+            return self.saveEvent(request, keyword, spareChange, status, reason, category, targetCoin);
+        } catch (DataIntegrityViolationException e) {
+            if (e.getCause() instanceof ConstraintViolationException violation && violation.getKind() == ConstraintKind.UNIQUE) {
+                log.warn("[PaymentService] 원장에 이미 있는 결제 요청 (DB Constraint Violation) - transactionId: {}, cause: {}",
+                        request.transactionId(), e.getMessage());
+                throw new DuplicatePaymentException();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * 결제 이벤트를 원장에 저장한다. 제약 위반은 잡지 않고 그대로 던진다.
+     */
     @Transactional
     public PaymentEvent saveEvent(PaymentScrapingRequest request, String keyword, Integer spareChange,
                                    PaymentStatus status, String reason, PaymentCategory category, Coin targetCoin) {
         log.info("[PaymentService] 결제 이벤트 저장 시도 - status: {}, spareChange: {}", status, spareChange);
-        try {
-            PaymentEvent event = PaymentEvent.builder()
-                    .userId(request.userId())
-                    .cardCompany(request.cardCompany())
-                    .cardNumberLast4(request.cardNumberLast4())
-                    .merchant(keyword != null ? keyword : request.merchant())
-                    .rawMerchant(request.merchant())
-                    .amount(request.amount())
-                    .spareChange(spareChange)
-                    .category(category)
-                    .transactionId(request.transactionId())
-                    .status(status)
-                    .reason(reason)
-                    .targetCoin(targetCoin)
-                    .build();
+        PaymentEvent event = PaymentEvent.builder()
+                .userId(request.userId())
+                .cardCompany(request.cardCompany())
+                .cardNumberLast4(request.cardNumberLast4())
+                .merchant(keyword != null ? keyword : request.merchant())
+                .rawMerchant(request.merchant())
+                .amount(request.amount())
+                .spareChange(spareChange)
+                .category(category)
+                .transactionId(request.transactionId())
+                .status(status)
+                .reason(reason)
+                .targetCoin(targetCoin)
+                .build();
 
-            return paymentEventRepository.save(event);
-        } catch (DataIntegrityViolationException e) {
-            if (e.getCause() instanceof ConstraintViolationException) {
-                log.warn("[PaymentService] DataIntegrityViolationException 발생. 동시성 중복 결제 가능성 - transactionId: {}, cause: {}",
-                        request.transactionId(), e.getMessage());
-                return null;
-            } else {
-                throw e;
-            }
-        }
+        return paymentEventRepository.save(event);
     }
 }
