@@ -8,6 +8,7 @@ import com.tikkle.notification.service.PushNotificationService;
 import com.tikkle.payment.scheduler.PendingOrderExpirationScheduler;
 import com.tikkle.payment.scheduler.UpbitDepositPollingScheduler;
 import com.tikkle.payment.scheduler.UpbitTradePollingScheduler;
+import com.tikkle.payment.service.AiClassificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +33,8 @@ import org.springframework.test.web.servlet.MockMvc;
  *   <li>AI 모델도 가짜로 바꿔 실제 호출이 나가지 않게 합니다.</li>
  *   <li>푸시 알림 발송도 가짜로 바꿉니다. 테스트 환경에는 FCM 이 꺼져 있어 원래도 발송되지 않으며,
  *       가짜로 바꾸면 어떤 종류의 알림을 보내려 했는지 검증할 수 있습니다.</li>
- *   <li>코인 추천은 실제 빈을 그대로 쓰되 감싸 둡니다. 동작은 바뀌지 않고, 몇 번 호출됐는지만 셀 수 있습니다.</li>
+ *   <li>코인 추천과 가맹점 분류는 실제 빈을 그대로 쓰되 감싸 둡니다. 평소 동작은 바뀌지 않고, 몇 번 호출됐는지 세거나
+ *       필요한 테스트에서만 분류 결과를 정해 줄 수 있습니다.</li>
  * </ul>
  *
  * 가짜로 바꾸는 빈을 이 클래스에 모아 두면 모든 테스트가 스프링 컨텍스트 하나를 함께 씁니다.
@@ -72,6 +74,9 @@ public abstract class IntegrationTest {
 
     @MockitoSpyBean
     protected TargetCoinRecommendationService targetCoinRecommendationService;
+
+    @MockitoSpyBean
+    protected AiClassificationService aiClassificationService;
 
     @Autowired
     protected MockMvc mockMvc;
