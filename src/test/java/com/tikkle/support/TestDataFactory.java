@@ -3,10 +3,15 @@ package com.tikkle.support;
 import com.tikkle.global.security.jwt.JwtProvider;
 import com.tikkle.investment.entity.Coin;
 import com.tikkle.investment.repository.CoinRepository;
+import com.tikkle.payment.entity.PaymentCategoryMapping;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.PaymentStatus;
+import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
+import com.tikkle.settings.entity.CategorySpareChangeRule;
+import com.tikkle.settings.repository.CategorySpareChangeRuleRepository;
 import com.tikkle.user.entity.LinkedAccount;
 import com.tikkle.user.entity.User;
 import com.tikkle.user.entity.enums.TwoFactorProvider;
@@ -21,7 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 테스트에 필요한 사용자·연동 계정·코인·결제 이벤트를 만들어 저장하고, 인증 헤더를 발급합니다.
+ * 테스트에 필요한 사용자·연동 계정·잔돈 규칙·분류 사전·코인·결제 이벤트를 만들어 저장하고, 인증 헤더를 발급합니다.
  * 값은 전부 테스트용 가짜 값입니다.
  */
 @TestComponent
@@ -34,6 +39,8 @@ public class TestDataFactory {
     private final LinkedAccountRepository linkedAccountRepository;
     private final PaymentEventRepository paymentEventRepository;
     private final CoinRepository coinRepository;
+    private final CategorySpareChangeRuleRepository categorySpareChangeRuleRepository;
+    private final PaymentCategoryMappingRepository paymentCategoryMappingRepository;
     private final JwtProvider jwtProvider;
 
     // 전화번호는 UNIQUE 라서 테스트마다 겹치지 않게 번호를 올린다
@@ -43,11 +50,15 @@ public class TestDataFactory {
                            LinkedAccountRepository linkedAccountRepository,
                            PaymentEventRepository paymentEventRepository,
                            CoinRepository coinRepository,
+                           CategorySpareChangeRuleRepository categorySpareChangeRuleRepository,
+                           PaymentCategoryMappingRepository paymentCategoryMappingRepository,
                            JwtProvider jwtProvider) {
         this.userRepository = userRepository;
         this.linkedAccountRepository = linkedAccountRepository;
         this.paymentEventRepository = paymentEventRepository;
         this.coinRepository = coinRepository;
+        this.categorySpareChangeRuleRepository = categorySpareChangeRuleRepository;
+        this.paymentCategoryMappingRepository = paymentCategoryMappingRepository;
         this.jwtProvider = jwtProvider;
     }
 
@@ -71,6 +82,28 @@ public class TestDataFactory {
                 .targetCardCompany("KBANK")
                 .targetCardLast4("1234")
                 .twoFactorProvider(twoFactorProvider)
+                .build());
+    }
+
+    /**
+     * 사용자가 한 카테고리에 설정한 잔돈 규칙을 만듭니다.
+     */
+    public CategorySpareChangeRule createSpareChangeRule(User user, PaymentCategory category, RuleType ruleType) {
+        return categorySpareChangeRuleRepository.save(CategorySpareChangeRule.builder()
+                .user(user)
+                .category(category)
+                .ruleType(ruleType)
+                .build());
+    }
+
+    /**
+     * 가맹점 이름에 이 키워드가 들어 있으면 주어진 카테고리로 분류되도록 분류 사전에 한 줄을 넣습니다.
+     * 사전에 있는 가맹점은 AI 분류를 거치지 않습니다.
+     */
+    public PaymentCategoryMapping createCategoryMapping(String keyword, PaymentCategory category) {
+        return paymentCategoryMappingRepository.save(PaymentCategoryMapping.builder()
+                .keyword(keyword)
+                .category(category)
                 .build());
     }
 

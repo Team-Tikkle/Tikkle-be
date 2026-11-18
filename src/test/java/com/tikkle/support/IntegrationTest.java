@@ -3,6 +3,7 @@ package com.tikkle.support;
 import com.tikkle.insight.scheduler.MarketTopicScheduler;
 import com.tikkle.investment.scheduler.AiPortfolioScheduler;
 import com.tikkle.investment.scheduler.CoinSyncScheduler;
+import com.tikkle.investment.service.TargetCoinRecommendationService;
 import com.tikkle.notification.service.PushNotificationService;
 import com.tikkle.payment.scheduler.PendingOrderExpirationScheduler;
 import com.tikkle.payment.scheduler.UpbitDepositPollingScheduler;
@@ -17,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -30,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
  *   <li>AI 모델도 가짜로 바꿔 실제 호출이 나가지 않게 합니다.</li>
  *   <li>푸시 알림 발송도 가짜로 바꿉니다. 테스트 환경에는 FCM 이 꺼져 있어 원래도 발송되지 않으며,
  *       가짜로 바꾸면 어떤 종류의 알림을 보내려 했는지 검증할 수 있습니다.</li>
+ *   <li>코인 추천은 실제 빈을 그대로 쓰되 감싸 둡니다. 동작은 바뀌지 않고, 몇 번 호출됐는지만 셀 수 있습니다.</li>
  * </ul>
  *
  * 가짜로 바꾸는 빈을 이 클래스에 모아 두면 모든 테스트가 스프링 컨텍스트 하나를 함께 씁니다.
@@ -37,7 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({TestcontainersConfig.class, DatabaseCleaner.class, TestDataFactory.class})
+@Import({TestcontainersConfig.class, DatabaseCleaner.class, TestDataFactory.class, PaymentIngestRequests.class})
 public abstract class IntegrationTest {
 
     @MockitoBean
@@ -66,6 +69,9 @@ public abstract class IntegrationTest {
 
     @MockitoBean
     protected PushNotificationService pushNotificationService;
+
+    @MockitoSpyBean
+    protected TargetCoinRecommendationService targetCoinRecommendationService;
 
     @Autowired
     protected MockMvc mockMvc;
