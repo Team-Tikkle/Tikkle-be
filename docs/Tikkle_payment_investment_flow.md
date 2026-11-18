@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 문서 버전 | 2.3 |
+| 문서 버전 | 2.4 |
 | 최종 수정일 | 2026-11-18 |
 | 작성 기준 | 백엔드 코드(`com.tikkle.payment` / `upbit` / `investment`) 및 `Tikkle_requirements.md`(FEAT-SYS-001~006) 대조 |
 | 대체 문서 | 구 `payment_flow.md`(초기 설계서), 구 `auto_trade_flow_final.md`(FE 연동 가이드) — 본 문서로 통합 |
@@ -79,14 +79,18 @@ sequenceDiagram
 
 **요청 본문** (`PaymentScrapingRequest`)
 
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `userId` | Long | 사용자 ID |
-| `cardCompany` | String | 카드사명 (예: `KBANK`) |
-| `cardNumberLast4` | String | 카드 번호 끝 4자리 |
-| `merchant` | String | 가맹점명 원문 (예: "스타벅스 강남점") |
-| `amount` | Integer | 결제 금액 (양수) |
-| `transactionId` | String | 앱이 생성한 고유 트랜잭션 ID (멱등성 키) |
+| 필드 | 타입 | 설명 | 제한 |
+| --- | --- | --- | --- |
+| `userId` | Long | 사용자 ID | 양수 |
+| `cardCompany` | String | 카드사명 (예: `KBANK`) | 50자 이하 |
+| `cardNumberLast4` | String | 카드 번호 끝 4자리 | 숫자 4자리 |
+| `merchant` | String | 가맹점명 원문 (예: "스타벅스 강남점") | 100자 이하 |
+| `amount` | Integer | 결제 금액 | 양수 |
+| `transactionId` | String | 앱이 생성한 고유 트랜잭션 ID (멱등성 키) | 255자 이하 |
+
+- 길이 제한은 원장(`PAYMENT_EVENTS`) 컬럼 길이와 같다. 넘는 값은 잘라서 받지 않고 **400 `COMMON-002`** 로 거절한다. 필수 값이 빠졌을 때와 같은 응답이다.
+- 검증은 서명 검사(§4)를 통과한 뒤, 중복 판정(§5)보다 먼저 한다. 검증에서 걸린 요청은 멱등 키와 원장을 남기지 않고 분류·추천도 하지 않는다.
+- 본문은 **8KB 이하**여야 한다. 넘으면 서명 검사보다 먼저 **413 `COMMON-005`** 로 거절한다(§4). 정상 요청의 본문은 1KB에 못 미친다.
 
 **응답 본문** (`PaymentScrapingResponse`)
 
@@ -102,10 +106,11 @@ sequenceDiagram
 
 ## 4. 1단계 — 보안 검증 (FEAT-SYS-001)
 
-`RequestBodyCachingFilter`(본문 캐싱) → `PaymentSecurityInterceptor` 순으로 동작한다.
+`RequestBodyCachingFilter`(본문 크기 확인 + 캐싱) → `PaymentSecurityInterceptor` 순으로 동작한다.
 
 | 검증 | 규칙 | 실패 시 |
 | --- | --- | --- |
+| 본문 크기 | 8KB 이하. `Content-Length`가 상한을 넘으면 본문을 읽지 않고 거절하고, 길이를 알리지 않은 요청은 상한까지만 읽어 넘는지 확인한다. 서명을 확인하기 전에 본문을 메모리에 올리기 때문에 가장 먼저 본다 | `COMMON-005` (413) |
 | 헤더 존재 | `X-Tikkle-Signature`, `X-Tikkle-Timestamp`(epoch 초) 필수 | `PAYMENT-001` (401) |
 | 전송 지연 | 서버 시각과 타임스탬프 차이가 **±5분(300초) 이내** | `PAYMENT-002` (401) |
 | 서명 무결성 | `HMAC-SHA256(rawBody + timestamp, secretKey)`를 Base64로 비교. 시크릿은 앱(`VITE_PAYMENT_SECRET_KEY`)과 서버(`tikkle.payment.secret-key`)가 공유 | `PAYMENT-001` (401) |
@@ -141,7 +146,7 @@ sequenceDiagram
 ### 6.1 2-Tier 카테고리 분류 (FEAT-SYS-003)
 
 1. **1차 (사전 HIT)**: `PAYMENT_CATEGORY_MAPPING` 테이블에서 가맹점명 부분 일치 검색 → 히트 시 즉시 확정
-2. **2차 (AI 폴백)**: 미스 시 **동기 Gemini 호출**(gemini-2.5-flash)로 핵심 키워드 추출 + 7개 카테고리(CAFE/MART/FOOD/SHOPPING/TRAFFIC/CULTURE/ETC) 중 분류. 결과는 사전에 저장되어 **전역적으로 학습 누적**된다(다음부터는 1차에서 히트).
+2. **2차 (AI 폴백)**: 미스 시 **동기 Gemini 호출**(gemini-2.5-flash)로 핵심 키워드 추출 + 7개 카테고리(CAFE/MART/FOOD/SHOPPING/TRAFFIC/CULTURE/ETC) 중 분류. 결과는 사전에 저장되어 **전역적으로 학습 누적**된다(다음부터는 1차에서 히트). AI가 돌려준 키워드가 100자(원장 `merchant` 컬럼 길이)를 넘으면 100자로 잘라 사전과 원장에 쓴다.
 3. **AI 장애 폴백**: 응답 5초 초과·오류·데이터 누락 시 `ETC` 카테고리로 폴백하고 파이프라인은 중단 없이 진행한다.
 
 ### 6.2 잔돈 계산 (`SpareChangeCalculator`)

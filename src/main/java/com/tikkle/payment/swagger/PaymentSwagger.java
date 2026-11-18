@@ -22,13 +22,17 @@ public interface PaymentSwagger {
                             @ExampleObject(name = "정상 처리 (매수 대기)", value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": { \"paymentEventId\": 10293, \"actionType\": \"PENDING_PURCHASE\", \"cleanMerchantName\": \"스타벅스\", \"paymentAmount\": 4500, \"spareChange\": 5500, \"market\": \"KRW-BTC\", \"coinName\": \"비트코인\" } }"),
                             @ExampleObject(name = "AI 분류 실패/타임아웃 (ETC 폴백)", value = "{ \"code\": \"SUCCESS\", \"message\": \"요청에 성공했습니다.\", \"data\": { \"paymentEventId\": null, \"actionType\": \"IGNORE_NO_SPARE_CHANGE\", \"cleanMerchantName\": \"스타벅스일산문화센터\", \"paymentAmount\": 4500, \"spareChange\": 0, \"market\": null, \"coinName\": null } }")
                     })),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청 (필수 파라미터 누락 등)",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청 (필수 값 누락, 필드 길이·형식 오류). 서명 검사를 통과한 뒤 판정합니다.",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
-                            value = "{ \"code\": \"COMMON-001\", \"message\": \"잘못된 요청 파라미터입니다.\" }"
+                            value = "{ \"code\": \"COMMON-002\", \"message\": \"가맹점명은 100자 이하여야 합니다.\" }"
                     ))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "보안 검증 실패 (서명 불일치 또는 타임스탬프 5분 만료)",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(
                             value = "{ \"code\": \"PAYMENT-001\", \"message\": \"유효하지 않은 서명입니다.\" }"
+                    ))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "413", description = "본문 크기 초과 (8KB). 서명 검사보다 먼저 판정합니다.",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(
+                            value = "{ \"code\": \"COMMON-005\", \"message\": \"업로드 가능한 파일 용량을 초과했습니다.\" }"
                     )))
     })
     ApiResponse<PaymentScrapingResponse> receivePaymentScraping(PaymentScrapingRequest request);
