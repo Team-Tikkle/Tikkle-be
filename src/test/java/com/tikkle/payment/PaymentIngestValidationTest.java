@@ -1,8 +1,11 @@
 package com.tikkle.payment;
 
+import com.tikkle.payment.dto.response.AiClassificationResponse;
+import com.tikkle.payment.entity.PaymentCategoryMapping;
 import com.tikkle.payment.entity.PaymentEvent;
 import com.tikkle.payment.entity.enums.PaymentCategory;
 import com.tikkle.payment.entity.enums.RuleType;
+import com.tikkle.payment.repository.PaymentCategoryMappingRepository;
 import com.tikkle.payment.repository.PaymentEventRepository;
 import com.tikkle.support.IntegrationTest;
 import com.tikkle.support.PaymentIngestRequests;
@@ -24,13 +27,15 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 결제 수신 API(POST /api/payments)가 요청 필드의 길이·형식을 검증하는지 확인합니다.
+ * 결제 수신 API(POST /api/payments)가 요청 필드의 길이·형식을 검증하고,
+ * 분류 키워드를 원장 컬럼 길이에 맞추는지 확인합니다.
  */
 class PaymentIngestValidationTest extends IntegrationTest {
 
@@ -50,6 +55,9 @@ class PaymentIngestValidationTest extends IntegrationTest {
 
     @Autowired
     private PaymentEventRepository paymentEventRepository;
+
+    @Autowired
+    private PaymentCategoryMappingRepository paymentCategoryMappingRepository;
 
     @Autowired
     private LinkedAccountRepository linkedAccountRepository;
@@ -135,6 +143,45 @@ class PaymentIngestValidationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("COMMON-002"));
 
         assertNothingProcessed(TRANSACTION_ID);
+    }
+
+    @Test
+    @DisplayName("AI가 100자를 넘는 키워드를 돌려주면 100자로 잘라 원장·분류 사전·응답에 쓴다")
+    void truncatesAiKeywordOverLength() throws Exception {
+        String unknownMerchant = "처음 보는 가게 본점";
+        String longKeyword = "가".repeat(MERCHANT_MAX + 50);
+        String expectedKeyword = "가".repeat(MERCHANT_MAX);
+        doReturn(new AiClassificationResponse(longKeyword, PaymentCategory.CAFE))
+                .when(aiClassificationService).classify(unknownMerchant);
+
+        send(CARD_COMPANY, CARD_LAST4, unknownMerchant, TRANSACTION_ID)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actionType").value("PENDING_PURCHASE"))
+                .andExpect(jsonPath("$.data.cleanMerchantName").value(expectedKeyword));
+
+        assertThat(savedEvents()).singleElement()
+                .extracting(PaymentEvent::getMerchant).isEqualTo(expectedKeyword);
+        assertThat(paymentCategoryMappingRepository.findAll())
+                .extracting(PaymentCategoryMapping::getKeyword)
+                .containsExactlyInAnyOrder("스타벅스", expectedKeyword);
+    }
+
+    @Test
+    @DisplayName("키워드를 자르는 자리에 이모지가 걸리면 반쪽 문자를 남기지 않는다")
+    void doesNotSplitSurrogatePairWhenTruncatingKeyword() throws Exception {
+        String unknownMerchant = "처음 보는 가게 본점";
+        // 100번째 자리에 2칸을 쓰는 문자(이모지)의 앞쪽이 온다
+        String longKeyword = "가".repeat(MERCHANT_MAX - 1) + "😀" + "나".repeat(10);
+        String expectedKeyword = "가".repeat(MERCHANT_MAX - 1);
+        doReturn(new AiClassificationResponse(longKeyword, PaymentCategory.CAFE))
+                .when(aiClassificationService).classify(unknownMerchant);
+
+        send(CARD_COMPANY, CARD_LAST4, unknownMerchant, TRANSACTION_ID)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cleanMerchantName").value(expectedKeyword));
+
+        assertThat(savedEvents()).singleElement()
+                .extracting(PaymentEvent::getMerchant).isEqualTo(expectedKeyword);
     }
 
     private ResultActions send(String cardCompany, String cardNumberLast4, String merchant, String transactionId) throws Exception {
