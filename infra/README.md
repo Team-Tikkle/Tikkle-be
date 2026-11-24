@@ -283,6 +283,61 @@ cd /home/ec2-user/Tikkle-be && docker compose logs app | grep CoinSyncScheduler
 - [ ] `dig api.tikkle.xyz` → Elastic IP
 - [ ] 메일 송·수신 정상 (`support@tikkle.xyz`)
 
+## 11. nginx 설정을 바꿨을 때 서버에 반영하기
+
+`infra/nginx/tikkle.conf` 를 고쳐 머지해도 서버의 nginx 는 바뀌지 않는다.
+
+| 사실 | 근거 |
+| --- | --- |
+| 서버 파일(`/etc/nginx/conf.d/tikkle.conf`)은 부트스트랩 때 한 번 복사됐다 | `bootstrap.sh` 5단계 |
+| 그 뒤 certbot 이 같은 파일에 443 블록·인증서 경로·HTTP 리다이렉트를 넣었다 | `bootstrap.sh` 6단계 (`certbot --nginx`) |
+| 배포는 nginx 를 건드리지 않는다 | `deploy-remote.sh` |
+
+그래서 서버 파일을 레포 파일로 덮어쓰면 certbot 이 넣은 줄이 사라진다. **바뀐 부분만 서버 파일에 넣는다.**
+`bootstrap.sh` 를 다시 돌려도 레포 파일로 덮어쓰므로, 그 뒤에는 certbot 을 다시 실행해야 한다.
+
+Session Manager 로 접속해서:
+
+```bash
+# 1. 버전 확인과 백업 (백업은 conf.d 밖에 둔다. 안에 두면 함께 읽힌다)
+nginx -v
+sudo cp /etc/nginx/conf.d/tikkle.conf /home/ec2-user/tikkle.conf.bak-$(date +%Y%m%d%H%M)
+
+# 2. 바뀐 부분을 서버 파일에 넣는다
+#    certbot 이 넣은 listen 443 · ssl_* · 리다이렉트 줄은 그대로 둔다
+sudo vi /etc/nginx/conf.d/tikkle.conf
+
+# 3. 문법 확인 → 통과하면 다시 읽는다 (reload 는 열려 있는 연결을 끊지 않는다)
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. 문제가 있으면 백업으로 되돌린다
+sudo cp /home/ec2-user/tikkle.conf.bak-<시각> /etc/nginx/conf.d/tikkle.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+반영한 뒤 밖에서 확인한다.
+
+- [ ] `https://api.tikkle.xyz/swagger-ui/index.html` 200
+- [ ] 16KB 를 넘는 `POST /api/payments` 본문 → 413
+- [ ] SSE: `GET /api/payments/{id}/stream` 이 버퍼링 없이 바로 이벤트를 흘린다
+
+### 지금 설정의 제한 값
+
+본문 크기는 전역 1MB, 결제 수신(`/api/payments`)만 16KB 다.
+요청 수는 접속 IP 기준으로 세고, 넘으면 429 로 답한다.
+
+| 대상 | 경로 | 제한 |
+| --- | --- | --- |
+| SMS 발송·확인 | `/api/auth/sms/*`, `/api/auth/password/reset-sms/*` | 분당 3회 + 한 번에 5회까지 더 |
+| 로그인·가입·비밀번호 재설정 | `/api/auth/login`, `/api/auth/signup`, `/api/auth/password/reset` | 분당 10회 + 한 번에 10회까지 더 |
+| 결제 수신 | `POST /api/payments` (같은 주소의 GET 은 세지 않는다) | 분당 30회 + 한 번에 20회까지 더 |
+| 동시 연결 | 모든 경로 (SSE 포함) | IP 당 20개 |
+
+토큰 재발급(`/api/auth/reissue`)처럼 앱이 자동으로 부르는 경로는 요청 수를 세지 않는다.
+
+> 앞에 로드 밸런서나 CDN 을 두면 nginx 가 보는 접속 IP 가 그쪽 주소가 되어 모든 사용자가 한 IP 로 세진다.
+> 그때는 실제 클라이언트 IP 를 읽는 설정(`real_ip_header` 등)을 함께 넣어야 한다.
+
 ---
 
 ## 비용 (추정)
