@@ -14,3 +14,9 @@ import {
   to = aws_route53_record.api
   id = "Z0712434KT7AJSJ8UE8C_api.tikkle.xyz_A"
 }
+
+# 콘솔에서 만든 월 예산. 가져오기 ID는 "계정 번호:예산 이름"이라 계정 번호를 코드에 적지 않고 읽어 온다.
+import {
+  to = aws_budgets_budget.monthly
+  id = "${local.account_id}:My Monthly Cost Budget"
+}

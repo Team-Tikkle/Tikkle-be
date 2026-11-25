@@ -1,0 +1,6 @@
+# 이 파일을 terraform.tfvars 로 복사해 값을 넣는다. terraform.tfvars 는 git에 올리지 않는다.
+
+budget_emails = ["you@example.com"]
+
+# 기본값 85. 바꿀 때만 적는다.
+# budget_limit_usd = 85
