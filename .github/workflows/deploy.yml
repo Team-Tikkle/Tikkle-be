@@ -3,6 +3,8 @@ name: Tikkle Backend CI/CD Pipeline
 on:
   push:
     branches: [ "main" ] # main 브랜치에 코드가 푸시될 때 작동
+    paths-ignore:
+      - "infra/terraform/**" # 인프라 코드만 바뀐 머지는 앱을 다시 배포하지 않는다
 
 env:
   AWS_REGION: "ap-northeast-2"
