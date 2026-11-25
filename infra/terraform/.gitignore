@@ -1,0 +1,16 @@
+# 공급자 바이너리와 로컬 상태 (상태는 S3 버킷에 둔다)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# 계정 번호가 들어가는 백엔드 설정
+backend.hcl
+
+# 개인 변수 파일
+*.auto.tfvars
+terraform.tfvars
+
+# .terraform.lock.hcl 은 커밋한다 (공급자 버전 고정)
