@@ -1,113 +1,76 @@
 name: Tikkle Backend CI/CD Pipeline
 
+# main 에 머지되면 운영 서버에 배포한다. 서버 1대라 배포 중 앱이 다시 뜨는 동안 잠깐 502 가 난다.
+# 테스트는 PR 에서 이미 통과했다(main 보호의 필수 검사 "test"). 여기서는 다시 돌리지 않는다.
+# 되돌리기는 rollback.yml(직전 이미지 태그를 손으로 고른다).
 on:
   push:
-    branches: [ "main" ] # main 브랜치에 코드가 푸시될 때 작동
+    branches: [ "main" ]
     paths-ignore:
       - "infra/terraform/**" # 인프라 코드만 바뀐 머지는 앱을 다시 배포하지 않는다
 
+# 배포와 되돌리기가 겹치지 않게 한 번에 하나만 돈다. 진행 중인 배포는 취소하지 않는다
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+# OIDC(키리스 인증)에 필요한 권한만. 액세스 키를 Secrets 에 넣지 않는다
+permissions:
+  contents: read
+  id-token: write
+
 env:
-  AWS_REGION: "ap-northeast-2"
-  ECR_REPOSITORY: "tikkle-be"
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: tikkle-be
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    # OIDC(키리스 인증)에 필요한 권한. 액세스 키를 Secrets 에 넣지 않는다.
-    permissions:
-      contents: 'read'
-      id-token: 'write'
+  deploy:
+    # 운영 서버가 arm64(t4g)라 arm64 러너에서 그대로 빌드한다
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
 
     steps:
-      - name: 1. 레포지토리 코드 체크아웃
-        uses: actions/checkout@v4
+      # 액션은 커밋 SHA 로 고정한다(태그는 옮겨질 수 있다). 주석은 그 SHA 의 릴리스
+      - name: 1. 코드 체크아웃
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: 2. application-prod.yml 설정 파일 생성 (Secrets 주입)
-        # 시크릿을 env 로 넘기고 printf 로 쓴다. run 블록에 직접 치환하면 yml 안의
-        # ${DB_URL} 같은 Spring placeholder 를 러너의 bash 가 빈 값으로 확장해 버린다.
-        env:
-          APPLICATION_PROD_YML: ${{ secrets.APPLICATION_PROD_YML }}
-        run: |
-          mkdir -p src/main/resources
-          printf '%s\n' "$APPLICATION_PROD_YML" > src/main/resources/application-prod.yml
-
-      - name: 3. Java 21 JDK 세팅
-        uses: actions/setup-java@v4
+      - name: 2. Java 21 (Gradle 캐시)
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
+          distribution: temurin
           java-version: '21'
-          distribution: 'temurin'
+          cache: gradle
 
-      - name: 4. Gradle 빌드 (테스트는 스킵하여 배포 속도 향상 및 DB 에러 방지)
+      - name: 3. jar 빌드
         run: |
           chmod +x gradlew
-          ./gradlew clean build -x test
+          ./gradlew --no-daemon clean bootJar
 
-      - name: 5. AWS 인증 (OIDC - Keyless Auth)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: 4. AWS 인증 (OIDC)
+        uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          # 공개 레포라 로그에 계정 ID 가 찍히지 않게 가린다(이미지 주소에도 들어 있다)
+          mask-aws-account-id: true
 
-      - name: 6. ECR 로그인
+      - name: 5. ECR 로그인
         id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
 
-      - name: 7. Docker 이미지 빌드 및 푸시
+      - name: 6. 이미지 빌드·푸시 (태그 = 커밋 SHA)
         id: image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
-          docker build -t "$IMAGE_URI" -t "${REGISTRY}/${ECR_REPOSITORY}:latest" .
+          IMAGE_URI="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --pull -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
-          docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
           echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
-      - name: 8. EC2 배포 (SSM Run Command)
+      - name: 7. 서버에 배포 (SSM)
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
-          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-        run: |
-          # 시크릿은 넘기지 않는다. 인스턴스가 Parameter Store 에서 직접 읽는다.
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Tikkle deploy ${GITHUB_SHA::7}" \
-            --timeout-seconds 600 \
-            --parameters "commands=[
-              'set -e',
-              'cd /home/ec2-user/Tikkle-be',
-              'git fetch origin main',
-              'git reset --hard origin/main',
-              'chmod +x infra/deploy-remote.sh',
-              'sudo -u ec2-user ./infra/deploy-remote.sh ${IMAGE_URI}'
-            ]" \
-            --query "Command.CommandId" --output text)
-
-          echo "SSM CommandId: $COMMAND_ID"
-
-          # 완료까지 대기 (aws ssm wait 는 최대 대기가 짧아 직접 폴링한다)
-          for i in $(seq 1 60); do
-            STATUS=$(aws ssm list-command-invocations \
-              --command-id "$COMMAND_ID" --details \
-              --query "CommandInvocations[0].Status" --output text)
-            echo "  [$i] status=$STATUS"
-            case "$STATUS" in
-              Success) break ;;
-              Failed|Cancelled|TimedOut) break ;;
-            esac
-            sleep 10
-          done
-
-          echo "── 원격 실행 로그 ──"
-          aws ssm list-command-invocations \
-            --command-id "$COMMAND_ID" --details \
-            --query "CommandInvocations[0].CommandPlugins[0].Output" --output text
-
-          if [ "$STATUS" != "Success" ]; then
-            echo "::error::배포 실패 (status=$STATUS)"
-            exit 1
-          fi
+        run: bash .github/scripts/deploy-via-ssm.sh "$IMAGE_URI"

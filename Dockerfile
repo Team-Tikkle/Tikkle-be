@@ -11,6 +11,10 @@ RUN groupadd --system --gid 10001 tikkle \
 WORKDIR /app
 COPY --chown=tikkle:tikkle build/libs/*.jar app.jar
 
+# 배포 파일. 서버의 배포 명령이 이 이미지에서 꺼내 쓴다 — 이미지와 compose·배포 스크립트가 늘 같은 커밋이다.
+# 앱은 이 파일들을 쓰지 않는다(운영 yml 은 jar 안의 것을 쓴다. 여기 사본은 배포 스크립트가 필요한 값 이름을 확인하는 데만 쓴다)
+COPY docker-compose.yml infra/deploy-remote.sh infra/deploy-env.py src/main/resources/application-prod.yml /app/deploy/
+
 USER tikkle
 
 # 8080: API (nginx 가 프록시), 8081: 헬스체크 전용 관리 포트(서버 안에서만 연다)
