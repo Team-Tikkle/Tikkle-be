@@ -1,0 +1,71 @@
+name: Tikkle Backend Rollback
+
+# 운영 서버를 ECR 에 있는 예전 이미지로 되돌린다. Actions 화면에서 손으로 실행한다(main 에서만).
+# 입력은 되돌릴 커밋의 SHA(40자) — ECR 이미지 태그와 같다. 그 이미지 안의 compose·배포 스크립트로 배포한다.
+# 배포가 실패하면 서버가 이미 직전 배포로 되돌리므로, 이 워크플로는 그보다 더 예전으로 가야 할 때 쓴다.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "되돌릴 이미지 태그 (커밋 SHA 40자)"
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: tikkle-be
+
+jobs:
+  rollback:
+    # 배포 역할은 main 브랜치의 워크플로만 믿는다
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - name: 1. 입력 확인
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::이미지 태그는 커밋 SHA(소문자 40자)여야 한다"
+            exit 1
+          fi
+
+      - name: 2. 코드 체크아웃 (배포 도우미 스크립트)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 3. AWS 인증 (OIDC)
+        uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: 4. ECR 로그인
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
+
+      - name: 5. 이미지가 ECR 에 있는지 확인
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          if ! aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" > /dev/null 2>&1; then
+            echo "::error::ECR 에 이 태그의 이미지가 없다(최근 10개만 남는다): $IMAGE_TAG"
+            exit 1
+          fi
+
+      - name: 6. 서버에 배포 (SSM)
+        env:
+          IMAGE_URI: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ inputs.image_tag }}
+        run: bash .github/scripts/deploy-via-ssm.sh "$IMAGE_URI"
