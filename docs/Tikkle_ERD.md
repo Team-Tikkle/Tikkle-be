@@ -2,7 +2,14 @@
 
 > 이 파일을 참고하여 API 설계, 쿼리 작성, 기능 개발 시 테이블 구조를 파악하세요.
 > **본 문서는 `src/main/java/com/tikkle` 엔티티 코드 기준으로 동기화되어 있습니다.**
-> 테이블 물리명은 전부 **대문자 스네이크 케이스**입니다 (AGENTS.md §5.4 규칙).
+> 엔티티의 `@Table` 이름은 **대문자 스네이크 케이스**입니다 (AGENTS.md §5.4 규칙). DB의 실제 테이블 이름은 Spring Boot 기본 이름 전략에 따라 **소문자**입니다 (`PAYMENT_EVENTS` → `payment_events`).
+>
+> **실제 DDL은 Flyway 마이그레이션(`src/main/resources/db/migration`)이 원본입니다.** 앱이 뜰 때 Flyway가 아직 적용하지 않은 마이그레이션을 실행하고, Hibernate는 엔티티와 스키마를 대조만 합니다(`ddl-auto: validate`). 다르면 기동이 멈춥니다.
+>
+> 스키마를 바꿀 때:
+> - 엔티티를 고치고 **새 마이그레이션 파일**(`V{다음 번호}__설명.sql`)을 함께 추가합니다. 이미 적용된 파일은 고치지 않습니다.
+> - enum에 값을 더하면 해당 ENUM 컬럼을 `ALTER TABLE … MODIFY`하는 마이그레이션이 필요합니다. `validate`는 ENUM 값 목록을 비교하지 않으므로 `SchemaMigrationTest`가 대신 확인합니다.
+> - 이 문서도 같은 PR에서 고칩니다.
 
 ---
 

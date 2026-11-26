@@ -17,12 +17,16 @@ spring:
   jpa:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
-    generate-ddl: true
     hibernate:
-      ddl-auto: update
+      # 스키마는 Flyway 마이그레이션(db/migration)이 만든다. Hibernate는 엔티티와 대조만 한다
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    # 예전에 Hibernate가 만든 로컬 DB가 있으면 V1로 표시만 하고 넘어간다(빈 DB면 V1부터 실행).
+    # 로컬 DB가 V1과 달라 기동이 멈추면 로컬 DB를 지우고 다시 만든다
+    baseline-on-migrate: true
 
   ai:
     # 결제 카테고리 분류용 (Gemini)
