@@ -1,0 +1,92 @@
+# 운영 설정. 공개 레포에 있다 — 비밀값은 SSM Parameter Store(/tikkle/prod/<이름>)의 이름과 같은
+# ${이름} 자리 표시자로만 둔다. 서버의 배포 스크립트가 SSM 값으로 .env 를 만들어 컨테이너 환경 변수로 넣는다.
+# 비밀값 자리에 평문이 들어가면 테스트(ProdConfigFileTest)가 실패한다.
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      # compose 의 서비스 이름
+      host: redis
+      port: 6379
+  jpa:
+    hibernate:
+      # 스키마는 Flyway 마이그레이션이 만든다. Hibernate는 엔티티와 대조만 하고, 다르면 기동을 멈춘다
+      ddl-auto: validate
+  lifecycle:
+    # 종료 단계마다 최대 40초. compose 의 stop_grace_period(60초)가 이보다 길어야 강제 종료되지 않는다
+    timeout-per-shutdown-phase: 40s
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          model: "gemini-2.5-flash"
+          temperature: 0.0
+    openai:
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: https://api.deepseek.com
+      chat:
+        model: deepseek-v4-flash
+        max-tokens: 16384
+        timeout: 5m
+        extra-body:
+          thinking:
+            type: disabled
+        response-format:
+          type: json_object
+
+server:
+  shutdown: graceful
+  # nginx 가 넘기는 X-Forwarded-For·X-Forwarded-Proto 를 믿는다 → 실제 접속 IP, HTTPS 인식(HSTS)
+  forward-headers-strategy: native
+
+management:
+  server:
+    # 헬스체크 전용 포트. compose 가 서버의 127.0.0.1 에만 연다(nginx 는 8080 만 프록시한다)
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
+
+tikkle:
+  payment:
+    secret-key: ${PAYMENT_SECRET_KEY}
+  encrypt:
+    secret-key: ${TIKKLE_ENCRYPT_SECRET_KEY}
+  fcm:
+    enabled: true
+    credentials-base64: ${FCM_CREDENTIALS_BASE64}
+
+app:
+  cors:
+    # https://localhost: 앱(Capacitor Android)의 출처
+    # http://localhost:5173: FE 로컬 개발 서버(Vite) — 앱 로컬 개발이 운영 API를 부른다
+    allowed-origins: http://localhost:5173,https://localhost
+
+coolsms:
+  api:
+    key: ${COOLSMS_API_KEY}
+    secret: ${COOLSMS_API_SECRET}
+  sender-number: ${COOLSMS_SENDER_NUMBER}

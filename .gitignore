@@ -65,8 +65,9 @@ Thumbs.db
 # ==========================================
 # 4. 보안 및 환경 설정 파일
 # ==========================================
-src/main/resources/application-prod.yml
-application-prod.yml
+# 운영 yml(src/main/resources/application-prod.yml)은 레포에서 관리한다 — 비밀값은 ${…} 자리 표시자만 둔다.
+# 비밀값이 든 사본을 레포 맨 위에 두는 실수만 막는다.
+/application-prod.yml
 .env
 .claude/
 

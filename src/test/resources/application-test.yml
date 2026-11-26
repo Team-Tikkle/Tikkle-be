@@ -1,6 +1,13 @@
 # 테스트 전용 설정. 아래 값은 전부 테스트용 가짜 값이며 실제 서비스의 키가 아니다.
 # DB·Redis 접속 정보는 Testcontainers 가 띄운 컨테이너에서 자동으로 주입된다(@ServiceConnection).
+# 운영(application-prod.yml)과 같은 실행 설정: 프록시 헤더를 믿고, 종료 단계마다 최대 40초를 준다
+server:
+  shutdown: graceful
+  forward-headers-strategy: native
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 40s
   jpa:
     hibernate:
       # 컨테이너 DB는 실행할 때마다 새로 뜬다. 지우는 단계 없이 만들기만 한다

@@ -38,7 +38,10 @@ public class SecurityConfig {
             "/api/auth/password/reset-sms/verify",
             "/api/auth/password/reset",
             "/swagger-ui/**",
-            "/v3/api-docs/**"
+            "/v3/api-docs/**",
+            // 헬스체크. 운영에서는 관리 포트(서버 안에서만 열림)에만 있어 밖에서는 보이지 않는다
+            "/actuator/health",
+            "/actuator/health/**"
     };
 
     @Bean
