@@ -15,13 +15,15 @@ import java.util.Set;
 
 /**
  * 테스트 사이에 데이터가 남지 않도록 MySQL 테이블과 Redis 를 비웁니다.
- * 기동 시 한 번만 채워지는 시드 테이블은 비우지 않습니다.
+ * 기동 시 한 번만 채워지는 시드 테이블과 마이그레이션 기록 테이블은 비우지 않습니다.
  */
 @TestComponent
 public class DatabaseCleaner {
 
-    // InsightDataSeeder 가 기동 시 채우는 테이블
-    private static final Set<String> SEED_TABLES = Set.of("INVESTMENT_TERMS", "BEGINNER_ARTICLES", "RECOMMENDED_VIDEOS");
+    // InsightDataSeeder 가 기동 시 채우는 테이블과, Flyway 가 적용한 마이그레이션을 기록하는 테이블.
+    // 마이그레이션 기록을 비우면 같은 DB 를 쓰는 다음 기동에서 V1 을 다시 실행하려다 실패한다
+    private static final Set<String> KEPT_TABLES = Set.of(
+            "INVESTMENT_TERMS", "BEGINNER_ARTICLES", "RECOMMENDED_VIDEOS", "FLYWAY_SCHEMA_HISTORY");
 
     private final DataSource dataSource;
     private final StringRedisTemplate redisTemplate;
@@ -50,7 +52,7 @@ public class DatabaseCleaner {
 
             statement.execute("SET FOREIGN_KEY_CHECKS = 0");
             for (String table : tables) {
-                if (!SEED_TABLES.contains(table.toUpperCase())) {
+                if (!KEPT_TABLES.contains(table.toUpperCase())) {
                     statement.execute("TRUNCATE TABLE `" + table + "`");
                 }
             }
